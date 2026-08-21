@@ -1,0 +1,65 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "content-automation/run",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b1f4a0c2-7d3e-4a91-8c5b-2e6f9a1d4c70",
+      "name": "API trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [179248, 228640],
+      "webhookId": "b1f4a0c2-7d3e-4a91-8c5b-2e6f9a1d4c70"
+    },
+    {
+      "parameters": {
+        "jsCode": "// The Webhook node wraps the POST body under `body`, while the Form Trigger\n// emits its fields flat. Flatten here so everything downstream, starting with\n// \"OnPage: start crawl\", sees the same shape either way.\nconst incoming = $json && typeof $json === 'object' ? $json : {};\nconst body = (incoming.body && typeof incoming.body === 'object') ? incoming.body : incoming;\n\n// Reject the call early if a shared secret is configured but not presented.\nconst EXPECTED_SECRET = '';\nif (EXPECTED_SECRET) {\n  const headers = incoming.headers || {};\n  const supplied = headers['x-trigger-secret'] || headers['X-Trigger-Secret'] || '';\n  if (supplied !== EXPECTED_SECRET) {\n    throw new Error('Bad or missing x-trigger-secret header.');\n  }\n}\n\nreturn [{ json: {\n  website_url: String(body.website_url || '').trim(),\n  market: String(body.market || 'gb').trim().toLowerCase(),\n  language: String(body.language || 'en').trim().toLowerCase(),\n  max_crawl_pages: Math.max(1, Math.min(10, Number(body.max_crawl_pages) || 10)),\n  brief_doc_id: String(body.brief_doc_id || '').trim()\n} }];\n"
+      },
+      "id": "c2a5b1d3-8e4f-4b02-9d6c-3f70ab2e5d81",
+      "name": "Normalise API input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [179456, 228640]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ executionId: $execution.id, startedAt: $now.toISO() }) }}",
+        "options": {}
+      },
+      "id": "d3b6c2e4-9f50-4c13-ae7d-4081bc3f6e92",
+      "name": "Return execution id",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [179664, 228640]
+    }
+  ],
+  "connections": {
+    "API trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalise API input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise API input": {
+      "main": [
+        [
+          {
+            "node": "Return execution id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {}
+}
