@@ -20,10 +20,16 @@
   --run-soft: #e8f0ff;
   --radius: 10px;
   --shadow: 0 1px 2px rgba(16, 20, 26, 0.05), 0 4px 16px rgba(16, 20, 26, 0.05);
+  --danger-bg: #c0392f;
+  --danger-bg-hover: #a52f26;
+  --run-id-ink: var(--ink);
 }
 
+/* Dark tokens apply in two situations: the viewer's OS asks for dark and they
+   have not explicitly chosen light, or they explicitly chose dark. Defining them
+   twice is what lets the toggle win over the OS in BOTH directions. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0e1116;
     --panel: #161b22;
     --panel-2: #1b212a;
@@ -44,7 +50,36 @@
     --run: #5b8dff;
     --run-soft: #17233c;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3);
+    --danger-bg: #d0453a;
+    --danger-bg-hover: #e05a4e;
+    --run-id-ink: #ffffff;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0e1116;
+  --panel: #161b22;
+  --panel-2: #1b212a;
+  --ink: #e9edf3;
+  --ink-2: #a9b4c4;
+  --ink-3: #79859a;
+  --line: #262d38;
+  --line-2: #333c4a;
+  --accent: #5b8dff;
+  --accent-ink: #0b0e13;
+  --accent-soft: #17233c;
+  --ok: #4ad295;
+  --ok-soft: #12271f;
+  --warn: #e0a94a;
+  --warn-soft: #2a2113;
+  --bad: #ff7a6e;
+  --bad-soft: #2d1715;
+  --run: #5b8dff;
+  --run-soft: #17233c;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3);
+  --danger-bg: #d0453a;
+  --danger-bg-hover: #e05a4e;
+  --run-id-ink: #ffffff;
 }
 
 * {
@@ -521,6 +556,7 @@ button,
 }
 
 .run-id {
+  color: var(--run-id-ink);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   font-size: 13px;
@@ -621,4 +657,184 @@ button,
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12.5px;
+}
+
+
+/* Sign out is destructive, so it reads red in both themes rather than
+   inheriting the muted ghost styling. The two reds are tuned per theme so
+   contrast against the panel stays legible. */
+.btn-danger {
+  border: 1px solid transparent;
+  background: var(--danger-bg);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.btn-danger:hover {
+  background: var(--danger-bg-hover);
+}
+
+.btn-danger:focus-visible {
+  outline: 2px solid var(--danger-bg);
+  outline-offset: 2px;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 88px;
+  justify-content: center;
+}
+
+.theme-toggle svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.show-more {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 4px 12px 12px;
+}
+
+/* ---------- top navigation ---------- */
+
+.topnav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 18px;
+  padding: 3px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.topnav-link {
+  display: inline-block;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.topnav-link:hover {
+  color: var(--ink);
+}
+
+.topnav-link.is-current {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* ---------- segmented filter ---------- */
+
+.seg {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.seg-btn {
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.seg-btn:hover {
+  color: var(--ink);
+}
+
+.seg-btn.is-on {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* ---------- activity log table ---------- */
+
+.logs {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.logs th {
+  text-align: left;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 600;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.logs td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  vertical-align: top;
+}
+
+.logs tr:last-child td {
+  border-bottom: 0;
+}
+
+.logs .nowrap {
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+
+.logs .detail {
+  color: var(--ink-2);
+  word-break: break-word;
+}
+
+.pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pill-ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.pill-bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.pill-run {
+  background: var(--run-soft);
+  color: var(--run);
+}
+
+.pill-idle {
+  background: var(--panel-2);
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+}
+
+/* The log table can overflow on a phone; scroll it rather than the page. */
+.card-body.tight:has(.logs) {
+  overflow-x: auto;
 }

@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { errorResponse, requireSession } from "@/lib/api-guard";
 import { listExecutions, startRun } from "@/lib/n8n";
 import { validateRunInput } from "@/lib/validate";
+import { auth } from "@/auth";
+import { record } from "@/lib/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,10 +41,27 @@ export async function POST(request: Request) {
     );
   }
 
+  const session = await auth();
+  const actor = session?.user?.email ?? "unknown";
+
   try {
     const result = await startRun(parsed.value);
+    record(
+      actor,
+      "run-started",
+      `${parsed.value.website_url} (${parsed.value.market}/${parsed.value.language}, ` +
+        `${parsed.value.max_crawl_pages} page${parsed.value.max_crawl_pages === 1 ? "" : "s"})` +
+        (result.executionId ? ` → execution #${result.executionId}` : "")
+    );
     return NextResponse.json({ ...result, input: parsed.value });
   } catch (error) {
+    record(
+      actor,
+      "run-failed",
+      `${parsed.value.website_url} — ${
+        error instanceof Error ? error.message : "Unknown error."
+      }`
+    );
     return errorResponse(error);
   }
 }

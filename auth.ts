@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 
 import { authConfig } from "./auth.config";
 import { findUser } from "./lib/users";
+import { record } from "./lib/audit";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -37,8 +38,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           ok = false;
         }
 
-        if (!user || !ok) return null;
+        if (!user || !ok) {
+          record(email, "sign-in-failed", "Wrong email or password.");
+          return null;
+        }
 
+
+        record(user.email, "sign-in", "Signed in.");
         return { id: user.email, email: user.email, name: user.name };
       },
     }),

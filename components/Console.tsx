@@ -9,6 +9,7 @@ import { formatDuration, formatWhen } from "@/lib/format";
 import type { ExecutionDetail, ExecutionSummary, N8nStatus } from "@/lib/n8n";
 
 const SELECTED_KEY = "ca:selected";
+const RUNS_PAGE = 5;
 const DETAIL_POLL = 4_000;
 const HISTORY_POLL = 15_000;
 const RESOLVE_POLL = 5_000;
@@ -37,6 +38,9 @@ export default function Console() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // The list is long and mostly noise, so it starts collapsed and grows a page
+  // at a time. Reset in loadHistory would fight the poller, so it only grows.
+  const [visibleRuns, setVisibleRuns] = useState(RUNS_PAGE);
 
   // A run we started but could not get an execution id for, so we hunt for it.
   const pending = useRef<Pending | null>(null);
@@ -255,25 +259,36 @@ export default function Console() {
             {history.length === 0 ? (
               <div className="empty">No executions yet.</div>
             ) : (
-              <ul className="runs">
-                {history.map((run) => (
-                  <li key={run.id}>
-                    <button
-                      type="button"
-                      className="run"
-                      aria-current={run.id === selectedId}
-                      onClick={() => selectRun(run.id)}
-                    >
-                      <span className="run-id">#{run.id}</span>
-                      <span className="run-meta">
-                        {formatWhen(run.startedAt)} ·{" "}
-                        {formatDuration(run.startedAt, run.stoppedAt)}
-                      </span>
-                      <StatusBadge status={run.status} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="runs">
+                  {history.slice(0, visibleRuns).map((run) => (
+                    <li key={run.id}>
+                      <button
+                        type="button"
+                        className="run"
+                        aria-current={run.id === selectedId}
+                        onClick={() => selectRun(run.id)}
+                      >
+                        <span className="run-id">#{run.id}</span>
+                        <span className="run-meta">
+                          {formatWhen(run.startedAt)} ·{" "}
+                          {formatDuration(run.startedAt, run.stoppedAt)}
+                        </span>
+                        <StatusBadge status={run.status} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {history.length > visibleRuns ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost show-more"
+                    onClick={() => setVisibleRuns((n) => n + RUNS_PAGE)}
+                  >
+                    Show more ({history.length - visibleRuns} older)
+                  </button>
+                ) : null}
+              </>
             )}
           </div>
         </div>

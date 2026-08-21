@@ -2,6 +2,8 @@
 
 import { AuthError } from "next-auth";
 import { signIn, signOut } from "@/auth";
+import { auth } from "@/auth";
+import { record } from "@/lib/audit";
 
 export type LoginState = { error: string | null };
 
@@ -25,10 +27,19 @@ export async function login(
       if (error.type === "CredentialsSignin") {
         return { error: "Email or password is not right." };
       }
-      // A missing AUTH_USERS or malformed JSON surfaces here.
+      // Auth.js wraps anything thrown inside authorize() as CallbackRouteError
+      // and hides the real message, which makes a misconfigured deployment
+      // undiagnosable from the browser. Dig the original out and show it: these
+      // messages name the offending env var and contain no secret values.
+      const cause = (error as { cause?: { err?: unknown } }).cause?.err;
+      const reason =
+        cause instanceof Error && cause.message ? cause.message : error.type;
+
       return {
         error:
-          "Sign in could not be completed. Check that AUTH_SECRET and AUTH_USERS are set.",
+          "Sign in could not be completed. " +
+          reason +
+          " (check AUTH_SECRET and AUTH_USERS in the environment)",
       };
     }
     throw error;
@@ -36,5 +47,8 @@ export async function login(
 }
 
 export async function logout(): Promise<void> {
+  // Read the session before it is destroyed, otherwise there is no actor.
+  const session = await auth();
+  record(session?.user?.email ?? "unknown", "sign-out", "Signed out.");
   await signOut({ redirectTo: "/login" });
 }

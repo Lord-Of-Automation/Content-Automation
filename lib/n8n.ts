@@ -140,21 +140,26 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
   const startedAt = new Date().toISOString();
   const mode = triggerMode();
 
-  const body =
-    mode === "webhook"
-      ? JSON.stringify(input)
-      : new URLSearchParams({
-          website_url: input.website_url,
-          market: input.market,
-          language: input.language,
-          max_crawl_pages: String(input.max_crawl_pages),
-          brief_doc_id: input.brief_doc_id,
-        }).toString();
+  // The Form Trigger asserts the submission is multipart/form-data and throws
+  // "Expected multipart/form-data" on anything else, urlencoded included. Handing
+  // fetch a FormData instance makes it write the multipart body and the boundary,
+  // so this branch must NOT set content-type itself: doing that omits the boundary
+  // and n8n cannot parse the body.
+  let body: string | FormData;
+  const headers: Record<string, string> = {};
 
-  const headers: Record<string, string> =
-    mode === "webhook"
-      ? { "content-type": "application/json" }
-      : { "content-type": "application/x-www-form-urlencoded" };
+  if (mode === "webhook") {
+    body = JSON.stringify(input);
+    headers["content-type"] = "application/json";
+  } else {
+    const form = new FormData();
+    form.set("website_url", input.website_url);
+    form.set("market", input.market);
+    form.set("language", input.language);
+    form.set("max_crawl_pages", String(input.max_crawl_pages));
+    form.set("brief_doc_id", input.brief_doc_id);
+    body = form;
+  }
 
   const secret = process.env.N8N_WEBHOOK_SECRET;
   if (secret && mode === "webhook") headers["x-trigger-secret"] = secret;
@@ -189,6 +194,16 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
+
+    // n8n serves a trigger URL only while the workflow is activated, and it
+    // auto-deactivates a workflow after repeated crashed executions. A 404 here
+    // is far more often that than a wrong URL, so name the likely cause.
+    if (response.status === 404) {
+      throw new Error(
+        "n8n returned 404 for the trigger URL, which almost always means the " +
+          "workflow is not active. Open it in n8n, switch it back on, and try again."
+      );
+    }
     throw new Error(
       `n8n trigger returned ${response.status}. ${text.slice(0, 300)}`
     );
@@ -220,29 +235,68 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
 }
 
 export async function listExecutions(limit = 20): Promise<ExecutionSummary[]> {
-  // Deliberately not filtering by status: the API rejects "running" as a filter
-  // value (n8n issue #19664), and we want in-flight runs in this list.
-  const params = new URLSearchParams({
-    workflowId: workflowId(),
-    limit: String(Math.min(Math.max(limit, 1), 250)),
-    includeData: "false",
-  });
+  const capped = Math.min(Math.max(limit, 1), 250);
 
-  const response = await apiFetch(`/executions?${params.toString()}`);
+  // The unfiltered list returns only FINISHED executions, so a run that is still
+  // in flight is missing from it until it stops. Ask for the live states as well
+  // and merge. (Older n8n rejected "running" as a filter value, issue #19664; 2.x
+  // accepts it, and an instance that still refuses just contributes nothing.)
+  //
+  // A 70s Wait node parks the execution in "waiting", not "running", so both
+  // matter here, and "new" covers a run that is queued but not yet started.
+  const queries: Array<string | null> = ["running", "waiting", "new", null];
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(
-      `n8n executions API returned ${response.status}. ${text.slice(0, 300)}`
-    );
+  const results = await Promise.all(
+    queries.map(async (status) => {
+      const params = new URLSearchParams({
+        workflowId: workflowId(),
+        limit: String(capped),
+        includeData: "false",
+      });
+      if (status) params.set("status", status);
+
+      let response: Response;
+      try {
+        response = await apiFetch(`/executions?${params.toString()}`);
+      } catch (error) {
+        // Only the unfiltered list is required; the live queries are a bonus.
+        if (status) return [];
+        throw error;
+      }
+
+      if (!response.ok) {
+        if (status) return [];
+        const text = await response.text().catch(() => "");
+        throw new Error(
+          `n8n executions API returned ${response.status}. ${text.slice(0, 300)}`
+        );
+      }
+
+      const payload = (await response.json()) as { data?: unknown };
+      return Array.isArray(payload.data) ? payload.data : [];
+    })
+  );
+
+  // Live queries are merged first so the unfiltered list, which is the one that
+  // carries a stoppedAt, wins on conflict. Without that a run finishing between
+  // the two requests would be shown as still running.
+  const byId = new Map<string, ExecutionSummary>();
+  for (const rows of results) {
+    for (const row of rows) {
+      if (!row || typeof row !== "object") continue;
+      const summary = toSummary(row as Record<string, unknown>);
+      byId.set(summary.id, summary);
+    }
   }
 
-  const payload = (await response.json()) as { data?: unknown };
-  if (!Array.isArray(payload.data)) return [];
+  const order = (id: string) => {
+    const n = Number(id);
+    return Number.isFinite(n) ? n : 0;
+  };
 
-  return payload.data
-    .filter((row): row is Record<string, unknown> => !!row && typeof row === "object")
-    .map(toSummary);
+  return [...byId.values()]
+    .sort((a, b) => order(b.id) - order(a.id))
+    .slice(0, capped);
 }
 
 /**
