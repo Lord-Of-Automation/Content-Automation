@@ -43,7 +43,7 @@ export function validateRunInput(raw: unknown): ValidationResult {
     errors.language = "Unsupported language code.";
   }
 
-  // ---- max_crawl_pages (the workflow hard-clamps this to 1..10)
+  // ---- max_crawl_pages (0 means every page; 1000 is DataForSEO's ceiling)
   const rawPages = input.max_crawl_pages;
   const pages =
     typeof rawPages === "number"
@@ -54,8 +54,24 @@ export function validateRunInput(raw: unknown): ValidationResult {
 
   if (!Number.isFinite(pages)) {
     errors.max_crawl_pages = "Required.";
-  } else if (pages < 1 || pages > 10) {
-    errors.max_crawl_pages = "Must be between 1 and 10.";
+  } else if (pages < 0 || pages > 1000) {
+    errors.max_crawl_pages = "Use 0 for every page, or a number up to 1000.";
+  }
+
+  // ---- pages_to_optimise (0 means every crawled page)
+  const rawOptimise = input.pages_to_optimise;
+  const optimise =
+    typeof rawOptimise === "number"
+      ? rawOptimise
+      : typeof rawOptimise === "string"
+        ? Number.parseInt(rawOptimise, 10)
+        : Number.NaN;
+
+  if (!Number.isFinite(optimise)) {
+    errors.pages_to_optimise = "Required.";
+  } else if (optimise < 0 || optimise > 1000) {
+    errors.pages_to_optimise =
+      "Use 0 for every crawled page, or a number up to 1000.";
   }
 
   // ---- brief_doc_id
@@ -78,6 +94,7 @@ export function validateRunInput(raw: unknown): ValidationResult {
       market,
       language,
       max_crawl_pages: Math.trunc(pages),
+      pages_to_optimise: Math.trunc(optimise),
       brief_doc_id: briefDocId,
     },
   };

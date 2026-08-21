@@ -14,6 +14,7 @@ export type RunValues = {
   market: string;
   language: string;
   max_crawl_pages: number;
+  pages_to_optimise: number;
   brief_doc_id: string;
 };
 
@@ -23,7 +24,8 @@ export const DEFAULT_VALUES: RunValues = {
   website_url: "",
   market: "gb",
   language: "en",
-  max_crawl_pages: 10,
+  max_crawl_pages: 0, // 0 = every page
+  pages_to_optimise: 1,
   brief_doc_id: DEFAULT_BRIEF_DOC_ID,
 };
 
@@ -155,24 +157,72 @@ export default function RunForm({
 
       <div className="field">
         <label htmlFor="max_crawl_pages">Crawl limit</label>
-        <div className="range-row">
+        <div className="limit-row">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={values.max_crawl_pages === 0}
+              onChange={(e) =>
+                set("max_crawl_pages", e.target.checked ? 0 : 10)
+              }
+            />
+            Every page
+          </label>
           <input
             id="max_crawl_pages"
-            type="range"
+            type="number"
             min={1}
-            max={10}
+            max={1000}
             step={1}
-            value={values.max_crawl_pages}
-            onChange={(e) =>
-              set("max_crawl_pages", Number.parseInt(e.target.value, 10))
-            }
+            disabled={values.max_crawl_pages === 0}
+            value={values.max_crawl_pages === 0 ? "" : values.max_crawl_pages}
+            placeholder="every page"
+            onChange={(e) => {
+              const n = Number.parseInt(e.target.value, 10);
+              set("max_crawl_pages", Number.isFinite(n) ? n : 0);
+            }}
           />
-          <span className="range-val">{values.max_crawl_pages}</span>
         </div>
         <div className="note">
-          Pages DataForSEO crawls. The workflow clamps this to 10 regardless, so
-          the slider stops there.
+          Pages DataForSEO crawls. Leave it on Every page to crawl the whole
+          site, or untick and enter a number. 1000 is the API ceiling, so
+          Every page means every page up to that.
         </div>
+
+      <div className="field">
+        <label htmlFor="pages_to_optimise">Pages to optimise</label>
+        <div className="limit-row">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={values.pages_to_optimise === 0}
+              onChange={(e) =>
+                set("pages_to_optimise", e.target.checked ? 0 : 1)
+              }
+            />
+            All crawled pages
+          </label>
+          <input
+            id="pages_to_optimise"
+            type="number"
+            min={1}
+            max={1000}
+            step={1}
+            disabled={values.pages_to_optimise === 0}
+            value={values.pages_to_optimise === 0 ? "" : values.pages_to_optimise}
+            placeholder="all"
+            onChange={(e) => {
+              const n = Number.parseInt(e.target.value, 10);
+              set("pages_to_optimise", Number.isFinite(n) ? n : 0);
+            }}
+          />
+        </div>
+        <div className="note">
+          How many crawled pages get an article written and published. Every
+          page here costs Claude, Gemini and DataForSEO credits and creates a
+          WordPress post, so raise it deliberately.
+        </div>
+      </div>
       </div>
 
       {showAdvanced ? (

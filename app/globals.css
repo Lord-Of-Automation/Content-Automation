@@ -838,3 +838,35 @@ button,
 .card-body.tight:has(.logs) {
   overflow-x: auto;
 }
+
+.limit-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.limit-row input[type="number"] {
+  width: 110px;
+}
+
+.limit-row input[type="number"]:disabled {
+  opacity: 0.5;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.check input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}

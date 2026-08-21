@@ -33,6 +33,7 @@ export type StartRunInput = {
   market: string;
   language: string;
   max_crawl_pages: number;
+  pages_to_optimise: number;
   brief_doc_id: string;
 };
 
