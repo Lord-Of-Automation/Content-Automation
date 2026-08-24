@@ -141,7 +141,7 @@ export default function RunForm({
               className={batch ? "seg-btn is-on" : "seg-btn"}
               onClick={() => setBatch(true)}
             >
-              Several
+              Bulk URLs
             </button>
           </div>
         </div>
