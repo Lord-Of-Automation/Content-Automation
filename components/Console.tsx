@@ -221,6 +221,63 @@ export default function Console() {
     }
   }
 
+  async function startBatch(values: RunValues, urls: string[]) {
+    setStarting(true);
+    setError(null);
+    setNotice(null);
+    setFieldErrors({});
+
+    try {
+      const response = await fetch("/api/runs/batch", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...values, urls }),
+      });
+
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Could not start the batch.");
+
+      const started = payload.started ?? [];
+      const failed = payload.failed ?? [];
+      const skipped = payload.skipped ?? [];
+
+      // Open the first one, so there is something to watch immediately.
+      const first = started.find((r: { executionId: string | null }) => r.executionId);
+      if (first?.executionId) selectRun(String(first.executionId));
+
+      const parts = [
+        `Queued ${started.length} run${started.length === 1 ? "" : "s"}.`,
+      ];
+      if (failed.length > 0) {
+        parts.push(
+          `${failed.length} could not start: ` +
+            failed
+              .slice(0, 3)
+              .map((f: { url: string; error: string }) => `${f.url} (${f.error})`)
+              .join("; ") +
+            (failed.length > 3 ? "…" : "")
+        );
+      }
+      if (skipped.length > 0) {
+        parts.push(
+          `${skipped.length} were not sent before the request ran out of time — start them again.`
+        );
+      }
+      setNotice(parts.join(" "));
+
+      void loadHistory();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not start the batch.");
+    } finally {
+      setStarting(false);
+    }
+  }
+
   async function cancelRun() {
     if (!selectedId) return;
 
@@ -275,6 +332,7 @@ export default function Console() {
               busy={starting}
               fieldErrors={fieldErrors}
               onSubmit={startRun}
+          onSubmitBatch={startBatch}
             />
           </div>
         </div>

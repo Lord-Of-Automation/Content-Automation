@@ -1419,3 +1419,35 @@ button,
   flex-direction: column;
   gap: 20px;
 }
+
+/* ---- One / Several URL mode ---- */
+.field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+/* The field's own label already carries the bottom margin. */
+.field-head label {
+  margin-bottom: 0;
+}
+
+.seg-sm .seg-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.url-list {
+  width: 100%;
+  resize: vertical;
+  min-height: 96px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  /* Long URLs should scroll rather than wrap mid-path, so a pasted list stays
+     one visible line per run. */
+  white-space: pre;
+  overflow-x: auto;
+}

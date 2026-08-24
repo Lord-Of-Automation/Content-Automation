@@ -25,6 +25,22 @@ export type RunValues = {
 
 const STORAGE_KEY = "ca:last-input";
 
+/**
+ * One URL per line is the obvious way to paste a list, but people paste from
+ * spreadsheets and comma-separated notes too, so split on any of it.
+ */
+export function parseUrlList(raw: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const piece of raw.split(/[\s,;]+/)) {
+    const url = piece.trim();
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+  }
+  return out;
+}
+
 export const DEFAULT_VALUES: RunValues = {
   website_url: "",
   market: "gb",
@@ -38,13 +54,19 @@ export default function RunForm({
   busy,
   fieldErrors,
   onSubmit,
+  onSubmitBatch,
 }: {
   busy: boolean;
   fieldErrors: Record<string, string>;
   onSubmit: (values: RunValues) => void;
+  onSubmitBatch: (values: RunValues, urls: string[]) => void;
 }) {
   const [values, setValues] = useState<RunValues>(DEFAULT_VALUES);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [batch, setBatch] = useState(false);
+  const [urlList, setUrlList] = useState("");
+
+  const urls = parseUrlList(urlList);
 
   // Restore whatever was run last. Reading localStorage in an effect keeps the
   // server and first client render identical, so there is no hydration warning.
@@ -83,7 +105,11 @@ export default function RunForm({
     } catch {
       /* ignore */
     }
-    onSubmit(values);
+    if (batch) {
+      onSubmitBatch(values, urls);
+    } else {
+      onSubmit(values);
+    }
   }
 
   const singlePage = (() => {
@@ -98,7 +124,55 @@ export default function RunForm({
   return (
     <form onSubmit={handleSubmit} noValidate>
       <div className="field">
-        <label htmlFor="website_url">Page or site URL</label>
+        <div className="field-head">
+          <label htmlFor={batch ? "url_list" : "website_url"}>
+            {batch ? "Pages or site URLs" : "Page or site URL"}
+          </label>
+          <div className="seg seg-sm">
+            <button
+              type="button"
+              className={batch ? "seg-btn" : "seg-btn is-on"}
+              onClick={() => setBatch(false)}
+            >
+              One
+            </button>
+            <button
+              type="button"
+              className={batch ? "seg-btn is-on" : "seg-btn"}
+              onClick={() => setBatch(true)}
+            >
+              Several
+            </button>
+          </div>
+        </div>
+
+        {batch ? (
+          <>
+            <textarea
+              id="url_list"
+              rows={6}
+              className="url-list"
+              placeholder={"https://example.com/casino/one-review/\nhttps://example.com/casino/two-review/"}
+              value={urlList}
+              onChange={(e) => setUrlList(e.target.value)}
+              required
+            />
+            <div className="note">
+              One per line. Every URL uses the settings below, and each becomes
+              its own run that n8n queues and works through on its own &mdash;
+              nothing needs to stay open here.
+              {urls.length > 0 ? (
+                <>
+                  {" "}
+                  <strong>
+                    {urls.length} URL{urls.length === 1 ? "" : "s"}
+                  </strong>{" "}
+                  ready.
+                </>
+              ) : null}
+            </div>
+          </>
+        ) : (
         <input
           id="website_url"
           type="url"
@@ -109,9 +183,11 @@ export default function RunForm({
           aria-invalid={Boolean(fieldErrors.website_url)}
           required
         />
-        {fieldErrors.website_url ? (
+        )}
+
+        {!batch && fieldErrors.website_url ? (
           <div className="err">{fieldErrors.website_url}</div>
-        ) : (
+        ) : !batch ? (
           <div className="note">
             {values.website_url === ""
               ? "A bare domain optimises every crawled page. A full URL optimises just that one."
@@ -119,7 +195,7 @@ export default function RunForm({
                 ? "Single page mode: the whole site is still crawled for the link graph, but only this page is rewritten."
                 : "Whole site mode: every crawled page gets optimised, up to the crawl limit."}
           </div>
-        )}
+        ) : null}
       </div>
 
       <div className="row-2">
@@ -264,22 +340,38 @@ export default function RunForm({
         // Recomputed on every keystroke, so the number reacts to the two fields
         // that actually drive it before anything is spent.
         const forecast = forecastCost(values);
+        // Every URL is a full run, so the batch costs its own estimate times
+        // however many were pasted.
+        const count = batch ? Math.max(urls.length, 0) : 1;
+        const low = forecast.low * count;
+        const high = forecast.high * count;
         return (
           <div className={forecast.unbounded ? "forecast is-open" : "forecast"}>
             <div className="forecast-row">
               <span className="forecast-label">Estimated cost</span>
               <span className="forecast-amount">
-                {money(forecast.low)} &ndash; {money(forecast.high)}
+                {money(low)} &ndash; {money(high)}
                 {forecast.unbounded ? "+" : ""}
               </span>
             </div>
-            <p className="forecast-note">{forecast.note}</p>
+            <p className="forecast-note">
+              {batch && count > 1 ? `${count} runs. ` : ""}
+              {forecast.note}
+            </p>
           </div>
         );
       })()}
 
-      <button type="submit" className="btn-primary" disabled={busy}>
-        {busy ? "Starting…" : "Start run"}
+      <button
+        type="submit"
+        className="btn-primary"
+        disabled={busy || (batch && urls.length === 0)}
+      >
+        {busy
+          ? "Starting…"
+          : batch
+            ? `Start ${urls.length || ""} run${urls.length === 1 ? "" : "s"}`.replace("  ", " ")
+            : "Start run"}
       </button>
     </form>
   );
