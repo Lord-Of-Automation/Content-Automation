@@ -17,3 +17,7 @@ build
 *.tsbuildinfo
 next-env.d.ts
 .data/
+
+# Workflow snapshots pulled from n8n: they embed API keys in node parameters.
+wf-*.json
+wf.json

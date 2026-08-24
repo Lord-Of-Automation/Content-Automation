@@ -138,13 +138,6 @@ export default function SiteAccounts() {
         {error ? <div className="notice bad">{error}</div> : null}
         {notice ? <div className="notice">{notice}</div> : null}
 
-        <div className="notice warn">
-          Use a WordPress <strong>application password</strong>, not the real
-          admin password. Create one under Users &rarr; Profile &rarr;
-          Application Passwords. It can be revoked on its own, and it cannot be
-          used to sign in to wp-admin.
-        </div>
-
         {loading ? (
           <div className="empty">Loading&hellip;</div>
         ) : sites.length === 0 ? (
