@@ -28,9 +28,24 @@ let cached: AppUser[] | null = null;
  * still accepted for those.
  */
 function decode(raw: string): string {
-  const trimmed = raw.trim();
-  if (trimmed.startsWith("[")) return trimmed;
-  return Buffer.from(trimmed, "base64").toString("utf8");
+  let value = raw.trim();
+
+  // Tolerate a whole "AUTH_USERS=..." line being pasted into a field that wants
+  // only the value. Easy mistake, and the failure is otherwise opaque.
+  value = value.replace(/^AUTH_USERSs*=s*/i, "").trim();
+
+  // ...and surrounding quotes, which a .env habit tends to add.
+  if (
+    (value.startsWith("'") && value.endsWith("'")) ||
+    (value.startsWith('"') && value.endsWith('"'))
+  ) {
+    value = value.slice(1, -1).trim();
+  }
+
+  if (value.startsWith("[")) return value;
+
+  // A pasted value can pick up newlines; base64 has no use for whitespace.
+  return Buffer.from(value.replace(/s+/g, ""), "base64").toString("utf8");
 }
 
 type RawUser = {
@@ -64,8 +79,13 @@ export function getUsers(): AppUser[] {
   try {
     parsed = JSON.parse(decode(raw));
   } catch {
+    const seen = raw.trim();
     throw new Error(
-      "AUTH_USERS is neither valid JSON nor base64 of a JSON array. Regenerate it with: npm run users"
+      "AUTH_USERS is neither valid JSON nor base64 of a JSON array. It is " +
+        seen.length +
+        " characters starting " +
+        JSON.stringify(seen.slice(0, 12)) +
+        ". Paste only the value, with no AUTH_USERS= prefix and no quotes, or regenerate it with: npm run users"
     );
   }
 
