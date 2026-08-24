@@ -2,7 +2,22 @@
 
 import StatusBadge from "@/components/StatusBadge";
 import { formatDuration, formatWhen } from "@/lib/format";
-import type { ExecutionDetail } from "@/lib/n8n";
+import { LANGUAGES, MARKETS } from "@/lib/markets";
+import type { ExecutionDetail, N8nStatus } from "@/lib/n8n";
+import type { RunInputs } from "@/lib/inputs";
+
+/**
+ * Repeated from Console rather than imported from lib/n8n, which would drag the
+ * whole server-side client into the browser bundle for one predicate.
+ */
+function isTerminal(status: N8nStatus | undefined): boolean {
+  return (
+    status === "success" ||
+    status === "error" ||
+    status === "crashed" ||
+    status === "canceled"
+  );
+}
 
 /** Money at a precision that does not round a fraction of a cent to zero. */
 function money(value: number): string {
@@ -11,14 +26,70 @@ function money(value: number): string {
   return "$" + value.toFixed(2);
 }
 
+/** The submitted values, spelled out the way the form asked for them. */
+function inputRows(inputs: RunInputs): { label: string; value: string }[] {
+  const rows: { label: string; value: string }[] = [];
+
+  if (inputs.website_url) {
+    rows.push({ label: "Website", value: inputs.website_url });
+  }
+
+  if (inputs.market) {
+    const match = MARKETS.find((m) => m.code === inputs.market);
+    rows.push({
+      label: "Market",
+      value: match ? `${match.label} (${match.code})` : inputs.market,
+    });
+  }
+
+  if (inputs.language) {
+    const match = LANGUAGES.find((l) => l.code === inputs.language);
+    rows.push({
+      label: "Language",
+      value: match ? `${match.label} (${match.code})` : inputs.language,
+    });
+  }
+
+  if (inputs.max_crawl_pages !== null) {
+    rows.push({
+      label: "Crawl limit",
+      // Zero is the form's "no limit", so echoing the digit would misreport it.
+      value:
+        inputs.max_crawl_pages === 0
+          ? "Every page"
+          : `${inputs.max_crawl_pages} page${inputs.max_crawl_pages === 1 ? "" : "s"}`,
+    });
+  }
+
+  if (inputs.pages_to_optimise !== null) {
+    rows.push({
+      label: "Pages to optimise",
+      value:
+        inputs.pages_to_optimise === 0
+          ? "Every crawled page"
+          : `${inputs.pages_to_optimise} page${inputs.pages_to_optimise === 1 ? "" : "s"}`,
+    });
+  }
+
+  if (inputs.brief_doc_id) {
+    rows.push({ label: "Brief document", value: inputs.brief_doc_id });
+  }
+
+  return rows;
+}
+
 export default function RunProgress({
   execution,
   n8nUrl,
   loading,
+  onCancel,
+  cancelling,
 }: {
   execution: ExecutionDetail | null;
   n8nUrl: string | null;
   loading: boolean;
+  onCancel?: () => void;
+  cancelling?: boolean;
 }) {
   if (!execution) {
     return (
@@ -53,6 +124,24 @@ export default function RunProgress({
       <div className="bar">
         <span style={{ width: `${progress?.percent ?? 0}%` }} />
       </div>
+
+      {execution.inputs ? (
+        <div className="inputs">
+          <div className="inputs-head">What was asked for</div>
+          <dl className="inputs-list">
+            {inputRows(execution.inputs).map((row) => (
+              <div key={row.label}>
+                <dt>{row.label}</dt>
+                <dd
+                  className={row.label === "Brief document" ? "mono" : undefined}
+                >
+                  {row.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ) : null}
 
       {execution.error ? (
         <div className="alert alert-bad" style={{ marginTop: 16 }}>
@@ -131,8 +220,8 @@ export default function RunProgress({
           </div>
         </div>
       ) : null}
-      {n8nUrl ? (
-        <div style={{ marginTop: 18 }}>
+      <div className="run-actions">
+        {n8nUrl ? (
           <a
             className="btn btn-ghost"
             href={n8nUrl}
@@ -141,8 +230,19 @@ export default function RunProgress({
           >
             Open in n8n ↗
           </a>
-        </div>
-      ) : null}
+        ) : null}
+
+        {onCancel && !isTerminal(execution.status) ? (
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={onCancel}
+            disabled={cancelling}
+          >
+            {cancelling ? "Stopping…" : "Cancel run"}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

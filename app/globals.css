@@ -1124,3 +1124,67 @@ button,
   font-size: 12px;
   color: var(--muted);
 }
+
+/* ---- What was asked for, on the run panel ---- */
+.inputs {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+}
+
+.inputs-head {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.inputs-list {
+  display: grid;
+  gap: 8px 18px;
+  margin: 0;
+}
+
+.inputs-list > div {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+}
+
+.inputs-list dt {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.inputs-list dd {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink);
+  /* A long URL or a Drive id must wrap rather than widen the whole panel. */
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 560px) {
+  .inputs-list > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
+/* ---- Run panel footer actions ---- */
+.run-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* Cancel sits at the far right, away from the link people click by habit. */
+.run-actions .btn-danger {
+  margin-left: auto;
+}

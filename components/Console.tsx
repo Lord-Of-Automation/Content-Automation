@@ -34,6 +34,7 @@ export default function Console() {
   const [n8nUrl, setN8nUrl] = useState<string | null>(null);
 
   const [starting, setStarting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -220,6 +221,46 @@ export default function Console() {
     }
   }
 
+  async function cancelRun() {
+    if (!selectedId) return;
+    if (
+      !window.confirm(
+        `Stop run #${selectedId}?
+
+Work already paid for is not refunded. ` +
+          "This only saves the steps that have not run yet."
+      )
+    ) {
+      return;
+    }
+
+    setCancelling(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const response = await fetch(`/api/runs/${selectedId}/stop`, {
+        method: "POST",
+      });
+
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Could not stop the run.");
+
+      setNotice(`Run #${selectedId} was cancelled.`);
+      await loadDetail(selectedId);
+      void loadHistory();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not stop the run.");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   // ------------------------------------------------------------- render
 
   return (
@@ -305,6 +346,8 @@ export default function Console() {
           execution={detail}
           n8nUrl={n8nUrl}
           loading={detailLoading}
+          onCancel={cancelRun}
+          cancelling={cancelling}
         />
       </div>
     </div>
