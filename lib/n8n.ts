@@ -439,6 +439,15 @@ export async function stopExecution(id: string): Promise<N8nStatus> {
         `n8n has no execution ${id} to stop. It may have already finished.`
       );
     }
+    // n8n answers a stop for an already-finished execution with a bare 500.
+    // The button is hidden once a run is terminal, so reaching this means the
+    // run finished between the page rendering and the click.
+    if (response.status === 500) {
+      throw new Error(
+        `n8n could not stop execution ${id}. It has most likely just ` +
+          "finished — refresh to see its final status."
+      );
+    }
     throw new Error(
       `n8n returned ${response.status} when stopping the run. ${text.slice(0, 300)}`
     );
