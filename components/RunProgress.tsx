@@ -99,12 +99,16 @@ export default function RunProgress({
   loading,
   onCancel,
   cancelling,
+  onRetry,
+  retrying,
 }: {
   execution: ExecutionDetail | null;
   n8nUrl: string | null;
   loading: boolean;
   onCancel?: () => void;
   cancelling?: boolean;
+  onRetry?: () => void;
+  retrying?: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
   if (!execution) {
@@ -162,6 +166,13 @@ export default function RunProgress({
       {execution.error ? (
         <div className="alert alert-bad" style={{ marginTop: 16 }}>
           <strong>Run failed.</strong> {execution.error}
+          {onRetry ? (
+            <>
+              {" "}
+              Resume from failure carries on from that node, keeping the crawl
+              and research already paid for.
+            </>
+          ) : null}
         </div>
       ) : null}
 
@@ -255,6 +266,19 @@ export default function RunProgress({
           >
             Open in n8n ↗
           </a>
+        ) : null}
+
+        {onRetry &&
+        (execution.status === "error" || execution.status === "crashed") ? (
+          <button
+            type="button"
+            className="btn btn-primary-soft"
+            onClick={onRetry}
+            disabled={retrying}
+            title="Carry on from the node that failed, keeping the work already done"
+          >
+            {retrying ? "Resuming…" : "Resume from failure"}
+          </button>
         ) : null}
 
         {onCancel && !isTerminal(execution.status) ? (

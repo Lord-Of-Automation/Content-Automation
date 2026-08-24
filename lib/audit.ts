@@ -12,6 +12,8 @@ export type AuditAction =
   | "account-created"
   | "run-canceled"
   | "run-cancel-failed"
+  | "run-retried"
+  | "run-retry-failed"
   | "site-saved"
   | "site-removed";
 

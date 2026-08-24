@@ -35,6 +35,7 @@ export default function Console() {
 
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -278,6 +279,45 @@ export default function Console() {
     }
   }
 
+  async function retryRun() {
+    if (!selectedId) return;
+
+    setRetrying(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const response = await fetch(`/api/runs/${selectedId}/retry`, {
+        method: "POST",
+      });
+
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Could not resume the run.");
+
+      // n8n makes a new execution for the retry, so follow that one.
+      if (payload.id && String(payload.id) !== selectedId) {
+        setNotice(
+          `Resumed #${selectedId} as #${payload.id}, carrying on from the node that failed.`
+        );
+        selectRun(String(payload.id));
+      } else {
+        setNotice(`Resumed #${selectedId} from the node that failed.`);
+        void loadDetail(selectedId);
+      }
+
+      void loadHistory();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not resume the run.");
+    } finally {
+      setRetrying(false);
+    }
+  }
+
   async function cancelRun() {
     if (!selectedId) return;
 
@@ -396,6 +436,8 @@ export default function Console() {
           loading={detailLoading}
           onCancel={cancelRun}
           cancelling={cancelling}
+          onRetry={retryRun}
+          retrying={retrying}
         />
       </div>
     </div>

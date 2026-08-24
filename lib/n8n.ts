@@ -432,6 +432,59 @@ export async function getExecution(id: string): Promise<ExecutionDetail> {
 }
 
 /**
+ * Re-run a failed execution, resuming rather than starting over.
+ *
+ * n8n replays the saved run data and picks up at the node that failed, which
+ * only works because the workflow saves execution progress: without it there is
+ * nothing to resume from and n8n starts at the beginning. A run that died at
+ * the drafting stage therefore keeps its crawl, its keyword research and its
+ * competitor analysis, all of which have already been paid for.
+ */
+export async function retryExecution(
+  id: string,
+  loadWorkflow = true
+): Promise<{ id: string; status: N8nStatus }> {
+  const response = await apiFetch(
+    `/executions/${encodeURIComponent(id)}/retry`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      // Retrying with the current workflow, not the version that failed: the
+      // usual reason for retrying is that the cause has just been fixed.
+      body: JSON.stringify({ loadWorkflow }),
+      timeoutMs: 30_000,
+    }
+  );
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+
+    if (response.status === 403) {
+      throw new Error(
+        "n8n refused the retry. The API key is missing the " +
+          '"execution:retry" scope: reissue it in n8n under Settings > API.'
+      );
+    }
+    if (response.status === 404) {
+      throw new Error(`n8n has no execution ${id} to retry.`);
+    }
+    if (response.status === 409) {
+      throw new Error(
+        `Execution ${id} cannot be retried. Only a finished run that failed can be, ` +
+          "and each one can be retried once."
+      );
+    }
+    throw new Error(
+      `n8n returned ${response.status} when retrying. ${text.slice(0, 300)}`
+    );
+  }
+
+  const payload = (await response.json()) as Record<string, unknown>;
+  const summary = toSummary(payload);
+  return { id: summary.id || id, status: summary.status };
+}
+
+/**
  * Ask n8n to stop a run. Returns the status it reports afterwards.
  *
  * A run sitting in a Wait node is the common case here, and n8n cancels those
