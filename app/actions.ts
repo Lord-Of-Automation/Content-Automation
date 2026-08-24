@@ -49,6 +49,6 @@ export async function login(
 export async function logout(): Promise<void> {
   // Read the session before it is destroyed, otherwise there is no actor.
   const session = await auth();
-  record(session?.user?.name ?? "unknown", "sign-out", "Signed out.");
+  await record(session?.user?.name ?? "unknown", "sign-out", "Signed out.");
   await signOut({ redirectTo: "/login" });
 }

@@ -39,12 +39,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         if (!user || !ok) {
-          record(username, "sign-in-failed", "Wrong username or password.");
+          await record(username, "sign-in-failed", "Wrong username or password.");
           return null;
         }
 
 
-        record(user.username, "sign-in", "Signed in.");
+        await record(user.username, "sign-in", "Signed in.");
         // The username is the identity the app displays and audits. There is
         // no email address in the user list any more, so none is carried.
         return { id: user.username, name: user.username };

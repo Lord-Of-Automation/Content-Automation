@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await startRun(parsed.value);
-    record(
+    await record(
       actor,
       "run-started",
       `${parsed.value.website_url} (${parsed.value.market}/${parsed.value.language}, ` +
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     );
     return NextResponse.json({ ...result, input: parsed.value });
   } catch (error) {
-    record(
+    await record(
       actor,
       "run-failed",
       `${parsed.value.website_url} — ${

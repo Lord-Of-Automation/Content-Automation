@@ -10,7 +10,8 @@ type AuditEvent = {
     | "sign-in-failed"
     | "sign-out"
     | "run-started"
-    | "run-failed";
+    | "run-failed"
+    | "account-created";
   detail: string;
 };
 
@@ -20,6 +21,7 @@ const LABEL: Record<AuditEvent["action"], string> = {
   "sign-out": "Signed out",
   "run-started": "Started a run",
   "run-failed": "Run failed to start",
+  "account-created": "Created an account",
 };
 
 const TONE: Record<AuditEvent["action"], string> = {
@@ -28,6 +30,7 @@ const TONE: Record<AuditEvent["action"], string> = {
   "sign-out": "idle",
   "run-started": "run",
   "run-failed": "bad",
+  "account-created": "run",
 };
 
 const PAGE = 25;
@@ -43,7 +46,7 @@ function formatWhen(iso: string): string {
 
 export default function LogsView() {
   const [events, setEvents] = useState<AuditEvent[]>([]);
-  const [persistent, setPersistent] = useState(true);
+  const [store, setStore] = useState<"redis" | "file" | "memory">("file");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [visible, setVisible] = useState(PAGE);
@@ -59,10 +62,10 @@ export default function LogsView() {
       if (!response.ok) throw new Error(`Logs API returned ${response.status}.`);
       const payload = (await response.json()) as {
         events: AuditEvent[];
-        persistent: boolean;
+        backend?: "redis" | "file" | "memory";
       };
       setEvents(payload.events ?? []);
-      setPersistent(payload.persistent !== false);
+      setStore(payload.backend ?? "file");
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load the log.");
@@ -109,11 +112,13 @@ export default function LogsView() {
         </div>
 
         <div className="card-body tight">
-          {!persistent ? (
+          {store === "memory" ? (
             <div className="notice warn">
-              The filesystem is read-only here, so entries are kept in memory only
-              and are lost when the instance recycles. On Vercel this is expected:
-              move the log to a database or KV store to keep it.
+              <strong>History is not being kept.</strong> This deployment has a
+              read-only filesystem and no KV store, so entries live in one server
+              instance&rsquo;s memory and are gone when it recycles &mdash; which
+              is why the log looks empty. Attach a KV store to the project and
+              redeploy; it is picked up automatically.
             </div>
           ) : null}
 
@@ -123,8 +128,9 @@ export default function LogsView() {
             <div className="empty">Loading…</div>
           ) : shown.length === 0 ? (
             <div className="empty">
-              Nothing recorded yet. Sign in and out, or start a run, and it will
-              appear here.
+              {filter === "all"
+                ? "Nothing recorded yet. Sign in and out, or start a run, and it will appear here."
+                : "Nothing in this category yet."}
             </div>
           ) : (
             <>
@@ -164,6 +170,15 @@ export default function LogsView() {
               ) : null}
             </>
           )}
+          <p className="logs-foot">
+            Stored in{" "}
+            {store === "redis"
+              ? "a KV store, kept across deployments and restarts"
+              : store === "file"
+                ? "a file on this machine (.data/audit.jsonl)"
+                : "memory only"}
+            .
+          </p>
         </div>
       </div>
     </div>

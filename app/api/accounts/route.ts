@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   }
 
   const session = await auth();
-  record(
+  await record(
     session?.user?.name ?? "unknown",
     "account-created",
     `Created "${result.username}"` +
