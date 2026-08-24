@@ -474,7 +474,7 @@ button,
 .stage {
   display: flex;
   gap: 11px;
-  padding: 7px 0;
+  padding: 10px 0;
   border-top: 1px solid var(--line);
   align-items: flex-start;
 }
@@ -513,6 +513,9 @@ button,
 }
 
 .stage-name {
+  /* Blockified so the description below it starts on its own line. As inline
+     spans these ran together, and the hint's vertical margin did nothing. */
+  display: block;
   font-size: 13.5px;
   font-weight: 520;
 }
@@ -528,9 +531,11 @@ button,
 }
 
 .stage-hint {
+  display: block;
   font-size: 12px;
+  line-height: 1.45;
   color: var(--ink-3);
-  margin-top: 1px;
+  margin-top: 5px;
 }
 
 .stage-tag {
@@ -538,9 +543,11 @@ button,
   color: var(--ink-3);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 0 5px;
-  margin-left: 7px;
+  padding: 1px 6px;
+  /* Clear of the stage name it annotates. */
+  margin-left: 9px;
   vertical-align: 1px;
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------------------------ list */
