@@ -1,5 +1,6 @@
 import TopBar from "@/components/TopBar";
 import AccountsView from "@/components/AccountsView";
+import SiteAccounts from "@/components/SiteAccounts";
 
 export const metadata = { title: "Accounts — Content Automation" };
 export const dynamic = "force-dynamic";
@@ -9,7 +10,10 @@ export default function AccountsPage() {
     <>
       <TopBar current="accounts" />
       <main>
-        <AccountsView />
+        <div className="stack">
+          <AccountsView />
+          <SiteAccounts />
+        </div>
       </main>
     </>
   );

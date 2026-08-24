@@ -1458,3 +1458,50 @@ button,
   white-space: pre;
   overflow-x: auto;
 }
+
+/* ---- Registered website logins ---- */
+.sites {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+}
+
+.sites li {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+.sites li:last-child {
+  border-bottom: 0;
+}
+
+.site-domain {
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.site-user {
+  font-size: 13px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Separated from the list above: adding is a different act from reviewing. */
+.site-form {
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 560px) {
+  .sites li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 4px;
+  }
+}

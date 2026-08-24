@@ -13,7 +13,9 @@ type AuditEvent = {
     | "run-failed"
     | "account-created"
     | "run-canceled"
-    | "run-cancel-failed";
+    | "run-cancel-failed"
+    | "site-saved"
+    | "site-removed";
   detail: string;
 };
 
@@ -26,6 +28,8 @@ const LABEL: Record<AuditEvent["action"], string> = {
   "account-created": "Created an account",
   "run-canceled": "Cancelled a run",
   "run-cancel-failed": "Cancel failed",
+  "site-saved": "Saved a site login",
+  "site-removed": "Removed a site login",
 };
 
 const TONE: Record<AuditEvent["action"], string> = {
@@ -37,6 +41,8 @@ const TONE: Record<AuditEvent["action"], string> = {
   "account-created": "run",
   "run-canceled": "idle",
   "run-cancel-failed": "bad",
+  "site-saved": "run",
+  "site-removed": "idle",
 };
 
 const PAGE = 25;

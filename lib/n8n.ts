@@ -1,6 +1,7 @@
 import { buildProgress, type Progress } from "./progress";
 import { estimateCost, type CostBreakdown } from "./cost";
 import { extractInputs, type RunInputs } from "./inputs";
+import { credentialsFor } from "./sites";
 
 export type N8nStatus =
   | "new"
@@ -149,6 +150,17 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
   const startedAt = new Date().toISOString();
   const mode = triggerMode();
 
+  // A registered site's WordPress login travels with the run, so the workflow
+  // can publish to any domain rather than only the one wired into its own
+  // credentials. Absent is fine: the workflow falls back to its own.
+  const site = await credentialsFor(input.website_url).catch(() => null);
+  const payload: Record<string, unknown> = { ...input };
+  if (site) {
+    payload.wp_username = site.username;
+    payload.wp_password = site.password;
+    payload.wp_domain = site.domain;
+  }
+
   // The Form Trigger asserts the submission is multipart/form-data and throws
   // "Expected multipart/form-data" on anything else, urlencoded included. Handing
   // fetch a FormData instance makes it write the multipart body and the boundary,
@@ -158,7 +170,7 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
   const headers: Record<string, string> = {};
 
   if (mode === "webhook") {
-    body = JSON.stringify(input);
+    body = JSON.stringify(payload);
     headers["content-type"] = "application/json";
   } else {
     const form = new FormData();
@@ -168,6 +180,11 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
     form.set("max_crawl_pages", String(input.max_crawl_pages));
     form.set("pages_to_optimise", String(input.pages_to_optimise));
     form.set("reuse_crawl_days", String(input.reuse_crawl_days));
+    if (site) {
+      form.set("wp_username", site.username);
+      form.set("wp_password", site.password);
+      form.set("wp_domain", site.domain);
+    }
     form.set("brief_doc_id", input.brief_doc_id);
     body = form;
   }

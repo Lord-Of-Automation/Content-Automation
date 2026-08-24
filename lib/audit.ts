@@ -11,7 +11,9 @@ export type AuditAction =
   | "run-failed"
   | "account-created"
   | "run-canceled"
-  | "run-cancel-failed";
+  | "run-cancel-failed"
+  | "site-saved"
+  | "site-removed";
 
 export type AuditEvent = {
   at: string;
