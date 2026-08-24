@@ -1404,13 +1404,6 @@ button,
   text-align: right;
 }
 
-.spend-foot {
-  margin: 16px 0 0;
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--muted);
-}
-
 /* Sets the article count apart from the crawl settings above it: the two read
    as one block otherwise, and this is the field that spends the money. */
 .field-sep {

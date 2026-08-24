@@ -16,7 +16,6 @@ type Spend = {
   total: number;
   byActor: { actor: string; total: number; runs: number }[];
   byMonth: { month: string; total: number; runs: number }[];
-  unpriced: number;
 };
 
 function money(value: number): string {
@@ -82,7 +81,7 @@ export default function SpendPanel() {
         </button>
       </div>
 
-      <div className="card-body tight">
+      <div className="card-body">
         {error ? <div className="notice bad">{error}</div> : null}
 
         {loading && !spend ? (
@@ -98,14 +97,6 @@ export default function SpendPanel() {
               <span className="spend-total-label">Total</span>
               <span className="spend-total-amount">{money(spend.total)}</span>
             </div>
-
-            {spend.unpriced > 0 ? (
-              <div className="notice warn">
-                {spend.unpriced} run{spend.unpriced === 1 ? "" : "s"} could not be
-                priced &mdash; still running, or the payload was unreadable. The
-                total below excludes {spend.unpriced === 1 ? "it" : "them"}.
-              </div>
-            ) : null}
 
             <div className="spend-split">
               <div>
@@ -146,13 +137,6 @@ export default function SpendPanel() {
                 )}
               </div>
             </div>
-
-            <p className="spend-foot">
-              DataForSEO reports its own prices, so that part is exact. Model
-              usage is priced from token counts, so treat the total as close
-              rather than billed. Runs started before the log existed show as
-              unattributed.
-            </p>
           </>
         ) : null}
       </div>
