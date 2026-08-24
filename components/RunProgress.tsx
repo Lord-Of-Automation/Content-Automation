@@ -74,6 +74,18 @@ function inputRows(inputs: RunInputs): { label: string; value: string }[] {
     });
   }
 
+  if (inputs.reuse_crawl_days !== null) {
+    rows.push({
+      label: "Reuse a crawl",
+      value:
+        inputs.reuse_crawl_days === 0
+          ? "No — always crawled fresh"
+          : `If one exists from the last ${inputs.reuse_crawl_days} day${
+              inputs.reuse_crawl_days === 1 ? "" : "s"
+            }`,
+    });
+  }
+
   if (inputs.brief_doc_id) {
     rows.push({ label: "Brief document", value: inputs.brief_doc_id });
   }

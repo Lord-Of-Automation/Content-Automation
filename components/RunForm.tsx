@@ -20,6 +20,7 @@ export type RunValues = {
   language: string;
   max_crawl_pages: number;
   pages_to_optimise: number;
+  reuse_crawl_days: number;
   brief_doc_id: string;
 };
 
@@ -47,6 +48,7 @@ export const DEFAULT_VALUES: RunValues = {
   language: "en",
   max_crawl_pages: 0, // 0 = every page
   pages_to_optimise: 1,
+  reuse_crawl_days: 7, // 0 = always crawl fresh
   brief_doc_id: DEFAULT_BRIEF_DOC_ID,
 };
 
@@ -268,6 +270,41 @@ export default function RunForm({
           Pages DataForSEO crawls. Leave it on Every page to crawl the whole
           site, or untick and enter a number. 1000 is the API ceiling, so
           Every page means every page up to that.
+        </div>
+      </div>
+
+      <div className="field">
+        <label htmlFor="reuse_crawl_days">Reuse a recent crawl</label>
+        <div className="limit-row">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={values.reuse_crawl_days === 0}
+              onChange={(e) =>
+                set("reuse_crawl_days", e.target.checked ? 0 : 7)
+              }
+            />
+            Always crawl fresh
+          </label>
+          <input
+            id="reuse_crawl_days"
+            type="number"
+            min={1}
+            max={90}
+            step={1}
+            disabled={values.reuse_crawl_days === 0}
+            value={values.reuse_crawl_days === 0 ? "" : values.reuse_crawl_days}
+            placeholder="days"
+            onChange={(e) => {
+              const n = Number.parseInt(e.target.value, 10);
+              set("reuse_crawl_days", Number.isFinite(n) ? n : 0);
+            }}
+          />
+        </div>
+        <div className="note">
+          {values.reuse_crawl_days === 0
+            ? "Every run pays for its own crawl of the whole site, even if the same domain was crawled minutes ago."
+            : `If this domain was already crawled in the last ${values.reuse_crawl_days} day${values.reuse_crawl_days === 1 ? "" : "s"}, that crawl is used again instead of paying for a new one. Different pages on one site then share a single crawl.`}
         </div>
       </div>
 

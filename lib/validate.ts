@@ -74,6 +74,28 @@ export function validateRunInput(raw: unknown): ValidationResult {
       "Use 0 for every crawled page, or a number up to 1000.";
   }
 
+  // ---- reuse_crawl_days (0 means always crawl fresh)
+  const rawReuse = input.reuse_crawl_days;
+
+  // Absent is not an error: callers written before this field still work, and
+  // they get the default. A value that was actually supplied is held to the
+  // rules, so a typo cannot quietly turn into "reuse a week-old crawl".
+  const reuseOmitted =
+    rawReuse === undefined || rawReuse === null || rawReuse === "";
+
+  let reuseDays = 7;
+  if (!reuseOmitted) {
+    const parsed =
+      typeof rawReuse === "number" ? rawReuse : Number(String(rawReuse).trim());
+    if (!Number.isFinite(parsed)) {
+      errors.reuse_crawl_days = "Enter a number of days, or 0 to always crawl fresh.";
+    } else if (parsed < 0 || parsed > 90) {
+      errors.reuse_crawl_days = "Use 0 to always crawl fresh, or up to 90 days.";
+    } else {
+      reuseDays = Math.trunc(parsed);
+    }
+  }
+
   // ---- brief_doc_id
   const briefDocId =
     typeof input.brief_doc_id === "string" && input.brief_doc_id.trim()
@@ -95,6 +117,7 @@ export function validateRunInput(raw: unknown): ValidationResult {
       language,
       max_crawl_pages: Math.trunc(pages),
       pages_to_optimise: Math.trunc(optimise),
+      reuse_crawl_days: reuseDays,
       brief_doc_id: briefDocId,
     },
   };

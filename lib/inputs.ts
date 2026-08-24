@@ -11,6 +11,7 @@ export type RunInputs = {
   language: string | null;
   max_crawl_pages: number | null;
   pages_to_optimise: number | null;
+  reuse_crawl_days: number | null;
   brief_doc_id: string | null;
 };
 
@@ -20,6 +21,7 @@ const FIELDS = [
   "language",
   "max_crawl_pages",
   "pages_to_optimise",
+  "reuse_crawl_days",
   "brief_doc_id",
 ] as const;
 
@@ -100,6 +102,7 @@ export function extractInputs(
     language: asString(best.language),
     max_crawl_pages: asNumber(best.max_crawl_pages),
     pages_to_optimise: asNumber(best.pages_to_optimise),
+    reuse_crawl_days: asNumber(best.reuse_crawl_days),
     brief_doc_id: asString(best.brief_doc_id),
   };
 }

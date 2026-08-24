@@ -40,6 +40,8 @@ export type StartRunInput = {
   language: string;
   max_crawl_pages: number;
   pages_to_optimise: number;
+  /** Reuse a finished crawl of the same domain this many days old. 0 = never. */
+  reuse_crawl_days: number;
   brief_doc_id: string;
 };
 
@@ -164,6 +166,8 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
     form.set("market", input.market);
     form.set("language", input.language);
     form.set("max_crawl_pages", String(input.max_crawl_pages));
+    form.set("pages_to_optimise", String(input.pages_to_optimise));
+    form.set("reuse_crawl_days", String(input.reuse_crawl_days));
     form.set("brief_doc_id", input.brief_doc_id);
     body = form;
   }
