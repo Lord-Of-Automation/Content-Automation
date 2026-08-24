@@ -10,19 +10,7 @@ supplied and move on.
 
 ---
 
-## 1. Will history be kept on the logs page now?
-
-**Giorgi:** So now history will be kept in the logs page, right?
-
-**Claude:** Yes, once redeployed. Verified against the live Upstash store: an
-event written through the app landed in KV and read back independently of the
-local file. The test event was deleted afterwards so the production log starts
-clean. The ~60 existing entries stay behind — they live in a local file, and KV
-starts empty.
-
----
-
-## 2. Is the warning message still needed?
+## 1. Is the warning message still needed?
 
 **Giorgi:** If the db is working, do we need that "History is not being kept"
 message any more?
@@ -36,7 +24,7 @@ unconfigured → `file`.
 
 ---
 
-## 3. Custom cancel confirmation
+## 2. Custom cancel confirmation
 
 **Giorgi:** When clicking cancel run, show a custom designed popup instead of the
 browser alert.
@@ -47,7 +35,7 @@ Enter dismisses rather than destroys, and it cannot be closed mid-request.
 
 ---
 
-## 4. What else would help?
+## 3. What else would help?
 
 **Giorgi:** Give me advice on what else we can add to make the project more
 comfortable to use.
@@ -60,7 +48,7 @@ three plus bulk URLs.
 
 ---
 
-## 5. Queue several URLs
+## 4. Queue several URLs
 
 **Giorgi:** Add the bulk URL queue.
 
@@ -72,7 +60,7 @@ from "Several" to "Bulk URLs".
 
 ---
 
-## 6. Stage list spacing
+## 5. Stage list spacing
 
 **Giorgi:** The stage names and descriptions in the run panel are too close
 together.
@@ -84,7 +72,7 @@ not apply to inline elements. Both are block now.
 
 ---
 
-## 7. Out-of-memory crash
+## 6. Out-of-memory crash
 
 **Giorgi:** A run failed with "possible out-of-memory issue". Can we increase the
 memory limit?
@@ -104,7 +92,7 @@ node. Giorgi chose to keep progress on and strip the payloads instead.
 
 ---
 
-## 8. Crawl reuse
+## 7. Crawl reuse
 
 **Giorgi:** Check whether a domain was already crawled before crawling from
 scratch, so different pages on one site share a crawl.
@@ -121,7 +109,7 @@ invalid value is rejected rather than silently defaulted.
 
 ---
 
-## 9. Website accounts
+## 8. Website accounts
 
 **Giorgi:** Add a website accounts section so WordPress logins per domain are
 stored in advance for n8n to use.
@@ -137,15 +125,32 @@ normalised so one entry covers a whole site.
 
 ---
 
-## 10. This file
+## 9. This file
 
 **Giorgi:** Create an MD file saving the last 10 messages of mine and the
 responses.
 
-**Claude:** Created `CHAT-HISTORY.md`. An earlier clarifying question had steered
-this towards giving the n8n workflow a memory across runs, which was built as
-`/api/memory` — that is a separate feature and still works, but it was not what
-was being asked for here.
+**Claude:** Created `CHAT-HISTORY.md` holding the Giorgi/Claude conversation.
+
+---
+
+## 10. What the MD was actually for
+
+**Giorgi:** Not our messages — the last 10 prompts the agent sent and the Claude
+API's responses.
+
+**Claude:** Third reading, and the right one. Rewrote `/api/memory` to store
+prompt/response pairs from the workflow's Claude API calls, per domain, capped
+at 10, returned as markdown headed "the conversation so far" for the next call
+to read. Long values are cut in the middle, keeping head and tail, since a
+prompt here can carry a whole crawled page.
+
+`CHAT-HISTORY.md` (this file) stays as it is — it turned out to be a second,
+separate thing, and a useful one.
+
+**Lesson for next time:** two wrong guesses came from asking a multiple-choice
+question with options I had invented. Asking "whose messages, in your words?"
+would have got there first.
 
 ---
 

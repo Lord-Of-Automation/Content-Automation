@@ -2,8 +2,13 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { errorResponse } from "@/lib/api-guard";
-import { entriesFor, forget, markdownFor, remember } from "@/lib/memory";
-import { normaliseDomain } from "@/lib/sites";
+import {
+  exchangesFor,
+  forget,
+  markdownFor,
+  recordExchange,
+  scopeFor,
+} from "@/lib/memory";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,21 +38,17 @@ export async function GET(request: Request) {
 
   const params = new URL(request.url).searchParams;
   const url = params.get("url") ?? params.get("domain") ?? "";
-  const domain = normaliseDomain(url);
-
-  if (!domain) {
-    return NextResponse.json(
-      { error: "Pass ?url= or ?domain= with a real domain." },
-      { status: 400 }
-    );
-  }
 
   try {
-    // Markdown by default: the caller is usually an n8n HTTP node feeding it
-    // straight into a prompt, and text needs no unwrapping at the other end.
     if (params.get("format") === "json") {
-      return NextResponse.json({ domain, entries: await entriesFor(url) });
+      return NextResponse.json({
+        scope: scopeFor(url),
+        exchanges: await exchangesFor(url),
+      });
     }
+
+    // Markdown by default: the caller is an n8n HTTP node feeding this straight
+    // into the next prompt, and text needs no unwrapping at the other end.
     return new NextResponse(await markdownFor(url), {
       status: 200,
       headers: { "content-type": "text/markdown; charset=utf-8" },
@@ -70,12 +71,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await remember({
+    const result = await recordExchange({
       url: body.url,
-      title: body.title,
-      summary: body.summary,
-      headings: body.headings,
-      notes: body.notes,
+      node: body.node,
+      prompt: body.prompt,
+      response: body.response,
     });
 
     if (!result.ok) {
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  // Clearing history is a person's decision, so no workflow shortcut here.
+  // Clearing a transcript is a person's decision, so no workflow shortcut here.
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
@@ -98,9 +98,12 @@ export async function DELETE(request: Request) {
   try {
     const cleared = await forget(url);
     if (!cleared) {
-      return NextResponse.json({ error: "Nothing stored for that domain." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Nothing stored for that scope." },
+        { status: 404 }
+      );
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, scope: scopeFor(url) });
   } catch (error) {
     return errorResponse(error);
   }
