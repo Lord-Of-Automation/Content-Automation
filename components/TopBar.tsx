@@ -34,7 +34,7 @@ export default async function TopBar({ current }: { current: "runs" | "logs" }) 
         </nav>
 
         <div className="spacer" />
-        {session?.user ? <span className="who">{session.user.email}</span> : null}
+        {session?.user ? <span className="who">{session.user.name}</span> : null}
         <ThemeToggle />
         <form action={logout}>
           <button type="submit" className="btn btn-danger">

@@ -28,12 +28,14 @@ export default function LoginForm() {
       ) : null}
 
       <div className="field">
-        <label htmlFor="email">Email</label>
+        <label htmlFor="username">Username</label>
         <input
-          id="email"
-          name="email"
-          type="email"
+          id="username"
+          name="username"
+          type="text"
           autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
           required
           autoFocus
         />

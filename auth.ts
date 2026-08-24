@@ -11,18 +11,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        email: { label: "Email", type: "email" },
+        username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const email =
-          typeof credentials?.email === "string" ? credentials.email : "";
+        const username =
+          typeof credentials?.username === "string" ? credentials.username : "";
         const password =
           typeof credentials?.password === "string" ? credentials.password : "";
 
-        if (!email || !password) return null;
+        if (!username || !password) return null;
 
-        const user = findUser(email);
+        const user = findUser(username);
 
         // Compare against a structurally valid throwaway hash when the user is
         // unknown, so an unknown email and a wrong password cost the same time
@@ -39,13 +39,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         if (!user || !ok) {
-          record(email, "sign-in-failed", "Wrong email or password.");
+          record(username, "sign-in-failed", "Wrong username or password.");
           return null;
         }
 
 
-        record(user.email, "sign-in", "Signed in.");
-        return { id: user.email, email: user.email, name: user.name };
+        record(user.username, "sign-in", "Signed in.");
+        // The username is the identity the app displays and audits. There is
+        // no email address in the user list any more, so none is carried.
+        return { id: user.username, name: user.username };
       },
     }),
   ],

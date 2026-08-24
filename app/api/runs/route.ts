@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   }
 
   const session = await auth();
-  const actor = session?.user?.email ?? "unknown";
+  const actor = session?.user?.name ?? "unknown";
 
   try {
     const result = await startRun(parsed.value);

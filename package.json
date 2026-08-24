@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "hash": "node scripts/hash-password.mjs"
+    "hash": "node scripts/hash-password.mjs",
+    "users": "node scripts/make-users.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

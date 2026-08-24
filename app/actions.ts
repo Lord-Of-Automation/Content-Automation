@@ -11,21 +11,21 @@ export async function login(
   _prev: LoginState,
   formData: FormData
 ): Promise<LoginState> {
-  const email = String(formData.get("email") ?? "");
+  const username = String(formData.get("username") ?? "");
   const password = String(formData.get("password") ?? "");
 
-  if (!email || !password) {
-    return { error: "Enter your email and password." };
+  if (!username || !password) {
+    return { error: "Enter your username and password." };
   }
 
   try {
     // On success this throws a redirect, which must reach Next untouched.
-    await signIn("credentials", { email, password, redirectTo: "/runs" });
+    await signIn("credentials", { username, password, redirectTo: "/runs" });
     return { error: null };
   } catch (error) {
     if (error instanceof AuthError) {
       if (error.type === "CredentialsSignin") {
-        return { error: "Email or password is not right." };
+        return { error: "Username or password is not right." };
       }
       // Auth.js wraps anything thrown inside authorize() as CallbackRouteError
       // and hides the real message, which makes a misconfigured deployment
@@ -49,6 +49,6 @@ export async function login(
 export async function logout(): Promise<void> {
   // Read the session before it is destroyed, otherwise there is no actor.
   const session = await auth();
-  record(session?.user?.email ?? "unknown", "sign-out", "Signed out.");
+  record(session?.user?.name ?? "unknown", "sign-out", "Signed out.");
   await signOut({ redirectTo: "/login" });
 }
