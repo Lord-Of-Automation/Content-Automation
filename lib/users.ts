@@ -32,7 +32,7 @@ function decode(raw: string): string {
 
   // Tolerate a whole "AUTH_USERS=..." line being pasted into a field that wants
   // only the value. Easy mistake, and the failure is otherwise opaque.
-  value = value.replace(/^AUTH_USERSs*=s*/i, "").trim();
+  value = value.replace(/^AUTH_USERS\s*=\s*/i, "").trim();
 
   // ...and surrounding quotes, which a .env habit tends to add.
   if (
@@ -45,7 +45,7 @@ function decode(raw: string): string {
   if (value.startsWith("[")) return value;
 
   // A pasted value can pick up newlines; base64 has no use for whitespace.
-  return Buffer.from(value.replace(/s+/g, ""), "base64").toString("utf8");
+  return Buffer.from(value.replace(/\s+/g, ""), "base64").toString("utf8");
 }
 
 type RawUser = {
