@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireSession } from "@/lib/api-guard";
-import { backend, readEvents } from "@/lib/audit";
+import { probeBackend, readEvents } from "@/lib/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +10,7 @@ export async function GET() {
   const denied = await requireSession();
   if (denied) return denied;
 
-  const store = backend();
+  const store = await probeBackend();
 
   return NextResponse.json({
     events: await readEvents(200),

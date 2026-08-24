@@ -64,15 +64,40 @@ async function redis(command: (string | number)[]): Promise<unknown> {
   return payload.result;
 }
 
-/** Which store is actually in use, without writing anything. */
+/** Which store is configured, judged without any network call. */
 export function backend(): Backend {
   if (redisConfig()) return "redis";
+  return fileBackend();
+}
+
+function fileBackend(): Backend {
   try {
     mkdirSync(DIR, { recursive: true });
     return "file";
   } catch {
     return "memory";
   }
+}
+
+/**
+ * Which store will actually take a write.
+ *
+ * Configuration alone is not proof: a KV whose variables are present but whose
+ * store is deleted, paused or misconfigured fails only at write time, and
+ * record() then falls back silently. Reporting "redis" on that basis would tell
+ * someone their history was safe while it was being dropped, so this pays for a
+ * PING to say something true.
+ */
+export async function probeBackend(): Promise<Backend> {
+  if (redisConfig()) {
+    try {
+      await redis(["PING"]);
+      return "redis";
+    } catch {
+      // Unreachable: whatever record() would fall back to is the real answer.
+    }
+  }
+  return fileBackend();
 }
 
 /**

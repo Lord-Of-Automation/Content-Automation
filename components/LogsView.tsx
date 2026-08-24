@@ -120,11 +120,12 @@ export default function LogsView() {
         <div className="card-body tight">
           {store === "memory" ? (
             <div className="notice warn">
-              <strong>History is not being kept.</strong> This deployment has a
-              read-only filesystem and no KV store, so entries live in one server
-              instance&rsquo;s memory and are gone when it recycles &mdash; which
-              is why the log looks empty. Attach a KV store to the project and
-              redeploy; it is picked up automatically.
+              <strong>History is not being kept.</strong> No KV store answered
+              and the filesystem is read-only, so entries live in one server
+              instance&rsquo;s memory and are gone when it recycles &mdash;
+              which is why the log looks empty. Check that KV_REST_API_URL and
+              KV_REST_API_TOKEN are set on the project and that the store is
+              still running.
             </div>
           ) : null}
 

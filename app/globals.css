@@ -1188,3 +1188,74 @@ button,
 .run-actions .btn-danger {
   margin-left: auto;
 }
+
+/* ---- Confirmation dialog ---- */
+.confirm {
+  /* A <dialog> is display:none until opened and centres itself in the top
+     layer, so it needs no fixed positioning of its own. */
+  border: 0;
+  padding: 0;
+  background: transparent;
+  max-width: min(440px, calc(100vw - 32px));
+  color: var(--ink);
+}
+
+.confirm::backdrop {
+  background: rgba(9, 12, 20, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.confirm-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  padding: 22px 22px 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.confirm-title {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.confirm-body {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.confirm-body p {
+  margin: 0 0 10px;
+}
+
+.confirm-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* The consequence people most need to read before clicking. */
+.confirm-warn {
+  margin-top: 12px !important;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--danger-bg) 40%, var(--line));
+  background: color-mix(in srgb, var(--danger-bg) 12%, transparent);
+  color: var(--ink);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+@media (max-width: 420px) {
+  .confirm-actions {
+    flex-direction: column-reverse;
+  }
+  .confirm-actions .btn {
+    width: 100%;
+  }
+}

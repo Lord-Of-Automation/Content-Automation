@@ -223,16 +223,6 @@ export default function Console() {
 
   async function cancelRun() {
     if (!selectedId) return;
-    if (
-      !window.confirm(
-        `Stop run #${selectedId}?
-
-Work already paid for is not refunded. ` +
-          "This only saves the steps that have not run yet."
-      )
-    ) {
-      return;
-    }
 
     setCancelling(true);
     setError(null);

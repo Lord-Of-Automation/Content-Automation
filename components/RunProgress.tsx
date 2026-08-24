@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+
+import ConfirmDialog from "@/components/ConfirmDialog";
 import StatusBadge from "@/components/StatusBadge";
 import { formatDuration, formatWhen } from "@/lib/format";
 import { LANGUAGES, MARKETS } from "@/lib/markets";
@@ -91,6 +94,7 @@ export default function RunProgress({
   onCancel?: () => void;
   cancelling?: boolean;
 }) {
+  const [confirming, setConfirming] = useState(false);
   if (!execution) {
     return (
       <div className="empty">
@@ -236,13 +240,38 @@ export default function RunProgress({
           <button
             type="button"
             className="btn btn-danger"
-            onClick={onCancel}
+            onClick={() => setConfirming(true)}
             disabled={cancelling}
           >
             {cancelling ? "Stopping…" : "Cancel run"}
           </button>
         ) : null}
       </div>
+
+      <ConfirmDialog
+        open={confirming}
+        busy={cancelling}
+        title={`Stop run #${execution.id}?`}
+        confirmLabel="Stop the run"
+        busyLabel="Stopping…"
+        onDismiss={() => setConfirming(false)}
+        onConfirm={() => {
+          onCancel?.();
+          setConfirming(false);
+        }}
+        body={
+          <>
+            <p>
+              The steps that have not run yet will be skipped and the run will
+              be marked cancelled.
+            </p>
+            <p className="confirm-warn">
+              Work already paid for is not refunded. If the crawl has been
+              billed, stopping saves what is left, not what is spent.
+            </p>
+          </>
+        }
+      />
     </div>
   );
 }
