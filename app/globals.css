@@ -1410,3 +1410,19 @@ button,
   line-height: 1.55;
   color: var(--muted);
 }
+
+/* Sets the article count apart from the crawl settings above it: the two read
+   as one block otherwise, and this is the field that spends the money. */
+.field-sep {
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+
+/* Used on the Logs and Accounts pages to space stacked cards. It had no rule at
+   all, so cards sat flush against each other. Matches the 20px the two-column
+   grid already uses, and nests safely: an empty stack adds no gap. */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}

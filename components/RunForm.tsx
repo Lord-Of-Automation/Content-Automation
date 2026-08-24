@@ -193,8 +193,9 @@ export default function RunForm({
           site, or untick and enter a number. 1000 is the API ceiling, so
           Every page means every page up to that.
         </div>
+      </div>
 
-      <div className="field">
+      <div className="field field-sep">
         <label htmlFor="pages_to_optimise">Pages to optimise</label>
         <div className="limit-row">
           <label className="check">
@@ -227,7 +228,6 @@ export default function RunForm({
           page here costs Claude, Gemini and DataForSEO credits and creates a
           WordPress post, so raise it deliberately.
         </div>
-      </div>
       </div>
 
       {showAdvanced ? (
