@@ -66,6 +66,26 @@ function requireEnv(name: string): string {
   return value.trim();
 }
 
+/**
+ * Where n8n should call this app back, worked out rather than configured.
+ *
+ * The workflow needs an address for the transcript endpoint, and hard-coding a
+ * domain means it breaks on every preview deployment and cannot be tested
+ * locally. Vercel publishes the deployment's own host, so the run carries it.
+ */
+function callbackBase(): string | null {
+  const explicit = process.env.APP_URL ?? process.env.AUTH_URL;
+  if (explicit) return explicit.replace(/\/+$/, "");
+
+  // Set by Vercel: the stable production domain first, then this deployment.
+  const host =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+  if (host) return "https://" + host.replace(/\/+$/, "");
+
+  const port = process.env.PORT ?? "3000";
+  return "http://localhost:" + port;
+}
+
 function baseUrl(): string {
   return requireEnv("N8N_BASE_URL").replace(/\/+$/, "");
 }
@@ -155,6 +175,11 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
   // credentials. Absent is fine: the workflow falls back to its own.
   const site = await credentialsFor(input.website_url).catch(() => null);
   const payload: Record<string, unknown> = { ...input };
+
+  // Lets the workflow read and write the Claude transcript without a domain
+  // written into a node.
+  const callback = callbackBase();
+  if (callback) payload.callback_base = callback;
   if (site) {
     payload.wp_username = site.username;
     payload.wp_password = site.password;
@@ -180,6 +205,7 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
     form.set("max_crawl_pages", String(input.max_crawl_pages));
     form.set("pages_to_optimise", String(input.pages_to_optimise));
     form.set("reuse_crawl_days", String(input.reuse_crawl_days));
+    if (callback) form.set("callback_base", callback);
     if (site) {
       form.set("wp_username", site.username);
       form.set("wp_password", site.password);
