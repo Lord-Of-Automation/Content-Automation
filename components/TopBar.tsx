@@ -4,6 +4,16 @@ import { auth } from "@/auth";
 import { logout } from "@/app/actions";
 import ThemeToggle from "@/components/ThemeToggle";
 
+/** Matches the one on the Accounts page, so a user reads the same either side. */
+function UserIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
 export default async function TopBar({
   current,
 }: {
@@ -46,7 +56,12 @@ export default async function TopBar({
         </nav>
 
         <div className="spacer" />
-        {session?.user ? <span className="who">{session.user.name}</span> : null}
+        {session?.user ? (
+          <span className="who">
+            <UserIcon />
+            <span className="who-name">{session.user.name}</span>
+          </span>
+        ) : null}
         <ThemeToggle />
         <form action={logout}>
           <button type="submit" className="btn btn-danger">

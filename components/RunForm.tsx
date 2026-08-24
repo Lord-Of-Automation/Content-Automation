@@ -7,7 +7,12 @@ import {
   MARKETS,
   MARKET_DEFAULT_LANGUAGE,
 } from "@/lib/markets";
+import { forecastCost } from "@/lib/forecast";
 import { DEFAULT_BRIEF_DOC_ID } from "@/lib/validate";
+
+function money(value: number): string {
+  return value < 10 ? "$" + value.toFixed(2) : "$" + Math.round(value);
+}
 
 export type RunValues = {
   website_url: string;
@@ -254,6 +259,24 @@ export default function RunForm({
           Use a different brief doc
         </button>
       )}
+
+      {(() => {
+        // Recomputed on every keystroke, so the number reacts to the two fields
+        // that actually drive it before anything is spent.
+        const forecast = forecastCost(values);
+        return (
+          <div className={forecast.unbounded ? "forecast is-open" : "forecast"}>
+            <div className="forecast-row">
+              <span className="forecast-label">Estimated cost</span>
+              <span className="forecast-amount">
+                {money(forecast.low)} &ndash; {money(forecast.high)}
+                {forecast.unbounded ? "+" : ""}
+              </span>
+            </div>
+            <p className="forecast-note">{forecast.note}</p>
+          </div>
+        );
+      })()}
 
       <button type="submit" className="btn-primary" disabled={busy}>
         {busy ? "Starting…" : "Start run"}

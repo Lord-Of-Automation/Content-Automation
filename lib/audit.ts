@@ -1,6 +1,8 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import { kv, kvConfigured, kvReachable } from "./kv";
+
 export type AuditAction =
   | "sign-in"
   | "sign-in-failed"
@@ -29,44 +31,9 @@ const CAP = 1000;
 // live, which is not long, so it is a stand-in rather than storage.
 const memory: AuditEvent[] = [];
 
-/**
- * Vercel KV and Upstash expose the same REST API under different variable
- * names, and Vercel sets its pair automatically when a store is attached, so
- * accepting both means no configuration in the common case.
- */
-function redisConfig(): { url: string; token: string } | null {
-  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
-  const token =
-    process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
-  return { url: url.replace(/\/$/, ""), token };
-}
-
-async function redis(command: (string | number)[]): Promise<unknown> {
-  const config = redisConfig();
-  if (!config) throw new Error("No KV configured.");
-
-  const response = await fetch(config.url, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${config.token}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(command),
-    cache: "no-store",
-    signal: AbortSignal.timeout(5_000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`KV returned ${response.status}.`);
-  }
-  const payload = (await response.json()) as { result?: unknown };
-  return payload.result;
-}
-
 /** Which store is configured, judged without any network call. */
 export function backend(): Backend {
-  if (redisConfig()) return "redis";
+  if (kvConfigured()) return "redis";
   return fileBackend();
 }
 
@@ -89,14 +56,7 @@ function fileBackend(): Backend {
  * PING to say something true.
  */
 export async function probeBackend(): Promise<Backend> {
-  if (redisConfig()) {
-    try {
-      await redis(["PING"]);
-      return "redis";
-    } catch {
-      // Unreachable: whatever record() would fall back to is the real answer.
-    }
-  }
+  if (await kvReachable()) return "redis";
   return fileBackend();
 }
 
@@ -119,10 +79,10 @@ export async function record(
     detail,
   };
 
-  if (redisConfig()) {
+  if (kvConfigured()) {
     try {
-      await redis(["LPUSH", KEY, JSON.stringify(event)]);
-      await redis(["LTRIM", KEY, 0, CAP - 1]);
+      await kv(["LPUSH", KEY, JSON.stringify(event)]);
+      await kv(["LTRIM", KEY, 0, CAP - 1]);
       return;
     } catch {
       // Fall through: a log line is worth keeping somewhere, even briefly.
@@ -154,9 +114,9 @@ function parseLine(line: string): AuditEvent | null {
 export async function readEvents(limit = 200): Promise<AuditEvent[]> {
   const events: AuditEvent[] = [...memory];
 
-  if (redisConfig()) {
+  if (kvConfigured()) {
     try {
-      const rows = (await redis(["LRANGE", KEY, 0, CAP - 1])) as unknown;
+      const rows = (await kv(["LRANGE", KEY, 0, CAP - 1])) as unknown;
       if (Array.isArray(rows)) {
         for (const row of rows) {
           const event = typeof row === "string" ? parseLine(row) : null;

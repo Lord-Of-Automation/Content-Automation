@@ -166,6 +166,15 @@ export default function RunProgress({
         </div>
       ) : null}
 
+      {!progress && !isTerminal(execution.status) ? (
+        <div className="alert alert-warn" style={{ marginTop: 16 }}>
+          n8n has not written any node data for this run yet, so there are no
+          stages to show. It publishes progress as the run goes only when
+          &ldquo;Save execution progress&rdquo; is on for the workflow; the
+          stages fill in from the first node once it does.
+        </div>
+      ) : null}
+
       {progress ? (
         <ul className="stages">
           {progress.stages.map((stage) => (

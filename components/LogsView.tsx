@@ -177,15 +177,6 @@ export default function LogsView() {
               ) : null}
             </>
           )}
-          <p className="logs-foot">
-            Stored in{" "}
-            {store === "redis"
-              ? "a KV store, kept across deployments and restarts"
-              : store === "file"
-                ? "a file on this machine (.data/audit.jsonl)"
-                : "memory only"}
-            .
-          </p>
         </div>
       </div>
     </div>
