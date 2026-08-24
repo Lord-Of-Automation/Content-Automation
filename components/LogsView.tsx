@@ -11,7 +11,9 @@ type AuditEvent = {
     | "sign-out"
     | "run-started"
     | "run-failed"
-    | "account-created";
+    | "account-created"
+    | "run-canceled"
+    | "run-cancel-failed";
   detail: string;
 };
 
@@ -22,6 +24,8 @@ const LABEL: Record<AuditEvent["action"], string> = {
   "run-started": "Started a run",
   "run-failed": "Run failed to start",
   "account-created": "Created an account",
+  "run-canceled": "Cancelled a run",
+  "run-cancel-failed": "Cancel failed",
 };
 
 const TONE: Record<AuditEvent["action"], string> = {
@@ -31,6 +35,8 @@ const TONE: Record<AuditEvent["action"], string> = {
   "run-started": "run",
   "run-failed": "bad",
   "account-created": "run",
+  "run-canceled": "idle",
+  "run-cancel-failed": "bad",
 };
 
 const PAGE = 25;

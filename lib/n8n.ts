@@ -1,5 +1,6 @@
 import { buildProgress, type Progress } from "./progress";
 import { estimateCost, type CostBreakdown } from "./cost";
+import { extractInputs, type RunInputs } from "./inputs";
 
 export type N8nStatus =
   | "new"
@@ -29,6 +30,8 @@ export type ExecutionDetail = ExecutionSummary & {
   dataUnavailable: string | null;
   /** What the run spent, where the payload says so. Null without run data. */
   cost: CostBreakdown | null;
+  /** What was submitted to start it, read back out of the payload. */
+  inputs: RunInputs | null;
 };
 
 export type StartRunInput = {
@@ -403,7 +406,51 @@ export async function getExecution(id: string): Promise<ExecutionDetail> {
     // Costs come out of the same payload progress is derived from, so this is
     // free: no extra request, and nothing to reconcile against a second source.
     cost: runData ? estimateCost(runData) : null,
+    inputs: extractInputs(runData),
   };
+}
+
+/**
+ * Ask n8n to stop a run. Returns the status it reports afterwards.
+ *
+ * A run sitting in a Wait node is the common case here, and n8n cancels those
+ * cleanly. Work already paid for, an OnPage crawl for instance, is not refunded
+ * by stopping, so this saves the remaining steps and not the spent ones.
+ */
+export async function stopExecution(id: string): Promise<N8nStatus> {
+  const response = await apiFetch(
+    `/executions/${encodeURIComponent(id)}/stop`,
+    { method: "POST", timeoutMs: 20_000 }
+  );
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+
+    // Stopping needs the execution:stop scope, which an older API key may not
+    // carry, and that reads as a flat 403 with nothing explaining why.
+    if (response.status === 403) {
+      throw new Error(
+        "n8n refused the stop request. The API key is missing the " +
+          "\"execution:stop\" scope: reissue it in n8n under Settings > API."
+      );
+    }
+    if (response.status === 404) {
+      throw new Error(
+        `n8n has no execution ${id} to stop. It may have already finished.`
+      );
+    }
+    throw new Error(
+      `n8n returned ${response.status} when stopping the run. ${text.slice(0, 300)}`
+    );
+  }
+
+  try {
+    const payload = (await response.json()) as Record<string, unknown>;
+    return toSummary(payload).status;
+  } catch {
+    // A 200 with an unreadable body still means it was accepted.
+    return "canceled";
+  }
 }
 
 /**
