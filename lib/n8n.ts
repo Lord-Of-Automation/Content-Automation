@@ -1,4 +1,5 @@
 import { buildProgress, type Progress } from "./progress";
+import { estimateCost, type CostBreakdown } from "./cost";
 
 export type N8nStatus =
   | "new"
@@ -26,6 +27,8 @@ export type ExecutionDetail = ExecutionSummary & {
   error: string | null;
   /** Set when the run data was too large or withheld, so progress is unavailable. */
   dataUnavailable: string | null;
+  /** What the run spent, where the payload says so. Null without run data. */
+  cost: CostBreakdown | null;
 };
 
 export type StartRunInput = {
@@ -397,6 +400,9 @@ export async function getExecution(id: string): Promise<ExecutionDetail> {
       executedNodes.length > 0
         ? buildProgress(executedNodes, running, lastNodeExecuted)
         : null,
+    // Costs come out of the same payload progress is derived from, so this is
+    // free: no extra request, and nothing to reconcile against a second source.
+    cost: runData ? estimateCost(runData) : null,
   };
 }
 

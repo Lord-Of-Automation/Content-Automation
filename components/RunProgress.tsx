@@ -4,6 +4,13 @@ import StatusBadge from "@/components/StatusBadge";
 import { formatDuration, formatWhen } from "@/lib/format";
 import type { ExecutionDetail } from "@/lib/n8n";
 
+/** Money at a precision that does not round a fraction of a cent to zero. */
+function money(value: number): string {
+  if (value === 0) return "$0";
+  if (value < 0.01) return "$" + value.toFixed(4);
+  return "$" + value.toFixed(2);
+}
+
 export default function RunProgress({
   execution,
   n8nUrl,
@@ -90,6 +97,40 @@ export default function RunProgress({
         </ul>
       ) : null}
 
+      {execution.cost ? (
+        <div className="cost">
+          <div className="cost-head">
+            <span>What this run cost</span>
+            <span className="cost-total">
+              {money(execution.cost.total)}
+              {execution.cost.incomplete ? "+" : ""}
+            </span>
+          </div>
+          <ul className="cost-lines">
+            {execution.cost.lines.map((line) => (
+              <li key={line.label}>
+                <span className="cost-label">
+                  {line.label}
+                  {line.exact ? (
+                    <span className="stage-tag">exact</span>
+                  ) : (
+                    <span className="stage-tag">estimated</span>
+                  )}
+                </span>
+                <span className="cost-detail">{line.detail}</span>
+                <span className="cost-amount">
+                  {line.amount === null ? "—" : money(line.amount)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="stage-hint" style={{ marginTop: 8 }}>
+            DataForSEO prices each call in its own response, so that part is
+            exact. Model usage is priced from token counts at the configured
+            rates, so treat it as close rather than billed.
+          </div>
+        </div>
+      ) : null}
       {n8nUrl ? (
         <div style={{ marginTop: 18 }}>
           <a

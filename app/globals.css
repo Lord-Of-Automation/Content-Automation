@@ -1000,3 +1000,67 @@ button,
 .added code.pill {
   font-size: 12.5px;
 }
+
+/* ---------- run cost ---------- */
+
+.cost {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.cost-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.cost-total {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cost-lines {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.cost-lines li {
+  display: grid;
+  grid-template-columns: minmax(0, auto) 1fr minmax(0, auto);
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.cost-lines li:last-child {
+  border-bottom: 0;
+}
+
+.cost-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.cost-detail {
+  color: var(--ink-3);
+  font-size: 12.5px;
+  min-width: 0;
+}
+
+.cost-amount {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  white-space: nowrap;
+}
