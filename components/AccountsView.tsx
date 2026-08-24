@@ -10,6 +10,24 @@ type Added = {
   note: string;
 };
 
+function UserIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+function KeyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M15 7a4 4 0 1 1-3.7 5.5L8 15.8V19H4v-4l6.5-6.5A4 4 0 0 1 15 7Z" />
+      <circle cx="16.5" cy="7.5" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
 export default function AccountsView() {
   const [accounts, setAccounts] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,15 +149,19 @@ export default function AccountsView() {
           <form onSubmit={submit}>
             <div className="field">
               <label htmlFor="new-username">Username</label>
-              <input
-                id="new-username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="niko"
-                autoCapitalize="none"
-                spellCheck={false}
-                required
-              />
+              <div className="input-icon">
+                <UserIcon />
+                <input
+                  id="new-username"
+                  className="input-fancy"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  required
+                />
+              </div>
               <div className="note">
                 Letters, digits, spaces, dots, underscores and hyphens. Sign-in
                 ignores capitals.
@@ -148,13 +170,17 @@ export default function AccountsView() {
 
             <div className="field">
               <label htmlFor="new-password">Password</label>
-              <input
-                id="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="leave empty to generate one"
-                autoComplete="new-password"
-              />
+              <div className="input-icon">
+                <KeyIcon />
+                <input
+                  id="new-password"
+                  className="input-fancy"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="leave empty to generate one"
+                  autoComplete="new-password"
+                />
+              </div>
               <div className="note">At least 10 characters if you set it yourself.</div>
             </div>
 
