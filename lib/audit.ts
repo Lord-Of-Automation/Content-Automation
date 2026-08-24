@@ -6,7 +6,8 @@ export type AuditAction =
   | "sign-in-failed"
   | "sign-out"
   | "run-started"
-  | "run-failed";
+  | "run-failed"
+  | "account-created";
 
 export type AuditEvent = {
   at: string;

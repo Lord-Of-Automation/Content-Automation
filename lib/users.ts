@@ -117,3 +117,16 @@ export function findUser(username: string): AppUser | undefined {
   const needle = username.trim().toLowerCase();
   return getUsers().find((u) => u.username === needle);
 }
+
+/** Drop the memoised list so the next read sees a freshly set AUTH_USERS. */
+export function refresh(): void {
+  cached = null;
+}
+
+/**
+ * The env-var form of a list. Base64 because Next expands $NAME when it parses
+ * a .env file and would otherwise eat the $2a$12$ prefix of every hash.
+ */
+export function encodeUsers(users: AppUser[]): string {
+  return Buffer.from(JSON.stringify(users), "utf8").toString("base64");
+}

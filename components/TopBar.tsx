@@ -4,7 +4,11 @@ import { auth } from "@/auth";
 import { logout } from "@/app/actions";
 import ThemeToggle from "@/components/ThemeToggle";
 
-export default async function TopBar({ current }: { current: "runs" | "logs" }) {
+export default async function TopBar({
+  current,
+}: {
+  current: "runs" | "logs" | "accounts";
+}) {
   const session = await auth();
 
   return (
@@ -30,6 +34,14 @@ export default async function TopBar({ current }: { current: "runs" | "logs" }) 
             className={current === "logs" ? "topnav-link is-current" : "topnav-link"}
           >
             Logs
+          </Link>
+          <Link
+            href="/accounts"
+            className={
+              current === "accounts" ? "topnav-link is-current" : "topnav-link"
+            }
+          >
+            Accounts
           </Link>
         </nav>
 

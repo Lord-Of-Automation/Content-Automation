@@ -980,3 +980,23 @@ button,
   width: 17px;
   height: 17px;
 }
+
+/* ---------- accounts ---------- */
+
+.added {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.added textarea {
+  width: 100%;
+  resize: vertical;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.added code.pill {
+  font-size: 12.5px;
+}
