@@ -21,6 +21,7 @@ export type RunValues = {
   max_crawl_pages: number;
   pages_to_optimise: number;
   reuse_crawl_days: number;
+  exclude_paths: string;
   brief_doc_id: string;
 };
 
@@ -49,6 +50,7 @@ export const DEFAULT_VALUES: RunValues = {
   max_crawl_pages: 0, // 0 = every page
   pages_to_optimise: 1,
   reuse_crawl_days: 7, // 0 = always crawl fresh
+  exclude_paths: "",
   brief_doc_id: DEFAULT_BRIEF_DOC_ID,
 };
 
@@ -271,6 +273,35 @@ export default function RunForm({
           site, or untick and enter a number. 1000 is the API ceiling, so
           Every page means every page up to that.
         </div>
+      </div>
+
+      <div className="field">
+        <label htmlFor="exclude_paths">Never optimise</label>
+        <input
+          id="exclude_paths"
+          type="text"
+          placeholder="/bonus/, /tag/, /author/"
+          value={values.exclude_paths}
+          onChange={(e) => set("exclude_paths", e.target.value)}
+          aria-invalid={Boolean(fieldErrors.exclude_paths)}
+        />
+        {fieldErrors.exclude_paths ? (
+          <div className="err">{fieldErrors.exclude_paths}</div>
+        ) : (
+          <div className="note">
+            {(() => {
+              const list = values.exclude_paths
+                .split(/[\n,]/)
+                .map((v) => v.trim())
+                .filter(Boolean);
+              return list.length === 0
+                ? "Leave empty to optimise every crawled page. Add path fragments, separated by commas, and any page whose address contains one is skipped."
+                : `Skipping any page whose address contains ${list
+                    .map((v) => '"' + v + '"')
+                    .join(" or ")}. They are still crawled for the link graph, just never written.`;
+            })()}
+          </div>
+        )}
       </div>
 
       <div className="field">

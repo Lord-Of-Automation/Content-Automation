@@ -43,6 +43,8 @@ export type StartRunInput = {
   pages_to_optimise: number;
   /** Reuse a finished crawl of the same domain this many days old. 0 = never. */
   reuse_crawl_days: number;
+  /** Crawled pages whose address contains any of these are never optimised. */
+  exclude_paths: string[];
   brief_doc_id: string;
 };
 
@@ -180,6 +182,7 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
     form.set("max_crawl_pages", String(input.max_crawl_pages));
     form.set("pages_to_optimise", String(input.pages_to_optimise));
     form.set("reuse_crawl_days", String(input.reuse_crawl_days));
+    form.set("exclude_paths", input.exclude_paths.join("\n"));
     if (site) {
       form.set("wp_username", site.username);
       form.set("wp_password", site.password);

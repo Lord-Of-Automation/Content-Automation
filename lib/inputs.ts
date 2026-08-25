@@ -12,6 +12,7 @@ export type RunInputs = {
   max_crawl_pages: number | null;
   pages_to_optimise: number | null;
   reuse_crawl_days: number | null;
+  exclude_paths: string[];
   brief_doc_id: string | null;
 };
 
@@ -22,6 +23,7 @@ const FIELDS = [
   "max_crawl_pages",
   "pages_to_optimise",
   "reuse_crawl_days",
+  "exclude_paths",
   "brief_doc_id",
 ] as const;
 
@@ -103,6 +105,11 @@ export function extractInputs(
     max_crawl_pages: asNumber(best.max_crawl_pages),
     pages_to_optimise: asNumber(best.pages_to_optimise),
     reuse_crawl_days: asNumber(best.reuse_crawl_days),
+    exclude_paths: (() => {
+      const raw = best.exclude_paths;
+      const list = Array.isArray(raw) ? raw : String(raw ?? "").split(/[\n,]/);
+      return list.map((v) => String(v).trim()).filter(Boolean);
+    })(),
     brief_doc_id: asString(best.brief_doc_id),
   };
 }

@@ -86,6 +86,13 @@ function inputRows(inputs: RunInputs): { label: string; value: string }[] {
     });
   }
 
+  if (inputs.exclude_paths.length > 0) {
+    rows.push({
+      label: "Never optimise",
+      value: inputs.exclude_paths.join(", "),
+    });
+  }
+
   if (inputs.brief_doc_id) {
     rows.push({ label: "Brief document", value: inputs.brief_doc_id });
   }

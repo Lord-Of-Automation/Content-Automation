@@ -96,6 +96,31 @@ export function validateRunInput(raw: unknown): ValidationResult {
     }
   }
 
+  // ---- exclude_paths
+  //
+  // Free text, because the shapes people want to skip are not a fixed list.
+  // Split on lines and commas, since a pasted list arrives as either.
+  const rawExclude = input.exclude_paths;
+  const excludeList: string[] = Array.isArray(rawExclude)
+    ? rawExclude.map((v) => String(v))
+    : String(rawExclude ?? "").split(/[\n,]/);
+
+  const excludePaths: string[] = [];
+  for (const entry of excludeList) {
+    const value = entry.trim();
+    if (!value) continue;
+    if (value.length > 200) {
+      errors.exclude_paths = "One of those is too long to be a path.";
+      break;
+    }
+    // Matching is on the address, so a full URL works as well as a fragment.
+    if (!excludePaths.includes(value)) excludePaths.push(value);
+  }
+
+  if (excludePaths.length > 50) {
+    errors.exclude_paths = "That is more than 50 patterns. Use fewer, broader ones.";
+  }
+
   // ---- brief_doc_id
   const briefDocId =
     typeof input.brief_doc_id === "string" && input.brief_doc_id.trim()
@@ -118,6 +143,7 @@ export function validateRunInput(raw: unknown): ValidationResult {
       max_crawl_pages: Math.trunc(pages),
       pages_to_optimise: Math.trunc(optimise),
       reuse_crawl_days: reuseDays,
+      exclude_paths: excludePaths,
       brief_doc_id: briefDocId,
     },
   };
