@@ -512,6 +512,18 @@ button,
   border-style: dashed;
 }
 
+/* A stage that failed. Distinct from active, which it used to be styled as,
+   so a failure no longer reads as something still in progress. */
+.stage-failed .stage-mark {
+  background: var(--bad, #c0392b);
+  border-color: var(--bad, #c0392b);
+  color: #fff;
+}
+
+.stage-failed .stage-name {
+  color: var(--bad, #c0392b);
+}
+
 .stage-name {
   /* Blockified so the description below it starts on its own line. As inline
      spans these ran together, and the hint's vertical margin did nothing. */

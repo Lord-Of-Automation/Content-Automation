@@ -164,8 +164,10 @@ function progressOf(run: EngineRun): Progress {
   const steps = run.steps ?? [];
 
   const stages: ProgressStage[] = steps.map((step) => {
+    // A failed step used to map to "active", so it read as still running and
+    // never stopped. It has its own state now.
     const state: StageState =
-      step.status === "skipped" ? "skipped" : step.status === "ok" ? "done" : "active";
+      step.status === "skipped" ? "skipped" : step.status === "ok" ? "done" : "failed";
     return {
       key: step.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
       label: step.name,

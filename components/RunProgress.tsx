@@ -210,13 +210,16 @@ export default function RunProgress({
           {progress.stages.map((stage) => (
             <li key={stage.key} className={`stage stage-${stage.state}`}>
               <span className="stage-mark" aria-hidden="true">
-                ✓
+                {stage.state === "failed" ? "✕" : "✓"}
               </span>
               <span style={{ minWidth: 0 }}>
                 <span className="stage-name">
                   {stage.label}
                   {stage.state === "skipped" ? (
                     <span className="stage-tag">not needed</span>
+                  ) : null}
+                  {stage.state === "failed" ? (
+                    <span className="stage-tag">failed</span>
                   ) : null}
                   {stage.state === "done" && stage.nodesRun > 0 ? (
                     <span className="stage-tag">{stage.nodesRun} steps</span>

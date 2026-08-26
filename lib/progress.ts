@@ -229,7 +229,7 @@ STAGES.forEach((stage, index) => {
   for (const node of stage.nodes) NODE_TO_STAGE.set(node, index);
 });
 
-export type StageState = "done" | "active" | "pending" | "skipped";
+export type StageState = "done" | "active" | "pending" | "skipped" | "failed";
 
 export type ProgressStage = Stage & {
   state: StageState;
