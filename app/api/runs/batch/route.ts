@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
-import { startRun } from "@/lib/n8n";
+import { startRun } from "@/lib/backend";
 import { validateRunInput } from "@/lib/validate";
 
 export const runtime = "nodejs";

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse, requireSession } from "@/lib/api-guard";
-import { findExecutionStartedAfter } from "@/lib/n8n";
+import { findExecutionStartedAfter } from "@/lib/backend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

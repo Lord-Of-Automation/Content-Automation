@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse, requireSession } from "@/lib/api-guard";
-import { listExecutions, startRun } from "@/lib/n8n";
+import { listExecutions, startRun } from "@/lib/backend";
 import { validateRunInput } from "@/lib/validate";
 import { auth } from "@/auth";
 import { record } from "@/lib/audit";

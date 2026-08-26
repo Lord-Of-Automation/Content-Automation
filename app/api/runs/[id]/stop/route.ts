@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
-import { isTerminal, stopExecution } from "@/lib/n8n";
+import { isTerminal, stopExecution } from "@/lib/backend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +17,8 @@ export async function POST(
 
   const { id } = await params;
 
-  if (!/^\d+$/.test(id)) {
+  // n8n ids are numeric; engine ids are a timestamp and a salt.
+  if (!/^[\w.-]{1,64}$/.test(id)) {
     return NextResponse.json({ error: "Bad execution id." }, { status: 400 });
   }
 

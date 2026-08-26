@@ -1,23 +1,31 @@
+# dependencies
 node_modules
+
+# build output
 .next
 out
 build
-.DS_Store
-*.pem
+next-env.d.ts
+*.tsbuildinfo
 
-# env
+# local run data
+.data/
+
+# secrets. The negation must come AFTER the pattern it exempts from,
+# because the last matching rule wins.
 .env
 .env*
 !.env.example
+*.pem
+
+# Workflow snapshots pulled from n8n for inspection. These embed credentials
+# in node parameters, which is exactly how one reached a commit before.
+gap.json
+wf-*.json
+wf.json
 
 # vercel
 .vercel
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-.data/
-
-# Workflow snapshots pulled from n8n: they embed API keys in node parameters.
-wf-*.json
-wf.json
+# macOS
+.DS_Store
