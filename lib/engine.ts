@@ -88,11 +88,14 @@ async function call<T>(
   }
 
   if (!response.ok) {
-    throw new Error(
-      body?.error ??
-        `The engine answered ${response.status} for ${path}.` +
-          (body?.missing ? ` Missing: ${body.missing.join(", ")}.` : ""),
-    );
+    // The `missing` list is the actionable half. It was being dropped whenever
+    // `error` was present, which is exactly when it is set.
+    const detail = Array.isArray(body?.missing) && body.missing.length
+      ? ` Missing: ${body.missing.join(", ")}.`
+      : "";
+    const message =
+      (body?.error ?? `The engine answered ${response.status} for ${path}.`) + detail;
+    throw new Error(message);
   }
   return body as T;
 }
