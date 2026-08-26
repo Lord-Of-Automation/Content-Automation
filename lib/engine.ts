@@ -27,6 +27,15 @@ import { credentialsFor } from "./sites";
 
 class EngineConfigError extends Error {}
 
+/**
+ * A run this backend has never heard of.
+ *
+ * Distinct from a general failure because it is usually not a failure at all:
+ * switching RUN_BACKEND orphans every id the other side issued, and the
+ * console remembers the last one it was looking at.
+ */
+class RunNotFoundError extends Error {}
+
 function base(): string {
   const url = process.env.ENGINE_URL?.trim();
   if (!url) {
@@ -69,6 +78,13 @@ async function call<T>(
     body = text ? JSON.parse(text) : null;
   } catch {
     body = { error: text.slice(0, 300) };
+  }
+
+  if (response.status === 404) {
+    throw new RunNotFoundError(
+      "That run does not exist on this backend. Ids from n8n and from the " +
+        "engine are separate, so switching backends leaves the old ones behind.",
+    );
   }
 
   if (!response.ok) {
@@ -301,4 +317,4 @@ export function isTerminal(status: N8nStatus): boolean {
   return status === "success" || status === "error" || status === "canceled" || status === "crashed";
 }
 
-export { EngineConfigError };
+export { EngineConfigError, RunNotFoundError };

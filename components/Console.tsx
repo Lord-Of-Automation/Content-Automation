@@ -74,12 +74,28 @@ export default function Console() {
         return;
       }
       const payload = await response.json();
+
+      // A remembered run the current backend has never heard of. Forget it,
+      // rather than polling an id that will never resolve — this happens to
+      // everyone once, the first time RUN_BACKEND changes.
+      if (response.status === 404) {
+        setSelectedId(null);
+        setDetail(null);
+        try {
+          window.localStorage.removeItem(SELECTED_KEY);
+        } catch {
+          /* private mode, cleared storage */
+        }
+        setError(payload.error ?? "That run no longer exists.");
+        return;
+      }
+
       if (!response.ok) throw new Error(payload.error ?? "Could not load run.");
       setDetail(payload.execution);
       setN8nUrl(payload.n8nUrl ?? null);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not reach n8n.");
+      setError(e instanceof Error ? e.message : "Could not reach the backend.");
     } finally {
       setDetailLoading(false);
     }
