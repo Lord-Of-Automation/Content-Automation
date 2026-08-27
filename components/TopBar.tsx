@@ -17,7 +17,7 @@ function UserIcon() {
 export default async function TopBar({
   current,
 }: {
-  current: "runs" | "logs" | "accounts";
+  current: "runs" | "logs" | "accounts" | "keys";
 }) {
   const session = await auth();
 
@@ -52,6 +52,12 @@ export default async function TopBar({
             }
           >
             Accounts
+          </Link>
+          <Link
+            href="/keys"
+            className={current === "keys" ? "topnav-link is-current" : "topnav-link"}
+          >
+            Keys
           </Link>
         </nav>
 

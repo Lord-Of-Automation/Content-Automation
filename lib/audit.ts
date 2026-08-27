@@ -15,7 +15,9 @@ export type AuditAction =
   | "run-retried"
   | "run-retry-failed"
   | "site-saved"
-  | "site-removed";
+  | "site-removed"
+  /** Which engine credentials were changed. The names only, never the values. */
+  | "keys-updated";
 
 export type AuditEvent = {
   at: string;
