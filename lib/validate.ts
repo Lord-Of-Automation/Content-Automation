@@ -1,7 +1,16 @@
 import { LANGUAGE_CODES, MARKET_CODES } from "./markets";
 import type { StartRunInput } from "./n8n";
 
-export const DEFAULT_BRIEF_DOC_ID = "1TesrkPHHJRHq0Gmb6keRrY-TdrWJ_u3QDFwNWOpwR6s";
+/**
+ * The house brief every run is written against.
+ *
+ * This must be a *native* Google Doc. The previous default was an uploaded
+ * .docx, which Drive will not export as text — so the workflow downloaded the
+ * zip, ran a plain-text extractor over its compressed bytes, and fed the model
+ * 2.34 MB of noise instead of the brief. Nothing ever followed the house voice
+ * as a result, and that one file was 62% of a run's entire payload.
+ */
+export const DEFAULT_BRIEF_DOC_ID = "19ohOWLCc7JP6A8goVJMD3a5DXxKa4oUAt-P9-UevTn8";
 
 export type ValidationResult =
   | { ok: true; value: StartRunInput }
