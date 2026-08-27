@@ -217,7 +217,10 @@ function inputsOf(run: EngineRun): RunInputs | null {
   };
 }
 
-export async function startRun(input: StartRunInput): Promise<StartRunResult> {
+export async function startRun(
+  input: StartRunInput,
+  resumeFrom?: string,
+): Promise<StartRunResult> {
   const startedAt = new Date().toISOString();
 
   // WordPress credentials travel with the run, so the console stays the one
@@ -226,6 +229,7 @@ export async function startRun(input: StartRunInput): Promise<StartRunResult> {
 
   const body = {
     ...input,
+    ...(resumeFrom ? { resume_from: resumeFrom } : {}),
     ...(credentials
       ? {
           wp_username: credentials.username,
@@ -284,11 +288,15 @@ export async function findExecutionStartedAfter(): Promise<ExecutionSummary | nu
 }
 
 /**
- * A retry starts a fresh run from the recorded input.
+ * Retries a run, reusing what the failed one already paid for.
  *
- * n8n replayed the workflow snapshot stored with the original execution, which
- * is why a retry there so often reproduced the original failure exactly. This
- * runs the current code against the same input instead.
+ * The engine keeps each run's crawl task and any finished article, so a retry
+ * resumes rather than re-buying: a publish failure costs the publish call
+ * again, not the crawl, the research and the draft.
+ *
+ * n8n could not do this — it replayed the workflow snapshot stored with the
+ * original execution, which is why a retry there so often reproduced the
+ * original failure exactly.
  */
 export async function retryExecution(id: string): Promise<{ id: string; status: N8nStatus }> {
   const run = await call<EngineRun>(`/runs/${encodeURIComponent(id)}`);
@@ -305,7 +313,7 @@ export async function retryExecution(id: string): Promise<{ id: string; status: 
     reuse_crawl_days: inputs.reuse_crawl_days ?? 0,
     exclude_paths: inputs.exclude_paths,
     brief_doc_id: inputs.brief_doc_id ?? "",
-  });
+  }, id);
   return { id: started.executionId ?? "", status: "new" };
 }
 

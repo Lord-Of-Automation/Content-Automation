@@ -318,7 +318,7 @@ export default function Console() {
       // n8n makes a new execution for the retry, so follow that one.
       if (payload.id && String(payload.id) !== selectedId) {
         setNotice(
-          `Resumed #${selectedId} as #${payload.id}, carrying on from the node that failed.`
+          `Retrying #${selectedId} as #${payload.id}, reusing its crawl and any article it finished writing.`
         );
         selectRun(String(payload.id));
       } else {
