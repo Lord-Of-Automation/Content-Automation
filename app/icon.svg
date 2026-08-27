@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- A page with a line being written across it: what this console does.
+       Flat colours and no gradients, because at 16px nothing else survives. -->
+  <rect width="32" height="32" rx="7" fill="#2f71b2"/>
+  <path d="M9 8h11l4 4v12a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" fill="#fff"/>
+  <path d="M20 8v4h4z" fill="#bcd4ea"/>
+  <rect x="11" y="15" width="10" height="1.8" rx=".9" fill="#2f71b2"/>
+  <rect x="11" y="19" width="7" height="1.8" rx=".9" fill="#9db8d2"/>
+</svg>
