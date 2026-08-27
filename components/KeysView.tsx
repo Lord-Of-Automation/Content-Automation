@@ -31,6 +31,14 @@ const GROUPS: Array<{ title: string; blurb: string; names: string[] }> = [
     names: ["IMAGE_BACKEND", "GOOGLE_AI_API_KEY", "GEMINI_LOCATION", "GEMINI_IMAGE_MODEL"],
   },
   {
+    title: "Game pages and screenshots",
+    blurb:
+      "The crawl sheet the gallery reads. One row per page of the source site; a game page is " +
+      "/slots/{studio}/{game}/ and the last part is matched against the game name. Only column A " +
+      "is read, so the sheet can stay as wide as the crawl exports it.",
+    names: ["SHEET_GAME_CRAWL_ID"],
+  },
+  {
     title: "Game data",
     blurb:
       "Specs from the provider's own feed, and the playable demo embed. Newer Slots Launch " +
