@@ -32,8 +32,19 @@ const GROUPS: Array<{ title: string; blurb: string; names: string[] }> = [
   },
   {
     title: "Game data",
-    blurb: "Specs from the provider's own feed, and the playable demo embed.",
-    names: ["SLOTSLAUNCH_TOKEN"],
+    blurb:
+      "Specs from the provider's own feed, and the playable demo embed. Newer Slots Launch " +
+      "credentials are a key and a secret: with a secret set, every call and every embed is " +
+      "signed, which becomes compulsory on 15 November 2026. The domain is the one registered " +
+      "under Launch Pad → API, hostname only and no www — it is checked on both, so the live " +
+      "site goes here rather than whichever host runs the engine. Embed days is how long a " +
+      "signed demo URL keeps working before its page must be regenerated.",
+    names: [
+      "SLOTSLAUNCH_TOKEN",
+      "SLOTSLAUNCH_SECRET",
+      "SLOTSLAUNCH_DOMAIN",
+      "SLOTSLAUNCH_EMBED_DAYS",
+    ],
   },
   {
     title: "Sheets and the brief",
