@@ -118,13 +118,24 @@ export async function saveSite(
   if (!username.trim()) {
     return { ok: false, error: "A WordPress username is required." };
   }
-  if (!password) {
+  if (!password || !password.trim()) {
     return { ok: false, error: "A password is required." };
   }
 
+  // WordPress shows an application password as "abcd EFGH ijkl MNOP", and
+  // copying it off that screen routinely brings a trailing space or newline
+  // with it. Those go into the Basic auth header verbatim and the site rejects
+  // the login — while the same password pasted by hand elsewhere works, which
+  // makes it look like the wrong password rather than a stray character.
+  //
+  // Ends only. The spaces inside are part of the format WordPress prints, and
+  // it accepts them. A non-breaking space is never intentional and comes from
+  // copying rendered HTML, so it becomes an ordinary one.
+  const cleanPassword = password.replace(/ /g, " ").trim();
+
   let secret: string;
   try {
-    secret = encrypt(password);
+    secret = encrypt(cleanPassword);
   } catch (error) {
     return {
       ok: false,
@@ -179,8 +190,10 @@ export async function credentialsFor(
   try {
     return {
       domain,
-      username: match.username,
-      password: decrypt(match.secret),
+      username: match.username.trim(),
+      // Cleaned on the way out as well as in, so an entry saved before this
+      // existed does not need re-typing to start working.
+      password: decrypt(match.secret).replace(/ /g, " ").trim(),
     };
   } catch {
     // Unreadable is the same as absent: better no credentials than wrong ones.
