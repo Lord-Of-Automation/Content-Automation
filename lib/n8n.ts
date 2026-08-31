@@ -560,8 +560,4 @@ export async function findExecutionStartedAfter(
   return candidates[0] ?? null;
 }
 
-export function executionUrl(id: string): string {
-  return `${baseUrl()}/workflow/${workflowId()}/executions/${id}`;
-}
-
 export { N8nConfigError };

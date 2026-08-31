@@ -141,7 +141,6 @@ function CurrentPage({ page }: { page: { url: string; index: number; total: numb
 
 export default function RunProgress({
   execution,
-  n8nUrl,
   loading,
   onCancel,
   cancelling,
@@ -149,7 +148,6 @@ export default function RunProgress({
   retrying,
 }: {
   execution: ExecutionDetail | null;
-  n8nUrl: string | null;
   loading: boolean;
   onCancel?: () => void;
   cancelling?: boolean;
@@ -308,17 +306,6 @@ export default function RunProgress({
         </div>
       ) : null}
       <div className="run-actions">
-        {n8nUrl ? (
-          <a
-            className="btn btn-ghost"
-            href={n8nUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open in n8n ↗
-          </a>
-        ) : null}
-
         {onRetry &&
         (execution.status === "error" || execution.status === "crashed") ? (
           <button

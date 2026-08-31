@@ -31,7 +31,6 @@ export default function Console() {
   const [history, setHistory] = useState<ExecutionSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ExecutionDetail | null>(null);
-  const [n8nUrl, setN8nUrl] = useState<string | null>(null);
 
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -92,7 +91,6 @@ export default function Console() {
 
       if (!response.ok) throw new Error(payload.error ?? "Could not load run.");
       setDetail(payload.execution);
-      setN8nUrl(payload.n8nUrl ?? null);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not reach the backend.");
@@ -448,7 +446,6 @@ export default function Console() {
         </div>
         <RunProgress
           execution={detail}
-          n8nUrl={n8nUrl}
           loading={detailLoading}
           onCancel={cancelRun}
           cancelling={cancelling}

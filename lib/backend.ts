@@ -27,7 +27,6 @@ export const startRun: typeof n8n.startRun = (input) => impl().startRun(input);
 export const listExecutions: typeof n8n.listExecutions = (limit) => impl().listExecutions(limit);
 export const getExecution: typeof n8n.getExecution = (id) => impl().getExecution(id);
 export const stopExecution: typeof n8n.stopExecution = (id) => impl().stopExecution(id);
-export const executionUrl: typeof n8n.executionUrl = (id) => impl().executionUrl(id);
 export const workflowId: typeof n8n.workflowId = () => impl().workflowId();
 export const isTerminal: typeof n8n.isTerminal = (status) => impl().isTerminal(status);
 

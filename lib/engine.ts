@@ -323,11 +323,6 @@ export async function retryExecution(id: string): Promise<{ id: string; status: 
   return { id: started.executionId ?? "", status: "new" };
 }
 
-/** There is no second UI to open, so the run's own log stands in. */
-export function executionUrl(id: string): string {
-  return `${base()}/runs/${encodeURIComponent(id)}/log?tail=200`;
-}
-
 export function workflowId(): string {
   return "engine";
 }

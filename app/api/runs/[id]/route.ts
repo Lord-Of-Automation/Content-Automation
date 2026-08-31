@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse, requireSession } from "@/lib/api-guard";
-import { executionUrl, getExecution } from "@/lib/backend";
+import { getExecution } from "@/lib/backend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,10 +25,7 @@ export async function GET(
 
   try {
     const execution = await getExecution(id);
-    return NextResponse.json({
-      execution,
-      n8nUrl: executionUrl(id),
-    });
+    return NextResponse.json({ execution });
   } catch (error) {
     return errorResponse(error);
   }
