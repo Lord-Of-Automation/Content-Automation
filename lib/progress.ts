@@ -248,12 +248,20 @@ export type CurrentPage = {
   total: number;
 };
 
+/** A page this run has already finished and published. */
+export type DonePage = {
+  url: string;
+  postId: number | string | null;
+};
+
 export type Progress = {
   stages: ProgressStage[];
   currentLabel: string | null;
   percent: number;
   nodesExecuted: number;
   currentPage: CurrentPage | null;
+  /** Oldest first, which is the order they were written in. */
+  donePages: DonePage[];
 };
 
 /**
@@ -313,7 +321,9 @@ export function buildProgress(
     percent: isRunning ? Math.min(percent, 99) : percent,
     nodesExecuted: executedNodes.length,
     // n8n's execution data has no equivalent: the workflow never recorded which
-    // page it was on. Runs on that backend simply do not show this.
+    // page it was on, nor which it had finished. Runs on that backend simply do
+    // not show either.
     currentPage: null,
+    donePages: [],
   };
 }

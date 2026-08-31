@@ -139,6 +139,44 @@ function CurrentPage({ page }: { page: { url: string; index: number; total: numb
   );
 }
 
+/**
+ * The pages this run has already finished.
+ *
+ * Closed by default: while a run is going the interesting line is the one above
+ * it, and on a forty-page run an open list would push everything else off the
+ * screen. The count is on the summary, so it says how many without opening.
+ *
+ * A disclosure rather than a select, because these are addresses worth opening
+ * — a select would list them and give no way to reach them.
+ */
+function DonePages({ pages }: { pages: { url: string; postId: number | string | null }[] }) {
+  const pathOf = (url: string): string => {
+    try {
+      const parsed = new URL(url);
+      return parsed.pathname + parsed.search;
+    } catch {
+      return url;
+    }
+  };
+
+  return (
+    <details className="done-pages">
+      <summary>
+        {pages.length} {pages.length === 1 ? "page" : "pages"} done
+      </summary>
+      <ol className="done-pages-list">
+        {pages.map((page) => (
+          <li key={`${page.url}-${page.postId ?? ""}`}>
+            <a href={page.url} target="_blank" rel="noopener noreferrer" title={page.url}>
+              {pathOf(page.url)}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
 export default function RunProgress({
   execution,
   loading,
@@ -190,6 +228,7 @@ export default function RunProgress({
       </div>
 
       {progress?.currentPage ? <CurrentPage page={progress.currentPage} /> : null}
+      {progress?.donePages?.length ? <DonePages pages={progress.donePages} /> : null}
 
       {execution.inputs ? (
         <div className="inputs">

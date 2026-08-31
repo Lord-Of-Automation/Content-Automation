@@ -500,6 +500,73 @@ button,
   text-decoration: underline;
 }
 
+/* The pages already finished, closed by default. */
+.done-pages {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.done-pages > summary {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--ink-2);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* Replace the default marker with one that points the way it opens. */
+.done-pages > summary::-webkit-details-marker {
+  display: none;
+}
+
+.done-pages > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 0.15s ease;
+  flex: none;
+}
+
+.done-pages[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.done-pages > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+
+.done-pages-list {
+  margin: 0;
+  padding: 0 12px 10px 30px;
+  /* Long runs get a scroller rather than a page that grows without end. */
+  max-height: 220px;
+  overflow-y: auto;
+  font-size: 13px;
+}
+
+.done-pages-list li {
+  padding: 2px 0;
+}
+
+.done-pages-list a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.done-pages-list a:hover {
+  text-decoration: underline;
+}
+
 .stages {
   list-style: none;
   margin: 16px 0 0;

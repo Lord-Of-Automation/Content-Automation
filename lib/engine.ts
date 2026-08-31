@@ -120,7 +120,11 @@ type EngineRun = {
   error: string | null;
   progress: { done: number; total: number; percent: number };
   current?: { url: string; index: number; total: number; startedAt: string } | null;
-  result: { pages_optimised: number; published: unknown[]; skipped: unknown[] };
+  result: {
+    pages_optimised: number;
+    published: Array<{ url?: string; postId?: number | string | null }>;
+    skipped: unknown[];
+  };
   input?: Record<string, unknown>;
   steps?: EngineStep[];
 };
@@ -203,6 +207,12 @@ function progressOf(run: EngineRun): Progress {
     currentPage: run.current
       ? { url: run.current.url, index: run.current.index, total: run.current.total }
       : null,
+    // Written as each page is published, so this grows while the run is going
+    // and is the finished list once it stops. A record from before the engine
+    // reported any of this simply has none.
+    donePages: (run.result?.published ?? [])
+      .filter((p) => p && typeof p.url === "string" && p.url)
+      .map((p) => ({ url: p.url as string, postId: p.postId ?? null })),
   };
 }
 
