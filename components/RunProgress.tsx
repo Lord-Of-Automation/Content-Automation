@@ -93,9 +93,14 @@ function inputRows(inputs: RunInputs): { label: string; value: string }[] {
     });
   }
 
-  if (inputs.brief_doc_id) {
-    rows.push({ label: "Brief document", value: inputs.brief_doc_id });
-  }
+  // Said either way. A missing row reads as "not recorded"; the point here is
+  // that writing without the brief is a choice someone made, and a run that
+  // reads oddly later should say so on its own record.
+  rows.push(
+    inputs.brief_doc_id
+      ? { label: "Brief document", value: inputs.brief_doc_id }
+      : { label: "Brief document", value: "None — written without the house voice" },
+  );
 
   return rows;
 }
@@ -238,7 +243,12 @@ export default function RunProgress({
               <div key={row.label}>
                 <dt>{row.label}</dt>
                 <dd
-                  className={row.label === "Brief document" ? "mono" : undefined}
+                  // Monospace suits a file ID; it does not suit a sentence.
+                  className={
+                    row.label === "Brief document" && !row.value.startsWith("None")
+                      ? "mono"
+                      : undefined
+                  }
                 >
                   {row.value}
                 </dd>

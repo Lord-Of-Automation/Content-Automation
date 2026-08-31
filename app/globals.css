@@ -500,6 +500,31 @@ button,
   text-decoration: underline;
 }
 
+/* A checkbox and its label on one line, for a setting that is simply on or off. */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  /* Overrides the block label styling the other fields use. */
+  margin-bottom: 0;
+}
+
+.toggle-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.toggle-row span {
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--ink-2);
+}
+
 /* The pages already finished, closed by default. */
 .done-pages {
   margin-top: 8px;

@@ -23,6 +23,14 @@ export type RunValues = {
   reuse_crawl_days: number;
   exclude_paths: string;
   brief_doc_id: string;
+  /**
+   * Whether the run reads the house brief at all.
+   *
+   * Off by default. The brief shapes the voice of every page a run writes, and
+   * it is a deliberate choice rather than something to inherit silently — so
+   * the address is kept but not sent unless this is on.
+   */
+  use_brief: boolean;
 };
 
 const STORAGE_KEY = "ca:last-input";
@@ -51,7 +59,9 @@ export const DEFAULT_VALUES: RunValues = {
   pages_to_optimise: 1,
   reuse_crawl_days: 7, // 0 = always crawl fresh
   exclude_paths: "",
+  // Kept so switching the brief on does not mean hunting for the ID again.
   brief_doc_id: DEFAULT_BRIEF_DOC_ID,
+  use_brief: false,
 };
 
 export default function RunForm({
@@ -66,7 +76,6 @@ export default function RunForm({
   onSubmitBatch: (values: RunValues, urls: string[]) => void;
 }) {
   const [values, setValues] = useState<RunValues>(DEFAULT_VALUES);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [batch, setBatch] = useState(false);
   const [urlList, setUrlList] = useState("");
 
@@ -109,10 +118,17 @@ export default function RunForm({
     } catch {
       /* ignore */
     }
+    // The address is remembered above but withheld here, which is what makes
+    // the switch mean anything: the engine skips the brief when it is given no
+    // document, so sending a blank one is how "off" is expressed to it.
+    const submitted: RunValues = values.use_brief
+      ? values
+      : { ...values, brief_doc_id: "" };
+
     if (batch) {
-      onSubmitBatch(values, urls);
+      onSubmitBatch(submitted, urls);
     } else {
-      onSubmit(values);
+      onSubmit(submitted);
     }
   }
 
@@ -374,7 +390,24 @@ export default function RunForm({
         </div>
       </div>
 
-      {showAdvanced ? (
+      <div className="field">
+        <label className="toggle-row" htmlFor="use_brief">
+          <input
+            id="use_brief"
+            type="checkbox"
+            checked={values.use_brief}
+            onChange={(e) => set("use_brief", e.target.checked)}
+          />
+          <span>Write in the house voice</span>
+        </label>
+        <div className="note">
+          {values.use_brief
+            ? "Every page this run writes is shaped by the brief below."
+            : "Off. Pages are written without the brief, in a neutral voice."}
+        </div>
+      </div>
+
+      {values.use_brief ? (
         <div className="field">
           <label htmlFor="brief_doc_id">Brief doc ID</label>
           <input
@@ -390,19 +423,11 @@ export default function RunForm({
           ) : (
             <div className="note">
               Google Drive file ID of the house brief. The ID only, not the URL.
+              It must be shared with the service account.
             </div>
           )}
         </div>
-      ) : (
-        <button
-          type="button"
-          className="btn-link"
-          onClick={() => setShowAdvanced(true)}
-          style={{ marginBottom: 15 }}
-        >
-          Use a different brief doc
-        </button>
-      )}
+      ) : null}
 
       {(() => {
         // Recomputed on every keystroke, so the number reacts to the two fields

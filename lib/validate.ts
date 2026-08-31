@@ -2,7 +2,10 @@ import { LANGUAGE_CODES, MARKET_CODES } from "./markets";
 import type { StartRunInput } from "./n8n";
 
 /**
- * The house brief every run is written against.
+ * The house brief, offered as the default when a run switches it on.
+ *
+ * Not applied to a run that leaves it off: this is what the form prefills, not
+ * a fallback the validator substitutes.
  *
  * This must be a *native* Google Doc. The previous default was an uploaded
  * .docx, which Drive will not export as text — so the workflow downloaded the
@@ -131,12 +134,16 @@ export function validateRunInput(raw: unknown): ValidationResult {
   }
 
   // ---- brief_doc_id
+  //
+  // Blank means blank. It used to fall back to the house brief, which made
+  // "no brief" impossible to express: the run form can now switch the brief
+  // off, and a substituted default would have made that switch do nothing
+  // while appearing to work. The engine already treats an absent document as
+  // "write without a brief".
   const briefDocId =
-    typeof input.brief_doc_id === "string" && input.brief_doc_id.trim()
-      ? input.brief_doc_id.trim()
-      : DEFAULT_BRIEF_DOC_ID;
+    typeof input.brief_doc_id === "string" ? input.brief_doc_id.trim() : "";
 
-  if (/[/\s]/.test(briefDocId)) {
+  if (briefDocId && /[/\s]/.test(briefDocId)) {
     errors.brief_doc_id =
       "Use the Drive file ID only, not the full document URL.";
   }
