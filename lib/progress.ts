@@ -234,6 +234,14 @@ export type StageState = "done" | "active" | "pending" | "skipped" | "failed";
 export type ProgressStage = Stage & {
   state: StageState;
   nodesRun: number;
+  /**
+   * What this step produced, when the engine recorded it.
+   *
+   * Only some steps carry one. A step whose result is the article itself has
+   * nothing safe to show — the run record holds decisions, never payload — so
+   * those simply have no dropdown rather than an empty one.
+   */
+  output?: unknown;
 };
 
 /**

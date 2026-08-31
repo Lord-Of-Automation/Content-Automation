@@ -108,6 +108,8 @@ type EngineStep = {
   ms: number;
   note?: string;
   error?: string;
+  /** A bounded snapshot of what the step produced. Absent on most steps. */
+  output?: unknown;
 };
 
 type EngineRun = {
@@ -180,6 +182,7 @@ function progressOf(run: EngineRun): Progress {
       nodes: [],
       state,
       nodesRun: 1,
+      output: step.output,
     };
   });
 

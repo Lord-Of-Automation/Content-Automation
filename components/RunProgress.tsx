@@ -182,6 +182,81 @@ function DonePages({ pages }: { pages: { url: string; postId: number | string | 
   );
 }
 
+/**
+ * One value out of a step's recorded output.
+ *
+ * Rendered structurally rather than as a blob of JSON: a list of addresses is
+ * far more useful as a list of addresses, and half of what these steps produce
+ * is exactly that. Anything unrecognised still falls through to readable text,
+ * so an odd shape degrades rather than disappearing.
+ */
+function OutputValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
+  if (value === null || value === undefined) {
+    return <span className="output-empty">none</span>;
+  }
+
+  if (typeof value === "boolean" || typeof value === "number") {
+    return <span className="output-scalar">{String(value)}</span>;
+  }
+
+  if (typeof value === "string") {
+    // The engine records plenty of addresses; making them clickable is the
+    // difference between reading a list and checking one.
+    if (/^https?:\/\//.test(value)) {
+      return (
+        <a href={value} target="_blank" rel="noopener noreferrer" className="output-link">
+          {value.replace(/^https?:\/\/[^/]+/, "") || value}
+        </a>
+      );
+    }
+    return <span>{value}</span>;
+  }
+
+  if (Array.isArray(value)) {
+    if (!value.length) return <span className="output-empty">none</span>;
+    return (
+      <ol className="output-list">
+        {value.map((item, i) => (
+          <li key={i}>
+            <OutputValue value={item} depth={depth + 1} />
+          </li>
+        ))}
+      </ol>
+    );
+  }
+
+  if (typeof value === "object") {
+    const rows = Object.entries(value as Record<string, unknown>);
+    if (!rows.length) return <span className="output-empty">none</span>;
+    return (
+      <dl className="output-rows">
+        {rows.map(([key, val]) => (
+          <div key={key}>
+            <dt>{key.replace(/_/g, " ")}</dt>
+            <dd>
+              <OutputValue value={val} depth={depth + 1} />
+            </dd>
+          </div>
+        ))}
+      </dl>
+    );
+  }
+
+  return <span>{String(value)}</span>;
+}
+
+/** Closed by default: twenty-odd open steps would bury the run. */
+function StageOutput({ output }: { output: unknown }) {
+  return (
+    <details className="stage-output">
+      <summary>Output</summary>
+      <div className="stage-output-body">
+        <OutputValue value={output} />
+      </div>
+    </details>
+  );
+}
+
 export default function RunProgress({
   execution,
   loading,
@@ -314,6 +389,9 @@ export default function RunProgress({
                   ) : null}
                 </span>
                 <span className="stage-hint">{stage.hint}</span>
+                {stage.output !== undefined && stage.output !== null ? (
+                  <StageOutput output={stage.output} />
+                ) : null}
               </span>
             </li>
           ))}
