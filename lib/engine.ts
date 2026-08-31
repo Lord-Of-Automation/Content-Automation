@@ -119,6 +119,7 @@ type EngineRun = {
   website_url: string;
   error: string | null;
   progress: { done: number; total: number; percent: number };
+  current?: { url: string; index: number; total: number; startedAt: string } | null;
   result: { pages_optimised: number; published: unknown[]; skipped: unknown[] };
   input?: Record<string, unknown>;
   steps?: EngineStep[];
@@ -197,6 +198,11 @@ function progressOf(run: EngineRun): Progress {
     currentLabel: run.finished ? null : (steps.at(-1)?.name ?? "Starting"),
     percent: run.finished ? 100 : run.progress?.percent ?? 0,
     nodesExecuted: done,
+    // Absent on a run that finished, and on any record written before the
+    // engine began reporting it.
+    currentPage: run.current
+      ? { url: run.current.url, index: run.current.index, total: run.current.total }
+      : null,
   };
 }
 

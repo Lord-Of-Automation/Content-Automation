@@ -465,6 +465,41 @@ button,
   transition: width 0.5s ease;
 }
 
+/* Which page the run is on, directly under the progress bar. */
+.current-page {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.current-page-label {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+  flex: none;
+}
+
+.current-page-url {
+  font-size: 13px;
+  color: var(--ink);
+  text-decoration: none;
+  /* The path can be long; truncate rather than wrap the box to three lines. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.current-page-url:hover {
+  text-decoration: underline;
+}
+
 .stages {
   list-style: none;
   margin: 16px 0 0;

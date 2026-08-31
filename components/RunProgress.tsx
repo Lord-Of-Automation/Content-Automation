@@ -100,6 +100,45 @@ function inputRows(inputs: RunInputs): { label: string; value: string }[] {
   return rows;
 }
 
+/**
+ * Which page the run is on.
+ *
+ * Shown for a bulk run and a single-page one alike: on a single page the count
+ * reads "1 of 1", which is honest and keeps the box from changing shape
+ * between the two. The address is the useful part either way — a run that has
+ * been going twenty minutes should not require reading the step list to learn
+ * what it is working on.
+ */
+function CurrentPage({ page }: { page: { url: string; index: number; total: number } }) {
+  // The path alone. The host is the same for every page in a run and is
+  // already named in the inputs above, so repeating it just pushes the part
+  // that differs off the end of the line.
+  let path = page.url;
+  try {
+    const parsed = new URL(page.url);
+    path = parsed.pathname + parsed.search;
+  } catch {
+    /* not a URL: show whatever was recorded */
+  }
+
+  return (
+    <div className="current-page">
+      <span className="current-page-label">
+        {page.total > 1 ? `Optimising ${page.index} of ${page.total}` : "Optimising"}
+      </span>
+      <a
+        className="current-page-url mono"
+        href={page.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={page.url}
+      >
+        {path}
+      </a>
+    </div>
+  );
+}
+
 export default function RunProgress({
   execution,
   n8nUrl,
@@ -151,6 +190,8 @@ export default function RunProgress({
       <div className="bar">
         <span style={{ width: `${progress?.percent ?? 0}%` }} />
       </div>
+
+      {progress?.currentPage ? <CurrentPage page={progress.currentPage} /> : null}
 
       {execution.inputs ? (
         <div className="inputs">

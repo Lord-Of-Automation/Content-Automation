@@ -236,11 +236,24 @@ export type ProgressStage = Stage & {
   nodesRun: number;
 };
 
+/**
+ * The page being written right now, and where it sits in the batch.
+ *
+ * Null when the run is between pages, finished, or still crawling — a run
+ * spends its first several minutes on work that belongs to no single page.
+ */
+export type CurrentPage = {
+  url: string;
+  index: number;
+  total: number;
+};
+
 export type Progress = {
   stages: ProgressStage[];
   currentLabel: string | null;
   percent: number;
   nodesExecuted: number;
+  currentPage: CurrentPage | null;
 };
 
 /**
@@ -299,5 +312,8 @@ export function buildProgress(
     currentLabel: activeIndex >= 0 ? STAGES[activeIndex]?.label ?? null : null,
     percent: isRunning ? Math.min(percent, 99) : percent,
     nodesExecuted: executedNodes.length,
+    // n8n's execution data has no equivalent: the workflow never recorded which
+    // page it was on. Runs on that backend simply do not show this.
+    currentPage: null,
   };
 }
