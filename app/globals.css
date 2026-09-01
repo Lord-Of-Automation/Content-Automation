@@ -141,14 +141,6 @@ a {
   flex: none;
 }
 
-.brand small {
-  display: block;
-  font-weight: 450;
-  font-size: 12px;
-  color: var(--ink-3);
-  letter-spacing: 0;
-}
-
 .spacer {
   flex: 1;
 }
@@ -305,6 +297,128 @@ input:focus,
 select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* The select whose list we draw ourselves. See components/Select.tsx: a native
+   one styles its closed control and nothing else, and the OS drew the open list
+   in its own colours, so on a dark page the market list came up white. */
+.select {
+  position: relative;
+}
+
+.select-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 32px 8px 10px;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  cursor: pointer;
+  outline: none;
+}
+
+.select-button:hover {
+  border-color: var(--ink-3);
+}
+
+.select-button:focus-visible,
+.select-button[aria-expanded="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.select-button[aria-invalid="true"] {
+  border-color: var(--bad);
+}
+
+.select-value {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.select-hint {
+  font-size: 12px;
+  color: var(--ink-3);
+  flex: none;
+}
+
+/* Same two triangles the native control was given, so the two kinds of field
+   in a row still look like siblings. */
+.select-arrow {
+  position: absolute;
+  right: 11px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+    linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position: 5px 0, 0 0;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+.select-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  /* Roughly nine rows. Long enough to choose from, short enough that the page
+     behind it is still there. */
+  max-height: 264px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  box-shadow: var(--shadow);
+  outline: none;
+}
+
+.select-option {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 7px 9px;
+  font-size: 13.5px;
+  color: var(--ink);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.select-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Hover and keyboard arrowing are the same state deliberately: two different
+   highlights in one list is a puzzle, not a hint. */
+.select-option.is-active {
+  background: var(--accent-soft);
+}
+
+.select-option.is-selected {
+  font-weight: 560;
+  color: var(--accent);
 }
 
 input[aria-invalid="true"] {
@@ -498,31 +612,6 @@ button,
 
 .current-page-url:hover {
   text-decoration: underline;
-}
-
-/* A checkbox and its label on one line, for a setting that is simply on or off. */
-.toggle-row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  cursor: pointer;
-  /* Overrides the block label styling the other fields use. */
-  margin-bottom: 0;
-}
-
-.toggle-row input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  flex: none;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-.toggle-row span {
-  font-size: 12.5px;
-  font-weight: 560;
-  color: var(--ink-2);
 }
 
 /* What a step produced, on demand. Closed by default: twenty-odd open steps
@@ -1192,6 +1281,20 @@ button,
 .check input:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* A .check standing on its own rather than sitting beside a number field. Its
+   label is a sentence, not two words, so it is allowed to wrap — and once it
+   wraps the box has to align to the first line instead of to the middle of the
+   block. The 1px nudge sits it on the text's baseline rather than its box. */
+.check-wrap {
+  display: flex;
+  align-items: flex-start;
+  white-space: normal;
+}
+
+.check-wrap input {
+  margin-top: 1px;
 }
 
 /* The label reads as one pill, so the hit area is obvious and comfortable. */

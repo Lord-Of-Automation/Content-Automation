@@ -9,6 +9,7 @@ import {
 } from "@/lib/markets";
 import { forecastCost } from "@/lib/forecast";
 import { DEFAULT_BRIEF_DOC_ID } from "@/lib/validate";
+import { Select } from "@/components/Select";
 
 function money(value: number): string {
   return value < 10 ? "$" + value.toFixed(2) : "$" + Math.round(value);
@@ -220,36 +221,42 @@ export default function RunForm({
 
       <div className="row-2">
         <div className="field">
-          <label htmlFor="market">Market</label>
-          <select
+          <label id="market-label" htmlFor="market">
+            Market
+          </label>
+          <Select
             id="market"
+            labelledBy="market-label"
             value={values.market}
-            onChange={(e) => set("market", e.target.value)}
-          >
-            {MARKETS.map((m) => (
-              <option key={m.code} value={m.code}>
-                {m.label} ({m.code})
-              </option>
-            ))}
-          </select>
+            onChange={(v) => set("market", v)}
+            invalid={Boolean(fieldErrors.market)}
+            options={MARKETS.map((m) => ({
+              value: m.code,
+              label: m.label,
+              hint: m.code,
+            }))}
+          />
           {fieldErrors.market ? (
             <div className="err">{fieldErrors.market}</div>
           ) : null}
         </div>
 
         <div className="field">
-          <label htmlFor="language">Language</label>
-          <select
+          <label id="language-label" htmlFor="language">
+            Language
+          </label>
+          <Select
             id="language"
+            labelledBy="language-label"
             value={values.language}
-            onChange={(e) => set("language", e.target.value)}
-          >
-            {LANGUAGES.map((l) => (
-              <option key={l.code} value={l.code}>
-                {l.label} ({l.code})
-              </option>
-            ))}
-          </select>
+            onChange={(v) => set("language", v)}
+            invalid={Boolean(fieldErrors.language)}
+            options={LANGUAGES.map((l) => ({
+              value: l.code,
+              label: l.label,
+              hint: l.code,
+            }))}
+          />
           {fieldErrors.language ? (
             <div className="err">{fieldErrors.language}</div>
           ) : null}
@@ -391,14 +398,14 @@ export default function RunForm({
       </div>
 
       <div className="field">
-        <label className="toggle-row" htmlFor="use_brief">
+        <label className="check check-wrap" htmlFor="use_brief">
           <input
             id="use_brief"
             type="checkbox"
             checked={values.use_brief}
             onChange={(e) => set("use_brief", e.target.checked)}
           />
-          <span>Write in the house voice</span>
+          Write in the house voice modern style like our other ones have
         </label>
         <div className="note">
           {values.use_brief
