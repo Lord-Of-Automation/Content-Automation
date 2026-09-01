@@ -8,10 +8,7 @@ export default function LoginPage() {
       <div className="login-card">
         <div className="brand" style={{ marginBottom: 18 }}>
           <span className="brand-dot" />
-          <span>
-            Content Automation
-            <small>n8n workflow console</small>
-          </span>
+          <span>SEO Automation</span>
         </div>
         <div className="card">
           <div className="card-body">

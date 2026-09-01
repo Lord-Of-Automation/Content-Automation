@@ -26,10 +26,7 @@ export default async function TopBar({
       <div className="topbar-inner">
         <div className="brand">
           <span className="brand-dot" />
-          <span>
-            Content Automation
-            <small>n8n workflow console</small>
-          </span>
+          <span>SEO Automation</span>
         </div>
 
         <nav className="topnav">
