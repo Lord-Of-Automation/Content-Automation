@@ -122,8 +122,13 @@ async function priceRun(id: string): Promise<CachedCost | null> {
       total: execution.cost?.total ?? null,
       website: execution.inputs?.website_url ?? null,
     };
-    // Only a finished run has a final cost worth keeping.
-    if (execution.stoppedAt) await kvSetJSON(key, value);
+
+    // Cached only when there is a figure to cache, and only once the run has
+    // finished. Caching "this run has no cost" forever is what turns a gap in
+    // reporting into a permanent one: every run priced while the engine was
+    // not yet sending its cost would have stayed blank for good, long after
+    // the reason was fixed. Re-asking for an unpriced run is one small request.
+    if (execution.stoppedAt && value.total !== null) await kvSetJSON(key, value);
     return value;
   } catch {
     return null;
