@@ -128,6 +128,8 @@ type EngineRun = {
     skipped: unknown[];
   };
   input?: Record<string, unknown>;
+  /** Counted by the engine as it spent it. Absent on a run older than that. */
+  cost?: CostBreakdown | null;
   steps?: EngineStep[];
 };
 
@@ -291,7 +293,10 @@ export async function getExecution(id: string): Promise<ExecutionDetail> {
     error: run.error,
     // The engine never withholds a payload, because it never stores one.
     dataUnavailable: null,
-    cost: null as CostBreakdown | null,
+    // Counted by the engine while the run ran, not derived here. There is no
+    // payload to derive it from — which is the point of the engine — so a run
+    // from before it kept a ledger has no cost and never will.
+    cost: run.cost ?? null,
     inputs: inputsOf(run),
   };
 }

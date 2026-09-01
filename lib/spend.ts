@@ -1,15 +1,24 @@
 /**
  * What has been spent, per run and per person.
  *
- * Cost is only derivable from the fat execution payload, which is slow to pull,
- * so every finished run is priced once and cached. A finished execution never
- * changes, which makes it safe to cache forever; an unfinished one is skipped
- * rather than cached, because its cost is still moving.
+ * Where the cost comes from depends on which backend ran it, and the difference
+ * is worth knowing. On n8n it is derived here, by walking the execution payload
+ * for the signatures that carry money — possible only because n8n stores every
+ * node's output, the same habit that made runs too large to store. The engine
+ * keeps no payload, so there is nothing to walk: it counts as it spends and
+ * reports the total itself.
+ *
+ * Either way a run is priced once and cached. A finished run never changes,
+ * which makes it safe to cache forever; an unfinished one is fetched again,
+ * because its cost is still moving.
  */
 
 import { readEvents } from "./audit";
 import { kvGetJSON, kvSetJSON } from "./kv";
-import { getExecution, listExecutions } from "./n8n";
+// Through the switch, never straight at n8n. Reading spend from n8n while runs
+// went to the engine is why the report sat empty: it was faithfully listing the
+// executions of a backend nobody was using.
+import { getExecution, listExecutions } from "./backend";
 
 export type RunSpend = {
   id: string;
