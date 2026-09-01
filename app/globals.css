@@ -1173,6 +1173,19 @@ button,
   word-break: break-word;
 }
 
+/* Money, right aligned so the figures line up down the column. The header has
+   to be told separately: .logs th sets text-align left for every heading. */
+.logs .num,
+.logs th.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.logs td.num {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
 .pill {
   display: inline-block;
   padding: 2px 9px;

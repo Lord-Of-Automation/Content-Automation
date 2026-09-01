@@ -53,6 +53,25 @@ const TONE: Record<AuditEvent["action"], string> = {
 
 const PAGE = 25;
 
+/**
+ * The run a log line is about, or null.
+ *
+ * Mirrors executionIdFrom on the server. Several actions carry an id and the
+ * last one in the line is the one meant: "Resumed execution #A as #B" is about
+ * B, the run that now exists.
+ */
+function runIdOf(event: AuditEvent): string | null {
+  if (!event.action.startsWith("run-")) return null;
+  const found = event.detail.match(/#[\w-]+/g);
+  if (!found?.length) return null;
+  return found[found.length - 1]!.slice(1) || null;
+}
+
+/** Under a dollar reads better with cents; above it, they are noise. */
+function money(value: number): string {
+  return value < 10 ? `$${value.toFixed(2)}` : `$${Math.round(value)}`;
+}
+
 function formatWhen(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -64,6 +83,7 @@ function formatWhen(iso: string): string {
 
 export default function LogsView() {
   const [events, setEvents] = useState<AuditEvent[]>([]);
+  const [costs, setCosts] = useState<Record<string, number>>({});
   const [store, setStore] = useState<"redis" | "file" | "memory">("file");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,8 +101,10 @@ export default function LogsView() {
       const payload = (await response.json()) as {
         events: AuditEvent[];
         backend?: "redis" | "file" | "memory";
+        costs?: Record<string, number>;
       };
       setEvents(payload.events ?? []);
+      setCosts(payload.costs ?? {});
       setStore(payload.backend ?? "file");
       setError(null);
     } catch (err) {
@@ -97,6 +119,21 @@ export default function LogsView() {
     const timer = setInterval(() => void load(), 15_000);
     return () => clearInterval(timer);
   }, [load]);
+
+  /**
+   * What this run cost.
+   *
+   * Blank when the line is not about a run at all — a sign-in has no price and
+   * a dash in that column would only invite the question. A dash on a run means
+   * there is no final cost yet: a run still going is never priced as though it
+   * had finished, and one that failed to start never cost anything.
+   */
+  function costOf(event: AuditEvent): string {
+    const id = runIdOf(event);
+    if (!id) return "";
+    const cost = costs[id];
+    return cost === undefined ? "—" : money(cost);
+  }
 
   const shown = events.filter((e) => {
     if (filter === "runs") return e.action.startsWith("run-");
@@ -160,6 +197,7 @@ export default function LogsView() {
                     <th>Who</th>
                     <th>What</th>
                     <th>Detail</th>
+                    <th className="num">Cost</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -173,6 +211,7 @@ export default function LogsView() {
                         </span>
                       </td>
                       <td className="detail">{event.detail}</td>
+                      <td className="num mono nowrap">{costOf(event)}</td>
                     </tr>
                   ))}
                 </tbody>

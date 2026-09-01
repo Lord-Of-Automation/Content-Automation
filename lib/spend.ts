@@ -33,9 +33,28 @@ export type Spend = {
 type CachedCost = { total: number | null; website: string | null };
 
 /**
+ * The run this log line is about, or null.
+ *
+ * Details are free text with the id written as `#<id>`, and several actions
+ * carry one: started, cancelled, resumed, and the failures of each. The LAST id
+ * in the line is the one meant — "Resumed execution #A as #B" is about B, the
+ * run that now exists and will cost something.
+ *
+ * This used to read `\d+`, which was right for n8n, whose ids are numbers, and
+ * silently wrong for the engine, whose ids look like 20260901143022-k3f9x. It
+ * captured the timestamp, matched no run, and left every engine run in the
+ * spend report attributed to nobody.
+ */
+export function executionIdFrom(detail: string): string | null {
+  const found = String(detail ?? "").match(/#[\w-]+/g);
+  if (!found?.length) return null;
+  return found[found.length - 1]!.slice(1) || null;
+}
+
+/**
  * The audit log records who started what as free text, with the execution id
  * appended by the runs route. Pulling the id back out is what links spend to a
- * person, since n8n itself has no idea who any of them are.
+ * person, since neither backend has any idea who any of them are.
  */
 async function actorsByExecution(): Promise<Map<string, { actor: string; at: string }>> {
   const map = new Map<string, { actor: string; at: string }>();
@@ -44,11 +63,42 @@ async function actorsByExecution(): Promise<Map<string, { actor: string; at: str
   // Oldest first, so the earliest claim on an id wins rather than the latest.
   for (const event of [...events].reverse()) {
     if (event.action !== "run-started") continue;
-    const match = /execution #(\d+)/.exec(event.detail);
-    if (!match) continue;
-    if (!map.has(match[1])) map.set(match[1], { actor: event.actor, at: event.at });
+    const id = executionIdFrom(event.detail);
+    if (!id) continue;
+    if (!map.has(id)) map.set(id, { actor: event.actor, at: event.at });
   }
   return map;
+}
+
+/**
+ * What each of these runs cost, for the activity log.
+ *
+ * Deliberately not collectSpend: that lists runs from the backend and prices
+ * every one of them, which is the right shape for a spend report and the wrong
+ * one here, where the question is only "what did the runs on this page cost?".
+ *
+ * A finished run is priced once and cached forever, so the first call after a
+ * run ends is the slow one and every later call is a KV read. An unfinished run
+ * is never cached — its cost is still moving — so it stays null until it ends,
+ * which is also the honest answer to show.
+ *
+ * Bounded by a deadline because the log polls: a slow answer for some of the
+ * rows beats a request that dies at the platform's ceiling and prices none.
+ */
+export async function priceRuns(
+  ids: string[],
+  budgetMs = 20_000,
+): Promise<Record<string, number>> {
+  const deadline = Date.now() + budgetMs;
+  const costs: Record<string, number> = {};
+
+  for (const id of [...new Set(ids)]) {
+    if (Date.now() > deadline) break;
+    const priced = await priceRun(id);
+    if (priced?.total !== null && priced?.total !== undefined) costs[id] = priced.total;
+  }
+
+  return costs;
 }
 
 async function priceRun(id: string): Promise<CachedCost | null> {
