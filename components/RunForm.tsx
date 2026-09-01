@@ -398,14 +398,14 @@ export default function RunForm({
       </div>
 
       <div className="field">
-        <label className="check check-wrap" htmlFor="use_brief">
+        <label className="check" htmlFor="use_brief">
           <input
             id="use_brief"
             type="checkbox"
             checked={values.use_brief}
             onChange={(e) => set("use_brief", e.target.checked)}
           />
-          Write in the house voice modern style like our other ones have
+          Write Using Brief
         </label>
         <div className="note">
           {values.use_brief

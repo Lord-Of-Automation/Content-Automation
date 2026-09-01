@@ -1283,20 +1283,6 @@ button,
   cursor: not-allowed;
 }
 
-/* A .check standing on its own rather than sitting beside a number field. Its
-   label is a sentence, not two words, so it is allowed to wrap — and once it
-   wraps the box has to align to the first line instead of to the middle of the
-   block. The 1px nudge sits it on the text's baseline rather than its box. */
-.check-wrap {
-  display: flex;
-  align-items: flex-start;
-  white-space: normal;
-}
-
-.check-wrap input {
-  margin-top: 1px;
-}
-
 /* The label reads as one pill, so the hit area is obvious and comfortable. */
 .check {
   padding: 6px 12px 6px 10px;
