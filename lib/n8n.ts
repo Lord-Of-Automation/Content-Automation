@@ -46,7 +46,22 @@ export type StartRunInput = {
   /** Crawled pages whose address contains any of these are never optimised. */
   exclude_paths: string[];
   brief_doc_id: string;
+  /**
+   * Body classes that identify each kind of page on this site, so the engine
+   * can read the class off the page rather than infer the type from its words.
+   * Empty when none were declared, which is the normal case.
+   */
+  body_classes: BodyClasses;
 };
+
+/**
+ * The four classes a run can be told how to recognise. `other` is absent on
+ * purpose: it is what the engine answers when nothing matched, not something
+ * there is a class for.
+ */
+export type BodyClasses = Partial<
+  Record<"game_review" | "casino_review" | "promocodes" | "blog", string[]>
+>;
 
 export type StartRunResult = {
   executionId: string | null;

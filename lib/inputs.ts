@@ -1,3 +1,5 @@
+import type { BodyClasses } from "./n8n";
+
 /**
  * What the person actually asked for, recovered from the execution payload.
  *
@@ -14,6 +16,12 @@ export type RunInputs = {
   reuse_crawl_days: number | null;
   exclude_paths: string[];
   brief_doc_id: string | null;
+  /**
+   * Declared body classes, where the backend records them. Always empty on the
+   * n8n path, which has never heard of them: reading a run back must not invent
+   * declarations that were not made.
+   */
+  body_classes: BodyClasses;
 };
 
 const FIELDS = [
@@ -111,5 +119,6 @@ export function extractInputs(
       return list.map((v) => String(v).trim()).filter(Boolean);
     })(),
     brief_doc_id: asString(best.brief_doc_id),
+    body_classes: {},
   };
 }

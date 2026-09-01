@@ -233,6 +233,10 @@ function inputsOf(run: EngineRun): RunInputs | null {
     reuse_crawl_days: num(i.reuse_crawl_days),
     exclude_paths: Array.isArray(i.exclude_paths) ? (i.exclude_paths as string[]) : [],
     brief_doc_id: (i.brief_doc_id as string) ?? null,
+    body_classes:
+      i.body_classes && typeof i.body_classes === "object"
+        ? (i.body_classes as RunInputs["body_classes"])
+        : {},
   };
 }
 
@@ -332,6 +336,8 @@ export async function retryExecution(id: string): Promise<{ id: string; status: 
     reuse_crawl_days: inputs.reuse_crawl_days ?? 0,
     exclude_paths: inputs.exclude_paths,
     brief_doc_id: inputs.brief_doc_id ?? "",
+    // A retry is the same run again, so the declarations go with it.
+    body_classes: inputs.body_classes,
   }, id);
   return { id: started.executionId ?? "", status: "new" };
 }

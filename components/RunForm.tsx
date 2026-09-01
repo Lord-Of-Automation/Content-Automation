@@ -8,7 +8,7 @@ import {
   MARKET_DEFAULT_LANGUAGE,
 } from "@/lib/markets";
 import { forecastCost } from "@/lib/forecast";
-import { DEFAULT_BRIEF_DOC_ID } from "@/lib/validate";
+import { DEFAULT_BRIEF_DOC_ID, type DeclarableClass } from "@/lib/validate";
 import { Select } from "@/components/Select";
 
 function money(value: number): string {
@@ -32,9 +32,29 @@ export type RunValues = {
    * the address is kept but not sent unless this is on.
    */
   use_brief: boolean;
+  /**
+   * Body classes that identify each kind of page on this site, as typed.
+   *
+   * Held as free text rather than a list because that is what a text field is,
+   * and because pasting a whole class attribute in and letting the validator
+   * pick it apart is the fastest way to fill this in. Split on submit.
+   */
+  body_classes: Record<DeclarableClass, string>;
 };
 
 const STORAGE_KEY = "ca:last-input";
+
+/** Label and placeholder for each declarable class, in the order shown. */
+const CLASS_FIELDS: Array<{
+  key: DeclarableClass;
+  label: string;
+  placeholder: string;
+}> = [
+  { key: "casino_review", label: "Casino review", placeholder: "single-casino" },
+  { key: "game_review", label: "Game review", placeholder: "single-game single-slot" },
+  { key: "promocodes", label: "Promo codes", placeholder: "single-promo" },
+  { key: "blog", label: "Blog", placeholder: "single-post" },
+];
 
 /**
  * One URL per line is the obvious way to paste a list, but people paste from
@@ -63,6 +83,7 @@ export const DEFAULT_VALUES: RunValues = {
   // Kept so switching the brief on does not mean hunting for the ID again.
   brief_doc_id: DEFAULT_BRIEF_DOC_ID,
   use_brief: false,
+  body_classes: { casino_review: "", game_review: "", promocodes: "", blog: "" },
 };
 
 export default function RunForm({
@@ -110,6 +131,13 @@ export default function RunForm({
 
       return next;
     });
+  }
+
+  function setClass(key: DeclarableClass, value: string) {
+    setValues((current) => ({
+      ...current,
+      body_classes: { ...current.body_classes, [key]: value },
+    }));
   }
 
   function handleSubmit(event: React.FormEvent) {
@@ -435,6 +463,41 @@ export default function RunForm({
           )}
         </div>
       ) : null}
+
+      <div className="field field-sep">
+        <label>Page classes by body class</label>
+        <div className="note" style={{ marginTop: 0, marginBottom: 9 }}>
+          Optional, and worth filling in once per site. Where a class here is on
+          the page&rsquo;s <code>&lt;body&gt;</code> tag, it decides what kind of
+          page it is and no classification call is made. Leave a row empty to
+          have those pages read and judged as before. View source and copy the
+          class in: <code>single-post</code>, <code>single-casino</code>. Space
+          separated for more than one. A class used for two kinds of page
+          identifies neither, so each must be unique.
+        </div>
+
+        <div className="row-2">
+          {CLASS_FIELDS.map((field) => (
+            <div className="field" key={field.key}>
+              <label htmlFor={`body_classes_${field.key}`}>{field.label}</label>
+              <input
+                id={`body_classes_${field.key}`}
+                type="text"
+                className="mono"
+                placeholder={field.placeholder}
+                value={values.body_classes[field.key]}
+                onChange={(e) => setClass(field.key, e.target.value)}
+                aria-invalid={Boolean(fieldErrors[`body_classes.${field.key}`])}
+              />
+              {fieldErrors[`body_classes.${field.key}`] ? (
+                <div className="err">
+                  {fieldErrors[`body_classes.${field.key}`]}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
 
       {(() => {
         // Recomputed on every keystroke, so the number reacts to the two fields

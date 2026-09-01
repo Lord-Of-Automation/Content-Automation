@@ -1,5 +1,37 @@
 import { LANGUAGE_CODES, MARKET_CODES } from "./markets";
-import type { StartRunInput } from "./n8n";
+import type { BodyClasses, StartRunInput } from "./n8n";
+
+/** The page classes a run can declare body classes for. */
+export const DECLARABLE_CLASSES = [
+  "casino_review",
+  "game_review",
+  "promocodes",
+  "blog",
+] as const;
+
+export type DeclarableClass = (typeof DECLARABLE_CLASSES)[number];
+
+/**
+ * A class attribute is space separated, so pasting one straight out of a page
+ * is the obvious thing to do and has to work. Commas and newlines too, since a
+ * list typed by hand arrives as either.
+ *
+ * A leading dot is dropped: copying a selector out of devtools gives you
+ * `.single-casino`, and silently never matching would be a miserable way to
+ * find that out.
+ */
+export function parseBodyClassList(raw: unknown): string[] {
+  const pieces = Array.isArray(raw)
+    ? raw.map((v) => String(v ?? ""))
+    : String(raw ?? "").split(/[\s,]+/);
+
+  const names: string[] = [];
+  for (const piece of pieces) {
+    const name = piece.trim().toLowerCase().replace(/^\.+/, "");
+    if (name && !names.includes(name)) names.push(name);
+  }
+  return names;
+}
 
 /**
  * The house brief, offered as the default when a run switches it on.
@@ -148,6 +180,38 @@ export function validateRunInput(raw: unknown): ValidationResult {
       "Use the Drive file ID only, not the full document URL.";
   }
 
+  // ---- body_classes
+  //
+  // Optional throughout. The interesting check is not the shape of a class
+  // name but whether the same one was declared for two page types: that cannot
+  // identify either, and the engine responds by ignoring both, so it is worth
+  // saying before the run is paid for rather than in the log afterwards.
+  const rawClasses = (input.body_classes ?? {}) as Record<string, unknown>;
+  const bodyClasses: BodyClasses = {};
+  const declaredBy = new Map<string, DeclarableClass>();
+
+  for (const key of DECLARABLE_CLASSES) {
+    const names = parseBodyClassList(rawClasses[key]);
+    if (!names.length) continue;
+
+    if (names.some((n) => n.length > 80)) {
+      errors[`body_classes.${key}`] = "That is too long to be a class name.";
+      continue;
+    }
+
+    for (const name of names) {
+      const already = declaredBy.get(name);
+      if (already && already !== key) {
+        errors[`body_classes.${key}`] =
+          `"${name}" is already declared for ${already.replace("_", " ")}. ` +
+          "A class on two kinds of page identifies neither.";
+      }
+      declaredBy.set(name, key);
+    }
+
+    bodyClasses[key] = names.slice(0, 25);
+  }
+
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
   return {
@@ -161,6 +225,7 @@ export function validateRunInput(raw: unknown): ValidationResult {
       reuse_crawl_days: reuseDays,
       exclude_paths: excludePaths,
       brief_doc_id: briefDocId,
+      body_classes: bodyClasses,
     },
   };
 }
