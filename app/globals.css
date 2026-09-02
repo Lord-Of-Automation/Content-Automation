@@ -2008,7 +2008,9 @@ button,
   z-index: 60;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  /* Spacing lives on the toast, not here as a gap: a gap cannot be animated, so
+     a toast leaving would collapse its own height and leave the space it sat
+     in behind. The margin goes with it. */
   /* The stack must not swallow clicks on the page behind it; each toast takes
      its own pointer events back, so only the toast itself is clickable. */
   pointer-events: none;
@@ -2028,7 +2030,20 @@ button,
   font-size: 13px;
   line-height: 1.45;
   color: var(--ink);
+  margin-bottom: 8px;
+  overflow: hidden;
   animation: toast-in 160ms ease-out;
+}
+
+.toasts .toast:last-child {
+  margin-bottom: 0;
+}
+
+/* Up and out, collapsing as it goes so whatever is below rises into the space
+   rather than jumping into it once the toast is gone. */
+.toast.is-leaving {
+  animation: toast-out 200ms ease-in forwards;
+  pointer-events: none;
 }
 
 /* A colour down the edge rather than across the whole card: at this size a
@@ -2069,8 +2084,34 @@ button,
   }
 }
 
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: none;
+    max-height: 160px;
+    margin-bottom: 8px;
+    padding-top: 11px;
+    padding-bottom: 11px;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+/* Still removed, just not animated about it. The component waits the same 200ms
+   either way, which is short enough not to read as a delay. */
 @media (prefers-reduced-motion: reduce) {
-  .toast {
+  .toast,
+  .toast.is-leaving {
     animation: none;
+  }
+
+  .toast.is-leaving {
+    opacity: 0;
   }
 }
