@@ -568,6 +568,35 @@ export default function LoopView() {
               </div>
 
               <div className="field">
+                <label htmlFor="loop_crawl">Crawl limit</label>
+                <div className="limit-row">
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={draft.max_crawl_pages === 0}
+                      onChange={(e) => set("max_crawl_pages", e.target.checked ? 0 : 200)}
+                    />
+                    Crawl the whole site
+                  </label>
+                  <input
+                    id="loop_crawl"
+                    type="number"
+                    min={1}
+                    max={1000}
+                    disabled={draft.max_crawl_pages === 0}
+                    value={draft.max_crawl_pages === 0 ? "" : draft.max_crawl_pages}
+                    placeholder="all"
+                    onChange={(e) => set("max_crawl_pages", Number.parseInt(e.target.value, 10) || 0)}
+                  />
+                </div>
+                <div className="note">
+                  {draft.mode === "gap"
+                    ? "How much of OUR site is crawled to work out what we already have. Cap this and anything past the cap looks missing — which is how a gap run ends up writing over a page you already had. Leave it on the whole site unless you have a reason."
+                    : "How many pages are crawled to choose from."}
+                </div>
+              </div>
+
+              <div className="field">
                 <label htmlFor="loop_cap">
                   {draft.mode === "gap" ? "New pages each time" : "Pages to optimise each time"}
                 </label>
