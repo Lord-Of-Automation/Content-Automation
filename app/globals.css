@@ -1997,3 +1997,80 @@ button,
 .switch-label {
   min-width: 3.4em;
 }
+
+/* Toasts. Top right, above the sticky header, out of the way of the list they
+   are describing — a notice pinned into the page moved the row you were
+   reaching for while you reached for it. */
+.toasts {
+  position: fixed;
+  top: 68px;
+  right: 20px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* The stack must not swallow clicks on the page behind it; each toast takes
+     its own pointer events back, so only the toast itself is clickable. */
+  pointer-events: none;
+  max-width: min(380px, calc(100vw - 40px));
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px 11px 14px;
+  border-radius: 9px;
+  border: 1px solid var(--line-2);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink);
+  animation: toast-in 160ms ease-out;
+}
+
+/* A colour down the edge rather than across the whole card: at this size a
+   filled background makes the text harder to read, and the tone is a label on
+   the message, not the message. */
+.toast-ok {
+  border-left: 3px solid var(--ok);
+}
+
+.toast-bad {
+  border-left: 3px solid var(--bad);
+}
+
+.toast-x {
+  flex: none;
+  margin: -2px -4px 0 0;
+  padding: 0 4px;
+  font-size: 17px;
+  line-height: 1.2;
+  color: var(--ink-3);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.toast-x:hover {
+  color: var(--ink);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}

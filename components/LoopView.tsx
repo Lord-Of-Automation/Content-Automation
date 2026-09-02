@@ -6,6 +6,7 @@ import { LANGUAGES, MARKETS } from "@/lib/markets";
 import type { Schedule } from "@/lib/schedules";
 import { DECLARABLE_CLASSES, type DeclarableClass } from "@/lib/validate";
 import { Select } from "@/components/Select";
+import { Toasts, useToasts } from "@/components/Toasts";
 
 /**
  * How often a loop looks, in the words someone would use.
@@ -116,8 +117,14 @@ export default function LoopView() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  /**
+   * The page failing to load, which is a state rather than an event: it stays
+   * true until it is not, and a toast that vanished after four seconds would
+   * leave an empty list with no explanation. Everything that happens *because
+   * of something you did* is a toast instead.
+   */
   const [error, setError] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const { toasts, push, dismiss } = useToasts();
 
   const load = useCallback(async () => {
     try {
@@ -154,8 +161,6 @@ export default function LoopView() {
     if (!draft) return;
 
     setBusy(true);
-    setError(null);
-    setNote(null);
     try {
       const response = await fetch("/api/schedules", {
         method: "POST",
@@ -165,10 +170,10 @@ export default function LoopView() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error ?? "The loop could not be saved.");
       setDraft(null);
-      setNote(`Saved. Next run ${when(payload.schedule.nextRunAt)}.`);
+      push("ok", `Saved. Next run ${when(payload.schedule.nextRunAt)}.`);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The loop could not be saved.");
+      push("bad", err instanceof Error ? err.message : "The loop could not be saved.");
     } finally {
       setBusy(false);
     }
@@ -190,8 +195,6 @@ export default function LoopView() {
       current.map((s) => (s.id === schedule.id ? { ...s, enabled } : s)),
     );
     setBusy(true);
-    setError(null);
-    setNote(null);
     try {
       const response = await fetch("/api/schedules", {
         method: "POST",
@@ -200,14 +203,15 @@ export default function LoopView() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error ?? "That did not work.");
-      setNote(
+      push(
+        "ok",
         enabled
           ? `${schedule.name} is on. Next run ${when(payload.schedule.nextRunAt)}.`
-          : `${schedule.name} is paused. Run now still works.`,
+          : `${schedule.name} is paused.`,
       );
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That did not work.");
+      push("bad", err instanceof Error ? err.message : "That did not work.");
       await load();
     } finally {
       setBusy(false);
@@ -216,16 +220,14 @@ export default function LoopView() {
 
   async function act(id: string, method: "POST" | "DELETE", success: string) {
     setBusy(true);
-    setError(null);
-    setNote(null);
     try {
       const response = await fetch(`/api/schedules/${encodeURIComponent(id)}`, { method });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error ?? "That did not work.");
-      setNote(success);
+      push("ok", success);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That did not work.");
+      push("bad", err instanceof Error ? err.message : "That did not work.");
     } finally {
       setBusy(false);
     }
@@ -233,6 +235,8 @@ export default function LoopView() {
 
   return (
     <div className="stack">
+      <Toasts toasts={toasts} onDismiss={dismiss} />
+
       <div className="card">
         <div className="card-head">
           <div>
@@ -251,7 +255,6 @@ export default function LoopView() {
 
         <div className="card-body">
           {error ? <div className="notice bad">{error}</div> : null}
-          {note ? <div className="notice ok">{note}</div> : null}
 
           {loading ? (
             <div className="empty">Loading…</div>
