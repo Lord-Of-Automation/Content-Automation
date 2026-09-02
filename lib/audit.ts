@@ -17,7 +17,11 @@ export type AuditAction =
   | "site-saved"
   | "site-removed"
   /** Which engine credentials were changed. The names only, never the values. */
-  | "keys-updated";
+  | "keys-updated"
+  /** Loops: runs that start themselves. */
+  | "schedule-created"
+  | "schedule-updated"
+  | "schedule-deleted";
 
 export type AuditEvent = {
   at: string;

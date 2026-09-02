@@ -17,7 +17,10 @@ type AuditEvent = {
     | "run-retried"
     | "run-retry-failed"
     | "site-saved"
-    | "site-removed";
+    | "site-removed"
+    | "schedule-created"
+    | "schedule-updated"
+    | "schedule-deleted";
   detail: string;
 };
 
@@ -34,6 +37,9 @@ const LABEL: Record<AuditEvent["action"], string> = {
   "run-retry-failed": "Resume failed",
   "site-saved": "Saved a site login",
   "site-removed": "Removed a site login",
+  "schedule-created": "Created a loop",
+  "schedule-updated": "Changed a loop",
+  "schedule-deleted": "Deleted a loop",
 };
 
 const TONE: Record<AuditEvent["action"], string> = {
@@ -49,6 +55,9 @@ const TONE: Record<AuditEvent["action"], string> = {
   "run-retry-failed": "bad",
   "site-saved": "run",
   "site-removed": "idle",
+  "schedule-created": "run",
+  "schedule-updated": "run",
+  "schedule-deleted": "idle",
 };
 
 const PAGE = 25;

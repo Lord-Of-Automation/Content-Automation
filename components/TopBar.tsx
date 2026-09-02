@@ -17,7 +17,7 @@ function UserIcon() {
 export default async function TopBar({
   current,
 }: {
-  current: "runs" | "logs" | "accounts" | "keys";
+  current: "runs" | "loop" | "logs" | "accounts" | "keys";
 }) {
   const session = await auth();
 
@@ -35,6 +35,12 @@ export default async function TopBar({
             className={current === "runs" ? "topnav-link is-current" : "topnav-link"}
           >
             Runs
+          </Link>
+          <Link
+            href="/loop"
+            className={current === "loop" ? "topnav-link is-current" : "topnav-link"}
+          >
+            Loop
           </Link>
           <Link
             href="/logs"
