@@ -103,7 +103,7 @@ async function call<T>(
 /** What the engine reports for one run. */
 type EngineStep = {
   name: string;
-  status: "ok" | "failed" | "skipped";
+  status: "ok" | "failed" | "skipped" | "running";
   startedAt: string;
   ms: number;
   note?: string;
@@ -180,7 +180,16 @@ function progressOf(run: EngineRun): Progress {
     // A failed step used to map to "active", so it read as still running and
     // never stopped. It has its own state now.
     const state: StageState =
-      step.status === "skipped" ? "skipped" : step.status === "ok" ? "done" : "failed";
+      step.status === "skipped"
+        ? "skipped"
+        : step.status === "ok"
+          ? "done"
+          : // A step the engine has opened and not yet closed. Active, so a long
+            // wait reads as work in progress rather than as the stage before it
+            // having been the last thing that happened.
+            step.status === "running"
+            ? "active"
+            : "failed";
     return {
       key: step.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
       label: step.name,
@@ -194,8 +203,10 @@ function progressOf(run: EngineRun): Progress {
     };
   });
 
-  // A run still going has one more stage in flight than it has recorded.
-  if (!run.finished) {
+  // A run still going has one more stage in flight than it has recorded —
+  // unless the engine has already opened one, in which case that IS the stage
+  // in flight and a placeholder beside it would be a second, imaginary one.
+  if (!run.finished && !steps.some((step) => step.status === "running")) {
     stages.push({
       key: "in-flight",
       label: "Working",
@@ -210,7 +221,11 @@ function progressOf(run: EngineRun): Progress {
 
   return {
     stages,
-    currentLabel: run.finished ? null : (steps.at(-1)?.name ?? "Starting"),
+    currentLabel: run.finished
+      ? null
+      : ([...steps].reverse().find((step) => step.status === "running")?.name ??
+         steps.at(-1)?.name ??
+         "Starting"),
     percent: run.finished ? 100 : run.progress?.percent ?? 0,
     nodesExecuted: done,
     // Absent on a run that finished, and on any record written before the
