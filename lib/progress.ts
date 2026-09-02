@@ -242,6 +242,15 @@ export type ProgressStage = Stage & {
    * those simply have no dropdown rather than an empty one.
    */
   output?: unknown;
+  /**
+   * The step's name as the engine knows it, which is what a pin is keyed by.
+   *
+   * The same string as `label` today, and deliberately separate: a pin keyed on
+   * a display label would break the day one is shortened to fit a column.
+   */
+  stepName?: string;
+  /** True when this step returned a pinned value instead of running. */
+  pinned?: boolean;
 };
 
 /**

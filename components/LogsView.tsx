@@ -20,7 +20,9 @@ type AuditEvent = {
     | "site-removed"
     | "schedule-created"
     | "schedule-updated"
-    | "schedule-deleted";
+    | "schedule-deleted"
+    | "step-pinned"
+    | "step-unpinned";
   detail: string;
 };
 
@@ -40,6 +42,8 @@ const LABEL: Record<AuditEvent["action"], string> = {
   "schedule-created": "Created a loop",
   "schedule-updated": "Changed a loop",
   "schedule-deleted": "Deleted a loop",
+  "step-pinned": "Pinned a step",
+  "step-unpinned": "Unpinned a step",
 };
 
 const TONE: Record<AuditEvent["action"], string> = {
@@ -58,6 +62,8 @@ const TONE: Record<AuditEvent["action"], string> = {
   "schedule-created": "run",
   "schedule-updated": "run",
   "schedule-deleted": "idle",
+  "step-pinned": "warn",
+  "step-unpinned": "idle",
 };
 
 const PAGE = 25;

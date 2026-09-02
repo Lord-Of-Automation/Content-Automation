@@ -35,6 +35,7 @@ export default function Console() {
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [pinning, setPinning] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -298,6 +299,40 @@ export default function Console() {
     }
   }
 
+  /**
+   * Freezes a step, or lets it run again.
+   *
+   * Pinning is keyed on the step's name and applies to every run afterwards,
+   * not just this one — so the notice says what was frozen rather than a bare
+   * "done". A pin left on a drafting step writes the same article for every
+   * page, and the only defence against that is knowing it is there.
+   */
+  async function pinStep(step: string, pin: boolean) {
+    if (!selectedId) return;
+    setPinning(step);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch("/api/pins", {
+        method: pin ? "POST" : "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(pin ? { run: selectedId, step } : { step }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error ?? "That did not work.");
+      setNotice(
+        pin
+          ? `Pinned "${step}". Every run from now on returns this saved value instead of running that step, until you unpin it.`
+          : `Unpinned "${step}". It runs again from the next run.`,
+      );
+      await loadDetail(selectedId);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That did not work.");
+    } finally {
+      setPinning(null);
+    }
+  }
+
   async function retryRun() {
     if (!selectedId) return;
 
@@ -456,6 +491,8 @@ export default function Console() {
           cancelling={cancelling}
           onRetry={retryRun}
           retrying={retrying}
+          onPin={pinStep}
+          pinning={pinning}
         />
       </div>
     </div>

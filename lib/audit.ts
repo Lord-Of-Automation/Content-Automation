@@ -21,7 +21,10 @@ export type AuditAction =
   /** Loops: runs that start themselves. */
   | "schedule-created"
   | "schedule-updated"
-  | "schedule-deleted";
+  | "schedule-deleted"
+  /** A step frozen so it stops running. Logged: it changes what a run does. */
+  | "step-pinned"
+  | "step-unpinned";
 
 export type AuditEvent = {
   at: string;

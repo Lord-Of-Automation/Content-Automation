@@ -264,6 +264,8 @@ export default function RunProgress({
   cancelling,
   onRetry,
   retrying,
+  onPin,
+  pinning,
 }: {
   execution: ExecutionDetail | null;
   loading: boolean;
@@ -271,6 +273,10 @@ export default function RunProgress({
   cancelling?: boolean;
   onRetry?: () => void;
   retrying?: boolean;
+  /** Pin or unpin a step by name. Absent on a backend that cannot pin. */
+  onPin?: (step: string, pin: boolean) => void;
+  /** The step a pin request is in flight for, so its button can say so. */
+  pinning?: string | null;
 }) {
   const [confirming, setConfirming] = useState(false);
   if (!execution) {
@@ -384,8 +390,28 @@ export default function RunProgress({
                   {stage.state === "failed" ? (
                     <span className="stage-tag">failed</span>
                   ) : null}
-                  {stage.state === "done" && stage.nodesRun > 0 ? (
+                  {stage.pinned ? (
+                    <span className="stage-tag stage-tag-pinned">pinned</span>
+                  ) : stage.state === "done" && stage.nodesRun > 0 ? (
                     <span className="stage-tag">{stage.nodesRun} steps</span>
+                  ) : null}
+                  {/* Only where there is something to pin. A skipped step
+                      returned no value, and the placeholder "Working" row is a
+                      label rather than a step, so neither can be keyed on. */}
+                  {onPin && stage.stepName && stage.state !== "skipped" && stage.state !== "active" ? (
+                    <button
+                      type="button"
+                      className="stage-pin"
+                      disabled={pinning === stage.stepName}
+                      title={
+                        stage.pinned
+                          ? "Unpin, so this step does its work again"
+                          : "Pin this result: the step stops running and returns it instead"
+                      }
+                      onClick={() => onPin(stage.stepName!, !stage.pinned)}
+                    >
+                      {pinning === stage.stepName ? "…" : stage.pinned ? "Unpin" : "Pin"}
+                    </button>
                   ) : null}
                 </span>
                 <span className="stage-hint">{stage.hint}</span>

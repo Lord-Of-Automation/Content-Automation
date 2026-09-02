@@ -110,6 +110,8 @@ type EngineStep = {
   error?: string;
   /** A bounded snapshot of what the step produced. Absent on most steps. */
   output?: unknown;
+  /** True when the step returned a pinned value instead of running. */
+  pinned?: boolean;
 };
 
 type EngineRun = {
@@ -187,6 +189,8 @@ function progressOf(run: EngineRun): Progress {
       state,
       nodesRun: 1,
       output: step.output,
+      stepName: step.name,
+      pinned: step.pinned ?? false,
     };
   });
 

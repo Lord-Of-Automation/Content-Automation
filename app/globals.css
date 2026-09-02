@@ -2123,3 +2123,39 @@ button,
     opacity: 0;
   }
 }
+
+/* Pin, on a step. Quiet until hovered: it sits on every row, and a run has
+   twenty of them, so it must not compete with the step's own name. */
+.stage-pin {
+  margin-left: 8px;
+  padding: 1px 7px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--ink-3);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.stage-pin:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.stage-pin:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* A pinned step is a run telling itself something that is not currently true,
+   so its tag is a warning colour rather than the neutral one the other tags
+   use. It should be the first thing noticed on a step that is not running. */
+.stage-tag-pinned {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-color: color-mix(in srgb, var(--warn) 35%, transparent);
+}
