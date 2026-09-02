@@ -59,6 +59,7 @@ type Draft = {
   enabled: boolean;
   body_classes: Record<DeclarableClass, string>;
   ideas_sheet_id: string;
+  style_reference_url: string;
 };
 
 const BLANK: Draft = {
@@ -78,6 +79,7 @@ const BLANK: Draft = {
   enabled: true,
   body_classes: { casino_review: "", game_review: "", promocodes: "", blog: "" },
   ideas_sheet_id: DEFAULT_IDEAS_SHEET_ID,
+  style_reference_url: "",
 };
 
 function draftOf(schedule: Schedule): Draft {
@@ -101,6 +103,7 @@ function draftOf(schedule: Schedule): Draft {
     // means "use the host's sheet", and filling the default in over the top
     // would quietly change which competitor it chases.
     ideas_sheet_id: schedule.ideas_sheet_id ?? "",
+    style_reference_url: schedule.style_reference_url ?? "",
     body_classes: {
       casino_review: (schedule.body_classes?.casino_review ?? []).join(" "),
       game_review: (schedule.body_classes?.game_review ?? []).join(" "),
@@ -502,6 +505,26 @@ export default function LoopView() {
                   </div>
                 </div>
               ) : null}
+
+              <div className="field">
+                <label htmlFor="loop_style_ref">Design reference page</label>
+                <input
+                  id="loop_style_ref"
+                  type="url"
+                  className="mono"
+                  value={draft.style_reference_url}
+                  placeholder="https://example.com/game/an-existing-page/"
+                  onChange={(e) => set("style_reference_url", e.target.value.trim())}
+                />
+                <div className="note">
+                  Optional. An existing page whose look new pages should copy —
+                  one you have checked and are happy with. Leave it blank and the
+                  run picks an example itself, which is whichever page happened
+                  to match the competitor and is not always one you would choose.
+                  Either way the template comes from what the post type agrees
+                  on; this only settles the details the type disagrees about.
+                </div>
+              </div>
 
               <div className="row-2">
                 <div className="field">

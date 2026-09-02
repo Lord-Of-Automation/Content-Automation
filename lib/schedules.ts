@@ -33,6 +33,8 @@ export type Schedule = {
   body_classes: BodyClasses;
   /** The competitor crawl export a gap loop works from. */
   ideas_sheet_id: string;
+  /** A page whose look new pages copy. Blank lets the run find its own. */
+  style_reference_url: string;
 
   wp_username: string;
   /** The password itself never leaves the engine. */
