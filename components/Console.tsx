@@ -220,6 +220,11 @@ export default function Console() {
 
       if (payload.executionId) {
         selectRun(String(payload.executionId));
+        // The engine runs a few at a time, so a run started while others are
+        // going may be waiting rather than working. Shown because those two
+        // look identical in the panel, and "why is it stuck" is the question
+        // that follows.
+        if (payload.note) setNotice(String(payload.note));
       } else {
         pending.current = { startedAt: payload.startedAt, since: Date.now() };
         setNotice(
