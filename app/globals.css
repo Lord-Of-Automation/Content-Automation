@@ -23,6 +23,11 @@
   --danger-bg: #c0392f;
   --danger-bg-hover: #a52f26;
   --run-id-ink: var(--ink);
+  /* Pinned. Purple because nothing else here is: a pinned step is neither
+     success nor warning nor failure, it is a step that did not run. */
+  --pin: #6b3fd4;
+  --pin-soft: #f1ebfe;
+  --pin-line: #d9c9f7;
 }
 
 /* Dark tokens apply in two situations: the viewer's OS asks for dark and they
@@ -53,6 +58,9 @@
     --danger-bg: #d0453a;
     --danger-bg-hover: #e05a4e;
     --run-id-ink: #ffffff;
+    --pin: #b79bff;
+    --pin-soft: #241a3d;
+    --pin-line: #3d2f63;
   }
 }
 
@@ -80,6 +88,9 @@
   --danger-bg: #d0453a;
   --danger-bg-hover: #e05a4e;
   --run-id-ink: #ffffff;
+  --pin: #b79bff;
+  --pin-soft: #241a3d;
+  --pin-line: #3d2f63;
 }
 
 * {
@@ -2151,11 +2162,15 @@ button,
   cursor: not-allowed;
 }
 
-/* A pinned step is a run telling itself something that is not currently true,
-   so its tag is a warning colour rather than the neutral one the other tags
-   use. It should be the first thing noticed on a step that is not running. */
-.stage-tag-pinned {
-  color: var(--warn);
-  background: var(--warn-soft);
-  border-color: color-mix(in srgb, var(--warn) 35%, transparent);
+/* Pinned reads as a state, not an offer: filled rather than outlined, and
+   holding its colour without a hover. It is still the control that undoes it,
+   which the title says, because a step frozen with no visible way back would be
+   worse than one that looks like a button. */
+.stage-pin.is-pinned,
+.stage-pin.is-pinned:hover {
+  color: var(--pin);
+  background: var(--pin-soft);
+  border-color: var(--pin-line);
 }
+
+

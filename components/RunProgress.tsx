@@ -390,9 +390,7 @@ export default function RunProgress({
                   {stage.state === "failed" ? (
                     <span className="stage-tag">failed</span>
                   ) : null}
-                  {stage.pinned ? (
-                    <span className="stage-tag stage-tag-pinned">pinned</span>
-                  ) : stage.state === "done" && stage.nodesRun > 0 ? (
+                  {stage.state === "done" && stage.nodesRun > 0 && !stage.pinned ? (
                     <span className="stage-tag">{stage.nodesRun} steps</span>
                   ) : null}
                   {/* Only where there is something to pin. A skipped step
@@ -401,16 +399,19 @@ export default function RunProgress({
                   {onPin && stage.stepName && stage.state !== "skipped" && stage.state !== "active" ? (
                     <button
                       type="button"
-                      className="stage-pin"
+                      /* The button is the state as well as the control. A
+                         separate "pinned" tag beside a button reading the same
+                         word was the label twice and the meaning once. */
+                      className={stage.pinned ? "stage-pin is-pinned" : "stage-pin"}
                       disabled={pinning === stage.stepName}
                       title={
                         stage.pinned
-                          ? "Unpin, so this step does its work again"
+                          ? "Pinned: this step returns a saved value instead of running. Click to unpin."
                           : "Pin this result: the step stops running and returns it instead"
                       }
                       onClick={() => onPin(stage.stepName!, !stage.pinned)}
                     >
-                      {pinning === stage.stepName ? "…" : stage.pinned ? "Unpin" : "Pin"}
+                      {pinning === stage.stepName ? "…" : stage.pinned ? "pinned" : "Pin"}
                     </button>
                   ) : null}
                 </span>
