@@ -7,6 +7,7 @@ import type { Schedule } from "@/lib/schedules";
 import { DECLARABLE_CLASSES, type DeclarableClass } from "@/lib/validate";
 import { Select } from "@/components/Select";
 import { Toasts, useToasts } from "@/components/Toasts";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 /**
  * How often a loop looks, in the words someone would use.
@@ -22,6 +23,16 @@ const EVERY = [
   { hours: 48, label: "Every other day" },
   { hours: 168, label: "Weekly" },
 ];
+
+/**
+ * The competitor crawl export a gap loop starts from.
+ *
+ * Prefilled because there is one in use and typing a 44 character Drive id from
+ * memory is how a loop ends up pointed at nothing. It is still a field rather
+ * than a constant: two loops chasing two different rivals is the obvious next
+ * thing to want, and the engine already takes it per run.
+ */
+const DEFAULT_IDEAS_SHEET_ID = "1vTmwt1Gi5GmFby-a3nTHRko_2KyDWfc9RRJGiLzrF14";
 
 const CLASS_FIELDS: Array<{ key: DeclarableClass; label: string; placeholder: string }> = [
   { key: "casino_review", label: "Casino review", placeholder: "single-casino" },
@@ -47,6 +58,7 @@ type Draft = {
   atMinute: number;
   enabled: boolean;
   body_classes: Record<DeclarableClass, string>;
+  ideas_sheet_id: string;
 };
 
 const BLANK: Draft = {
@@ -65,6 +77,7 @@ const BLANK: Draft = {
   atMinute: 0,
   enabled: true,
   body_classes: { casino_review: "", game_review: "", promocodes: "", blog: "" },
+  ideas_sheet_id: DEFAULT_IDEAS_SHEET_ID,
 };
 
 function draftOf(schedule: Schedule): Draft {
@@ -84,6 +97,10 @@ function draftOf(schedule: Schedule): Draft {
     atHour: schedule.atHour,
     atMinute: schedule.atMinute,
     enabled: schedule.enabled,
+    // An existing loop keeps whatever it was saved with, blank included: blank
+    // means "use the host's sheet", and filling the default in over the top
+    // would quietly change which competitor it chases.
+    ideas_sheet_id: schedule.ideas_sheet_id ?? "",
     body_classes: {
       casino_review: (schedule.body_classes?.casino_review ?? []).join(" "),
       game_review: (schedule.body_classes?.game_review ?? []).join(" "),
@@ -124,6 +141,14 @@ export default function LoopView() {
    * of something you did* is a toast instead.
    */
   const [error, setError] = useState<string | null>(null);
+  /**
+   * The loop awaiting a yes on deleting it.
+   *
+   * The whole schedule rather than its id, so the dialog can name it. "Delete
+   * this loop?" is a question about something; "Delete Nightly gap fill?" is a
+   * question you can answer.
+   */
+  const [deleting, setDeleting] = useState<Schedule | null>(null);
   const { toasts, push, dismiss } = useToasts();
 
   const load = useCallback(async () => {
@@ -233,9 +258,46 @@ export default function LoopView() {
     }
   }
 
+  async function confirmDelete() {
+    if (!deleting) return;
+    const name = deleting.name;
+    await act(deleting.id, "DELETE", `${name} deleted.`);
+    setDeleting(null);
+  }
+
   return (
     <div className="stack">
       <Toasts toasts={toasts} onDismiss={dismiss} />
+
+      <ConfirmDialog
+        open={!!deleting}
+        title={`Delete ${deleting?.name ?? "this loop"}?`}
+        confirmLabel="Delete loop"
+        busyLabel="Deleting…"
+        cancelLabel="Keep it"
+        busy={busy}
+        onConfirm={confirmDelete}
+        onDismiss={() => (busy ? undefined : setDeleting(null))}
+        body={
+          <>
+            <p>
+              Its schedule and settings go with it, and it stops firing. The
+              pages it has already written stay where they are, and so do their
+              runs in the log.
+            </p>
+            <p className="confirm-quiet">
+              {deleting?.mode === "gap" ? "Game gap filler" : "Optimiser"} on{" "}
+              <strong>{deleting?.website_url}</strong>, every{" "}
+              {EVERY.find((e) => e.hours === deleting?.everyHours)?.label.toLowerCase() ??
+                `${deleting?.everyHours} hours`}
+              .
+            </p>
+            <p className="confirm-quiet">
+              To stop it without losing it, switch it off instead.
+            </p>
+          </>
+        }
+      />
 
       <div className="card">
         <div className="card-head">
@@ -311,7 +373,7 @@ export default function LoopView() {
                         type="button"
                         className="btn btn-ghost"
                         disabled={busy}
-                        onClick={() => act(schedule.id, "DELETE", "Loop deleted.")}
+                        onClick={() => setDeleting(schedule)}
                       >
                         Delete
                       </button>
@@ -420,6 +482,26 @@ export default function LoopView() {
                     : "The same thing the Runs page does: crawls the site and rewrites the pages it finds."}
                 </div>
               </div>
+
+              {draft.mode === "gap" ? (
+                <div className="field">
+                  <label htmlFor="loop_ideas">Ideas sheet ID</label>
+                  <input
+                    id="loop_ideas"
+                    type="text"
+                    className="mono"
+                    value={draft.ideas_sheet_id}
+                    placeholder="Drive file ID of the competitor crawl export"
+                    onChange={(e) => set("ideas_sheet_id", e.target.value.trim())}
+                  />
+                  <div className="note">
+                    The competitor this loop chases: a crawl export with Address,
+                    Meta Title and H1 columns, shared with the service account.
+                    The ID only, not the URL. Leave it blank to use whichever
+                    sheet the engine is configured with.
+                  </div>
+                </div>
+              ) : null}
 
               <div className="row-2">
                 <div className="field">

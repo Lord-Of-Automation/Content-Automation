@@ -31,6 +31,8 @@ export type Schedule = {
   exclude_paths: string[];
   brief_doc_id: string;
   body_classes: BodyClasses;
+  /** The competitor crawl export a gap loop works from. */
+  ideas_sheet_id: string;
 
   wp_username: string;
   /** The password itself never leaves the engine. */
