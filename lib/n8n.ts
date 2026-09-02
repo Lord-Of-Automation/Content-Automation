@@ -52,6 +52,13 @@ export type StartRunInput = {
    * Empty when none were declared, which is the normal case.
    */
   body_classes: BodyClasses;
+  /**
+   * Which pipeline runs it. Absent means the optimiser, which is what every
+   * caller written before there was a choice means.
+   */
+  mode?: "optimise" | "gap";
+  /** The competitor crawl export a gap run works from. */
+  ideas_sheet_id?: string;
 };
 
 /**

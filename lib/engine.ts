@@ -130,6 +130,8 @@ type EngineRun = {
   input?: Record<string, unknown>;
   /** Counted by the engine as it spent it. Absent on a run older than that. */
   cost?: CostBreakdown | null;
+  /** Which pipeline ran it. Absent on a run from before there was a choice. */
+  mode?: "optimise" | "gap";
   steps?: EngineStep[];
 };
 
@@ -343,6 +345,11 @@ export async function retryExecution(id: string): Promise<{ id: string; status: 
     brief_doc_id: inputs.brief_doc_id ?? "",
     // A retry is the same run again, so the declarations go with it.
     body_classes: inputs.body_classes,
+    // And so does which pipeline it was. Retrying a failed gap run as the
+    // optimiser would rewrite the site's existing pages instead of writing the
+    // missing ones — the wrong work entirely, done quietly and successfully.
+    mode: run.mode ?? "optimise",
+    ideas_sheet_id: (run.input?.ideas_sheet_id as string) ?? "",
   }, id);
   return { id: started.executionId ?? "", status: "new" };
 }
