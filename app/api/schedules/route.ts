@@ -58,20 +58,33 @@ export async function POST(request: Request) {
       );
     }
 
-    const body_classes: Record<string, string[]> = {};
-    const declared = (body.body_classes ?? {}) as Record<string, unknown>;
-    for (const key of DECLARABLE_CLASSES) {
-      const names = parseBodyClassList(declared[key]);
-      if (names.length) body_classes[key] = names;
+    // Only what the caller actually sent is transformed. The engine merges a
+    // partial save onto the stored schedule, so rebuilding these two from an
+    // absent field would quietly empty them — which is what flipping a loop on
+    // or off from the list would have done to its body classes every time.
+    const patch: Record<string, unknown> = { ...body };
+
+    if (body.body_classes !== undefined) {
+      const body_classes: Record<string, string[]> = {};
+      const declared = (body.body_classes ?? {}) as Record<string, unknown>;
+      for (const key of DECLARABLE_CLASSES) {
+        const names = parseBodyClassList(declared[key]);
+        if (names.length) body_classes[key] = names;
+      }
+      patch.body_classes = body_classes;
+    }
+
+    if (body.exclude_paths !== undefined) {
+      patch.exclude_paths = Array.isArray(body.exclude_paths)
+        ? body.exclude_paths.map((v) => String(v).trim()).filter(Boolean)
+        : String(body.exclude_paths)
+            .split(/[\n,]/)
+            .map((v) => v.trim())
+            .filter(Boolean);
     }
 
     const saved = await saveSchedule({
-      ...body,
-      body_classes,
-      exclude_paths: String(body.exclude_paths ?? "")
-        .split(/[\n,]/)
-        .map((v) => v.trim())
-        .filter(Boolean),
+      ...patch,
       ...(credentials
         ? { wp_username: credentials.username, wp_password: credentials.password }
         : {}),

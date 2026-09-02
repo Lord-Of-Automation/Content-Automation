@@ -174,6 +174,46 @@ export default function LoopView() {
     }
   }
 
+  /**
+   * On or off, saved straight away.
+   *
+   * Sends the id and the flag and nothing else: the engine merges a partial
+   * save onto what it already holds, so pausing a loop must not carry a stale
+   * copy of the rest of it back over the top.
+   *
+   * The row is updated before the request rather than after it. A switch that
+   * waits for a round trip reads as broken, and load() puts it right if the
+   * save fails.
+   */
+  async function toggle(schedule: Schedule, enabled: boolean) {
+    setSchedules((current) =>
+      current.map((s) => (s.id === schedule.id ? { ...s, enabled } : s)),
+    );
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    try {
+      const response = await fetch("/api/schedules", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: schedule.id, website_url: schedule.website_url, enabled }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error ?? "That did not work.");
+      setNote(
+        enabled
+          ? `${schedule.name} is on. Next run ${when(payload.schedule.nextRunAt)}.`
+          : `${schedule.name} is paused. Run now still works.`,
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That did not work.");
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function act(id: string, method: "POST" | "DELETE", success: string) {
     setBusy(true);
     setError(null);
@@ -227,10 +267,22 @@ export default function LoopView() {
                 <div className="loop" key={schedule.id}>
                   <div className="loop-head">
                     <div>
+                      <label className="switch" title={
+                        schedule.enabled
+                          ? "Firing on schedule. Switch off to pause it."
+                          : "Paused. It keeps its settings and stops firing."
+                      }>
+                        <input
+                          type="checkbox"
+                          checked={schedule.enabled}
+                          disabled={busy}
+                          onChange={(e) => toggle(schedule, e.target.checked)}
+                        />
+                        <span className="switch-label">
+                          {schedule.enabled ? "On" : "Paused"}
+                        </span>
+                      </label>
                       <strong>{schedule.name}</strong>
-                      <span className={`pill pill-${schedule.enabled ? "run" : "idle"}`}>
-                        {schedule.enabled ? "On" : "Paused"}
-                      </span>
                       <span className="pill pill-idle">
                         {schedule.mode === "gap" ? "Game gap filler" : "Optimiser"}
                       </span>
@@ -305,6 +357,17 @@ export default function LoopView() {
                 the same one a manual run uses. Nothing is typed twice.
               </p>
             </div>
+            <div className="spacer" />
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={draft.enabled}
+                onChange={(e) => set("enabled", e.target.checked)}
+              />
+              <span className="switch-label">
+                {draft.enabled ? "On" : "Paused"}
+              </span>
+            </label>
           </div>
 
           <div className="card-body">
@@ -485,22 +548,6 @@ export default function LoopView() {
                       />
                     </div>
                   ))}
-                </div>
-              </div>
-
-              <div className="field">
-                <label className="check" htmlFor="loop_enabled">
-                  <input
-                    id="loop_enabled"
-                    type="checkbox"
-                    checked={draft.enabled}
-                    onChange={(e) => set("enabled", e.target.checked)}
-                  />
-                  Run on schedule
-                </label>
-                <div className="note">
-                  Off keeps the loop and its settings but stops it firing. Run now
-                  still works.
                 </div>
               </div>
 
