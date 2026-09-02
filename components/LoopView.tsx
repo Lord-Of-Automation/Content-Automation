@@ -60,6 +60,7 @@ type Draft = {
   body_classes: Record<DeclarableClass, string>;
   ideas_sheet_id: string;
   style_reference_url: string;
+  publish_new_pages: boolean;
 };
 
 const BLANK: Draft = {
@@ -80,6 +81,7 @@ const BLANK: Draft = {
   body_classes: { casino_review: "", game_review: "", promocodes: "", blog: "" },
   ideas_sheet_id: DEFAULT_IDEAS_SHEET_ID,
   style_reference_url: "",
+  publish_new_pages: false,
 };
 
 function draftOf(schedule: Schedule): Draft {
@@ -104,6 +106,7 @@ function draftOf(schedule: Schedule): Draft {
     // would quietly change which competitor it chases.
     ideas_sheet_id: schedule.ideas_sheet_id ?? "",
     style_reference_url: schedule.style_reference_url ?? "",
+    publish_new_pages: schedule.publish_new_pages ?? false,
     body_classes: {
       casino_review: (schedule.body_classes?.casino_review ?? []).join(" "),
       game_review: (schedule.body_classes?.game_review ?? []).join(" "),
@@ -659,6 +662,25 @@ export default function LoopView() {
                   crawls fresh every time.
                 </div>
               </div>
+
+              {draft.mode === "gap" ? (
+                <div className="field">
+                  <label className="check" htmlFor="loop_publish">
+                    <input
+                      id="loop_publish"
+                      type="checkbox"
+                      checked={draft.publish_new_pages}
+                      onChange={(e) => set("publish_new_pages", e.target.checked)}
+                    />
+                    Publish new pages
+                  </label>
+                  <div className="note">
+                    {draft.publish_new_pages
+                      ? "New pages go straight onto the site. This loop fires on its own, so nobody reads them first."
+                      : "Off. New pages are created as drafts and wait in WordPress until you publish them — which is why a run can finish successfully and the page show nothing."}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="field field-sep">
                 <label>Page classes by body class</label>

@@ -35,6 +35,8 @@ export type Schedule = {
   ideas_sheet_id: string;
   /** A page whose look new pages copy. Blank lets the run find its own. */
   style_reference_url: string;
+  /** Whether pages this loop creates go live, or wait as drafts. */
+  publish_new_pages: boolean;
 
   wp_username: string;
   /** The password itself never leaves the engine. */
