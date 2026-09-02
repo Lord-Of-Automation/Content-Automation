@@ -84,6 +84,19 @@ const BLANK: Draft = {
   publish_new_pages: false,
 };
 
+/**
+ * Whether a crawl limit means "the whole site".
+ *
+ * Zero means it on the way out and 1000 means it on the way back: the engine
+ * resolves a zero to DataForSEO's ceiling, which IS the whole site, and stores
+ * that. Ticking the box therefore saved correctly and then came back unticked
+ * with 1000 in the number beside it, which reads exactly like a setting that
+ * refused to save.
+ */
+function isWholeSite(pages: number): boolean {
+  return pages === 0 || pages >= 1000;
+}
+
 function draftOf(schedule: Schedule): Draft {
   return {
     id: schedule.id,
@@ -599,7 +612,7 @@ export default function LoopView() {
                   <label className="check">
                     <input
                       type="checkbox"
-                      checked={draft.max_crawl_pages === 0}
+                      checked={isWholeSite(draft.max_crawl_pages)}
                       onChange={(e) => set("max_crawl_pages", e.target.checked ? 0 : 200)}
                     />
                     Crawl the whole site
@@ -609,8 +622,8 @@ export default function LoopView() {
                     type="number"
                     min={1}
                     max={1000}
-                    disabled={draft.max_crawl_pages === 0}
-                    value={draft.max_crawl_pages === 0 ? "" : draft.max_crawl_pages}
+                    disabled={isWholeSite(draft.max_crawl_pages)}
+                    value={isWholeSite(draft.max_crawl_pages) ? "" : draft.max_crawl_pages}
                     placeholder="all"
                     onChange={(e) => set("max_crawl_pages", Number.parseInt(e.target.value, 10) || 0)}
                   />
