@@ -161,8 +161,8 @@ export default function ProfileMenu({
               <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
             </svg>
             Dark mode
-            <span className={dark ? "switch is-on" : "switch"} aria-hidden>
-              <span className="switch-knob" />
+            <span className={dark ? "profile-switch is-on" : "profile-switch"} aria-hidden>
+              <span className="profile-switch-knob" />
             </span>
           </button>
 

@@ -2332,11 +2332,18 @@ button,
 
 /* The switch pushes to the right edge, which is what makes the row read as a
    setting rather than a link that goes somewhere. */
-.profile-item-toggle .switch {
+.profile-item-toggle .profile-switch {
   margin-left: auto;
 }
 
-.switch {
+/* Named for the profile menu, not "switch".
+   It was called .switch, which the Loop page had already been using for a
+   different thing entirely — a label wrapping a checkbox and the words On or
+   Paused. Being later in this file, these rules won, and every loop's switch
+   was forced to a 30 by 17 pixel pill with its own label clipped inside it. It
+   read as a title covering the text. Two components cannot share a generic
+   class name and mean different things by it. */
+.profile-switch {
   position: relative;
   width: 30px;
   height: 17px;
@@ -2346,11 +2353,11 @@ button,
   transition: background 140ms ease;
 }
 
-.switch.is-on {
+.profile-switch.is-on {
   background: var(--accent);
 }
 
-.switch-knob {
+.profile-switch-knob {
   position: absolute;
   top: 2px;
   left: 2px;
@@ -2361,7 +2368,7 @@ button,
   transition: transform 140ms ease;
 }
 
-.switch.is-on .switch-knob {
+.profile-switch.is-on .profile-switch-knob {
   transform: translateX(13px);
 }
 
