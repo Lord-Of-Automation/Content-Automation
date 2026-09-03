@@ -213,7 +213,8 @@ export default function DomainsView() {
                     <th>Status</th>
                     <th>Expires</th>
                     <th>Renewal</th>
-                    <th>Points at</th>
+                    <th>NS Points At</th>
+                    <th>Name servers</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -250,6 +251,20 @@ export default function DomainsView() {
                         </td>
                         <td className="detail">
                           <span className={`pill pill-${where.tone}`}>{where.label}</span>
+                        </td>
+                        {/* The names themselves, beside the summary rather than
+                            instead of it. The pill answers "is this domain
+                            live"; these answer "which record do I go and
+                            change", which is the next thing you need and the
+                            reason you would otherwise open GoDaddy. Every
+                            domain on this account has exactly two, so the cell
+                            is a predictable height. */}
+                        <td className="ns">
+                          {d.nameServers.length ? (
+                            d.nameServers.map((ns) => <span key={ns}>{ns}</span>)
+                          ) : (
+                            <span className="quiet">none recorded</span>
+                          )}
                         </td>
                       </tr>
                     );

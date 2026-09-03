@@ -2460,6 +2460,19 @@ button,
   text-decoration: underline;
 }
 
+/* One name server per line, in the same tabular face the cost column uses.
+   They differ only in their first label — brad.ns, jule.ns — so aligning them
+   makes the odd one out visible at a glance down the column. */
+.logs td.ns {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
 .domain-note {
   margin: 0;
   padding: 10px 14px;
