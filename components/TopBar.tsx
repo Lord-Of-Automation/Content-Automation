@@ -23,11 +23,13 @@ export default async function TopBar({
             live in the profile menu, where they stop reading as somewhere to
             go and start reading as something to change. */}
         <nav className="topnav">
+          {/* The label says what the page does; the address stays /runs, which
+              is what every bookmark and every stored selection points at. */}
           <Link
             href="/runs"
             className={current === "runs" ? "topnav-link is-current" : "topnav-link"}
           >
-            Runs
+            Optimize
           </Link>
           <Link
             href="/loop"
