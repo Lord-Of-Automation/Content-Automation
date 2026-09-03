@@ -6,7 +6,8 @@
  * Comparators in particular: a sort that is subtly wrong looks like a sort.
  */
 
-export type SortKey = "domain" | "status" | "expires" | "renewal" | "price" | "ns";
+export type SortKey =
+  | "domain" | "provider" | "status" | "expires" | "renewal" | "price" | "ns";
 export type Direction = "asc" | "desc";
 
 export interface Sortable {
@@ -16,6 +17,9 @@ export interface Sortable {
   renewAuto: boolean;
   nameServers: string[];
   suffix: string;
+  /** Micro-units, or null when the registrar would not price this extension. */
+  renewalPrice: number | null;
+  providerLabel: string;
 }
 
 /**
@@ -75,7 +79,6 @@ export function orderDomains<T extends Sortable>(
   rows: T[],
   sortKey: SortKey,
   direction: Direction,
-  prices: Record<string, { renewal: number | null }>,
 ): T[] {
   /**
    * Null sorts last whichever way the column is pointing.
@@ -105,9 +108,14 @@ export function orderDomains<T extends Sortable>(
           (pointsAt(a.nameServers).label.localeCompare(pointsAt(b.nameServers).label) ||
             a.domain.localeCompare(b.domain)) * flip
         );
+      case "provider":
+        return (
+          (a.providerLabel.localeCompare(b.providerLabel) ||
+            a.domain.localeCompare(b.domain)) * flip
+        );
       case "price": {
-        const pa = prices[a.suffix]?.renewal ?? null;
-        const pb = prices[b.suffix]?.renewal ?? null;
+        const pa = a.renewalPrice;
+        const pb = b.renewalPrice;
         if (pa === null && pb === null) return a.domain.localeCompare(b.domain);
         return (nullsLast(pa, flip) - nullsLast(pb, flip)) * flip;
       }

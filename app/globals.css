@@ -2608,6 +2608,21 @@ button,
   color: var(--accent);
 }
 
+/* Which registrar the row belongs to. Quiet on purpose: it matters when you
+   are looking for it and is noise on every row where you are not, and there
+   are only ever a handful of distinct values down the column. */
+.registrar {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel-2);
+  font-size: 11.5px;
+  font-weight: 560;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
 /* One name server per line, each in its own box.
    As two bare lines of grey text they ran into the row above and below and
    read as a wrapped sentence rather than as two separate hostnames. A border

@@ -27,7 +27,7 @@ const KEY = "content-automation:providers";
 const DIR = path.join(process.cwd(), ".data");
 const FILE = path.join(DIR, "providers.json");
 
-export type ProviderId = "godaddy" | "namecheap" | "spaceship";
+export type ProviderId = "godaddy" | "gandi" | "namecheap" | "spaceship";
 
 export interface ProviderField {
   name: string;
@@ -76,6 +76,23 @@ export const PROVIDERS: ProviderSpec[] = [
         patternNote:
           "A GoDaddy token starts with gd_pat_ and has no spaces. Paste the token " +
           "itself, not the whole Authorization header and not the key id beside it.",
+      },
+    ],
+  },
+  {
+    id: "gandi",
+    label: "Gandi",
+    wired: true,
+    blurb:
+      "One API key, from Account, Authentication options. Gandi's own older " +
+      "documentation shows it sent as \"Apikey\", which its current API refuses " +
+      "with a 403 — it goes as a bearer token, which is what this uses.",
+    fields: [
+      {
+        name: "apiKey",
+        label: "API key",
+        secret: true,
+        placeholder: "the key or personal access token",
       },
     ],
   },

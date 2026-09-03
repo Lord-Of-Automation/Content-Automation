@@ -13,6 +13,7 @@
  */
 
 import { credentialFor } from "./providers";
+import { byExpiry, daysUntil, suffixOf, type Domain, type DomainSource } from "./domains";
 
 export class GoDaddyConfigError extends Error {
   constructor(message: string) {
@@ -45,35 +46,6 @@ export interface TldPrice {
   currency: string;
 }
 
-/** What the list page shows for one domain. */
-export interface Domain {
-  domain: string;
-  domainId: number | null;
-  status: string;
-  /** ISO date, or null for a domain with no expiry recorded. */
-  expires: string | null;
-  createdAt: string | null;
-  renewAuto: boolean;
-  locked: boolean;
-  privacy: boolean;
-  /** Days until expiry, negative once past. Null when there is no expiry. */
-  daysLeft: number | null;
-  nameServers: string[];
-  /** Everything after the first dot: "com", "co.uk". Keys the price lookup. */
-  suffix: string;
-}
-
-export interface DomainList {
-  domains: Domain[];
-  /** Which authorization scheme the API accepted, for the diagnostics line. */
-  scheme: string;
-  /** True when the account holds more than this page fetched. */
-  truncated: boolean;
-  /** List renewal price per suffix, keyed by suffix. Best effort. */
-  prices: Record<string, TldPrice>;
-  /** Suffixes GoDaddy would not price, so the page can say which and why. */
-  unpriced: string[];
-}
 
 const HOST = "https://api.godaddy.com";
 /** The API's own ceiling. Asking for more is a 422, not a clamp. */
@@ -197,36 +169,24 @@ async function fetchPage(
   return { status: response.status, body: await response.text().catch(() => "") };
 }
 
-function daysUntil(iso: string | null): number | null {
-  if (!iso) return null;
-  const at = Date.parse(iso);
-  if (!Number.isFinite(at)) return null;
-  return Math.round((at - Date.now()) / 86_400_000);
-}
-
-/** "shop.example.co.uk" -> "co.uk". Everything after the first label. */
-function suffixOf(domain: string): string {
-  const at = domain.indexOf(".");
-  return at < 0 ? "" : domain.slice(at + 1).toLowerCase();
-}
-
 function shape(raw: Record<string, unknown>): Domain {
   const expires = typeof raw.expires === "string" ? raw.expires : null;
   const domain = String(raw.domain ?? "");
   return {
-    suffix: suffixOf(domain),
+    provider: "godaddy",
+    providerLabel: "GoDaddy",
     domain,
-    domainId: typeof raw.domainId === "number" ? raw.domainId : null,
+    suffix: suffixOf(domain),
     status: String(raw.status ?? "UNKNOWN"),
     expires,
-    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : null,
-    renewAuto: raw.renewAuto === true,
-    locked: raw.locked === true,
-    privacy: raw.privacy === true,
     daysLeft: daysUntil(expires),
+    renewAuto: raw.renewAuto === true,
     nameServers: Array.isArray(raw.nameServers)
       ? (raw.nameServers as unknown[]).map(String).slice(0, 6)
       : [],
+    // Filled in by finish(), once per extension rather than once per domain.
+    renewalPrice: null,
+    currency: "USD",
   };
 }
 
@@ -328,19 +288,41 @@ async function pricesFor(
 
 
 /**
- * The answer, with prices attached.
+ * The answer, with prices attached to the rows.
  *
  * Both exits from the paging loop come through here so they cannot drift
- * apart, and so the price lookup is written once rather than twice.
+ * apart, and so the price lookup is written once rather than twice. The price
+ * lands on each domain rather than in a table beside it, because the same
+ * extension costs different money at a different registrar.
  */
 async function finish(
   collected: Domain[],
   scheme: { name: string; value: string },
   truncated: boolean,
-): Promise<DomainList> {
+): Promise<{ domains: Domain[]; source: DomainSource }> {
   const suffixes = [...new Set(collected.map((d) => d.suffix).filter(Boolean))].sort();
   const { prices, unpriced } = await pricesFor(suffixes, scheme.value);
-  return { domains: sort(collected), scheme: scheme.name, truncated, prices, unpriced };
+
+  for (const d of collected) {
+    const price = prices[d.suffix];
+    if (!price) continue;
+    d.renewalPrice = price.renewal;
+    d.currency = price.currency;
+  }
+
+  return {
+    domains: byExpiry(collected),
+    source: {
+      provider: "godaddy",
+      label: "GoDaddy",
+      ok: true,
+      count: collected.length,
+      note: truncated
+        ? "more domains than one read returns; this is the first several thousand"
+        : `read with the ${scheme.name} authorization scheme`,
+      unpriced,
+    },
+  };
 }
 
 /**
@@ -350,7 +332,7 @@ async function finish(
  * than an offset — so a page that comes back short is the end, and a page that
  * comes back full means asking again from that name.
  */
-export async function listDomains(): Promise<DomainList> {
+export async function listGoDaddyDomains(): Promise<{ domains: Domain[]; source: DomainSource }> {
   const tried: string[] = [];
   let lastAuthError = "";
 
@@ -407,16 +389,3 @@ export async function listDomains(): Promise<DomainList> {
   );
 }
 
-/**
- * Soonest to expire first, because that is the only column anyone opens this
- * page in a hurry to read. Domains with no expiry sort to the bottom rather
- * than the top, where a missing date would otherwise look like an emergency.
- */
-function sort(domains: Domain[]): Domain[] {
-  return [...domains].sort((a, b) => {
-    if (a.daysLeft === null && b.daysLeft === null) return a.domain.localeCompare(b.domain);
-    if (a.daysLeft === null) return 1;
-    if (b.daysLeft === null) return -1;
-    return a.daysLeft - b.daysLeft;
-  });
-}

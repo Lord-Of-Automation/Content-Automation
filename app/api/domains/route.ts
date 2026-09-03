@@ -1,26 +1,24 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse, requireSession } from "@/lib/api-guard";
-import { GoDaddyConfigError, listDomains } from "@/lib/godaddy";
+import { listAllDomains } from "@/lib/domains";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// A large account pages, and each page is a round trip to GoDaddy.
-export const maxDuration = 60;
+// Two registrars, each paging and pricing per extension, and Gandi wants a
+// request per domain for its name servers.
+export const maxDuration = 90;
 
 export async function GET() {
   const denied = await requireSession();
   if (denied) return denied;
 
   try {
-    return NextResponse.json(await listDomains());
+    // No try/catch around each reader here: listAllDomains already turns one
+    // registrar failing into a note beside the others, so an error reaching
+    // this line means something wider went wrong.
+    return NextResponse.json(await listAllDomains());
   } catch (error) {
-    // A missing key is something to go and fix in the project settings, not an
-    // upstream failure to retry. errorResponse would call it a 502 and send
-    // whoever is reading off to check GoDaddy's status page.
-    if (error instanceof GoDaddyConfigError) {
-      return NextResponse.json({ error: error.message, kind: "config" }, { status: 500 });
-    }
     return errorResponse(error);
   }
 }

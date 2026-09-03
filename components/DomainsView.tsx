@@ -7,28 +7,31 @@ import {
 } from "@/lib/domainsort";
 
 type Domain = {
+  provider: string;
+  providerLabel: string;
   domain: string;
-  domainId: number | null;
+  suffix: string;
   status: string;
   expires: string | null;
-  createdAt: string | null;
-  renewAuto: boolean;
-  locked: boolean;
-  privacy: boolean;
   daysLeft: number | null;
+  renewAuto: boolean;
   nameServers: string[];
-  suffix: string;
-};
-
-type TldPrice = {
-  suffix: string;
-  /** Micro-units, as GoDaddy sends them. 22990000 is 22.99. */
-  renewal: number | null;
-  register: number | null;
+  /** Micro-units, as both registrars quote. 22990000 is 22.99. */
+  renewalPrice: number | null;
   currency: string;
 };
 
-/** GoDaddy prices in millionths. Rendered in the viewer's own locale. */
+/** How one registrar's read went, so the page can say what it is missing. */
+type Source = {
+  provider: string;
+  label: string;
+  ok: boolean;
+  count: number;
+  note: string;
+  unpriced: string[];
+};
+
+/** Both registrars price in millionths. Rendered in the viewer's own locale. */
 function money(micro: number, currency: string): string {
   try {
     return new Intl.NumberFormat(undefined, {
@@ -54,6 +57,7 @@ const PAGE = 50;
  */
 const FIRST_DIRECTION: Record<SortKey, Direction> = {
   domain: "asc",
+  provider: "asc",
   status: "asc",
   expires: "asc",
   renewal: "asc",
@@ -106,10 +110,7 @@ function prettyStatus(status: string): string {
 
 export default function DomainsView() {
   const [domains, setDomains] = useState<Domain[]>([]);
-  const [scheme, setScheme] = useState<string>("");
-  const [truncated, setTruncated] = useState(false);
-  const [prices, setPrices] = useState<Record<string, TldPrice>>({});
-  const [unpriced, setUnpriced] = useState<string[]>([]);
+  const [sources, setSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [configError, setConfigError] = useState(false);
@@ -144,10 +145,7 @@ export default function DomainsView() {
         throw new Error(payload.error ?? `The domains API returned ${response.status}.`);
       }
       setDomains(payload.domains ?? []);
-      setScheme(payload.scheme ?? "");
-      setTruncated(!!payload.truncated);
-      setPrices(payload.prices ?? {});
-      setUnpriced(payload.unpriced ?? []);
+      setSources(payload.sources ?? []);
       setConfigError(false);
       setError(null);
     } catch (e) {
@@ -173,8 +171,8 @@ export default function DomainsView() {
       return true;
     });
 
-    return orderDomains(kept, sortKey, direction, prices);
-  }, [domains, query, only, sortKey, direction, prices]);
+    return orderDomains(kept, sortKey, direction);
+  }, [domains, query, only, sortKey, direction]);
 
   // Counted over everything, not over what the search box left behind: these
   // are facts about the account, and they should not change as you type.
@@ -194,14 +192,13 @@ export default function DomainsView() {
       const totals = new Map<string, number>();
       let counted = 0;
       for (const d of list) {
-        const price = prices[d.suffix];
-        if (!price?.renewal) continue;
-        totals.set(price.currency, (totals.get(price.currency) ?? 0) + price.renewal);
+        if (!d.renewalPrice) continue;
+        totals.set(d.currency, (totals.get(d.currency) ?? 0) + d.renewalPrice);
         counted += 1;
       }
       return { totals: [...totals.entries()], counted };
     },
-    [prices],
+    [],
   );
 
   const yearly = useMemo(() => totalOver(domains), [domains, totalOver]);
@@ -239,13 +236,17 @@ export default function DomainsView() {
             </div>
           ) : null}
 
-          {truncated ? (
-            <div className="notice warn">
-              This account holds more domains than one read returns. The list
-              below is the first several thousand, soonest to expire first.
-            </div>
-          ) : null}
-
+          {/* One line per registrar, and only when there is something to say.
+              A registrar that failed must not empty the page or hide the other
+              one's domains — it says so here and the rest of the list stands. */}
+          {sources
+            .filter((s) => !s.ok || s.note !== "read")
+            .map((s) => (
+              <div className={s.ok ? "notice" : "notice bad"} key={s.provider}>
+                <strong>{s.label}:</strong> {s.note}
+                {s.ok && s.count ? ` (${s.count} domains)` : null}
+              </div>
+            ))}
           {loading && !domains.length ? (
             <div className="empty">Asking GoDaddy…</div>
           ) : !domains.length && !error ? (
@@ -366,6 +367,7 @@ export default function DomainsView() {
                     {(
                       [
                         ["domain", "Domain", false],
+                        ["provider", "Registrar", false],
                         ["status", "Status", false],
                         ["expires", "Expires", false],
                         ["renewal", "Renewal", false],
@@ -386,7 +388,6 @@ export default function DomainsView() {
                 <tbody>
                   {shown.slice(0, visible).map((d) => {
                     const where = pointsAt(d.nameServers);
-                    const price = prices[d.suffix];
                     return (
                       <tr key={d.domain}>
                         <td>
@@ -398,6 +399,9 @@ export default function DomainsView() {
                           >
                             {d.domain}
                           </a>
+                        </td>
+                        <td>
+                          <span className="registrar">{d.providerLabel}</span>
                         </td>
                         <td>
                           <span className={`pill pill-${statusTone(d.status)}`}>
@@ -417,8 +421,8 @@ export default function DomainsView() {
                           )}
                         </td>
                         <td className="num">
-                          {price?.renewal ? (
-                            money(price.renewal, price.currency)
+                          {d.renewalPrice ? (
+                            money(d.renewalPrice, d.currency)
                           ) : (
                             <span className="quiet">not priced</span>
                           )}
@@ -471,25 +475,22 @@ export default function DomainsView() {
               ) : null}
 
               <p className="domain-note">
-                Prices are GoDaddy&rsquo;s published renewal rate for each
+                Prices are each registrar&rsquo;s published renewal rate for the
                 extension, looked up once per extension and applied to every
-                domain on it. They are not a quote for your account: a Discount
-                Domain Club membership, a multi-year term or a premium name will
-                all differ. GoDaddy does not publish what was originally paid,
-                so that is not shown at all.
-                {unpriced.length ? (
-                  <>
-                    {" "}
-                    {unpriced.length} extension
-                    {unpriced.length === 1 ? "" : "s"} could not be priced
-                    because GoDaddy refuses a price check on{" "}
-                    {unpriced.length === 1 ? "it" : "them"}:{" "}
-                    {unpriced.map((s) => `.${s}`).join(", ")}.
-                  </>
-                ) : null}
-                {scheme ? <> Read with the {scheme} authorization scheme.</> : null}
-              </p>
-            </>
+                domain on it. They are not a quote for your account: a discount
+                club membership, a multi-year term or a premium name will all
+                differ. Neither registrar publishes what was originally paid, so
+                that is not shown at all.
+                {sources
+                  .filter((s) => s.unpriced.length)
+                  .map((s) => (
+                    <span key={s.provider}>
+                      {" "}
+                      {s.label} would not price{" "}
+                      {s.unpriced.map((x) => `.${x}`).join(", ")}.
+                    </span>
+                  ))}
+              </p>            </>
           ) : null}
         </div>
       </div>
