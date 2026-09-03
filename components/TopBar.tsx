@@ -7,7 +7,7 @@ import ProfileMenu from "@/components/ProfileMenu";
 export default async function TopBar({
   current,
 }: {
-  current: "runs" | "loop" | "logs" | "accounts" | "keys";
+  current: "runs" | "loop" | "logs" | "domains" | "accounts" | "keys";
 }) {
   const session = await auth();
 
@@ -36,6 +36,12 @@ export default async function TopBar({
             className={current === "loop" ? "topnav-link is-current" : "topnav-link"}
           >
             Loop
+          </Link>
+          <Link
+            href="/domains"
+            className={current === "domains" ? "topnav-link is-current" : "topnav-link"}
+          >
+            Domains
           </Link>
           <Link
             href="/logs"
