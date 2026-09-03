@@ -8,7 +8,7 @@ export default function DomainsPage() {
   return (
     <>
       <TopBar current="domains" />
-      <main>
+      <main className="wide">
         <DomainsView />
       </main>
     </>
