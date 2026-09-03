@@ -2496,12 +2496,39 @@ button,
   min-width: 160px;
 }
 
+/* What the filter left, boxed.
+   Pushed to the far end, so the search box and the filter stay together as the
+   two things you touch and this sits apart as the thing you read. It used to be
+   a run of grey text joined by a middle dot, which read as a caption on the
+   search box; it is a result, and its two halves answer different questions —
+   how many, and what they cost. So they are separate cells with a rule between
+   them, and the figures are the part set in the ink colour. */
 .domain-counts {
-  font-size: 12.5px;
-  color: var(--ink-3);
-  /* Pushed to the far end, so the search box and the filter stay together as
-     the two things you touch and the count sits apart as the thing you read. */
+  display: flex;
+  align-items: stretch;
   margin-left: auto;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--panel-2);
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.domain-count {
+  padding: 5px 11px;
+  border-left: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.domain-count:first-child {
+  border-left: 0;
+}
+
+.domain-count strong {
+  font-weight: 640;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .domain-bar .seg {
@@ -2581,17 +2608,28 @@ button,
   color: var(--accent);
 }
 
-/* One name server per line, in the same tabular face the cost column uses.
-   They differ only in their first label — brad.ns, jule.ns — so aligning them
-   makes the odd one out visible at a glance down the column. */
+/* One name server per line, each in its own box.
+   As two bare lines of grey text they ran into the row above and below and
+   read as a wrapped sentence rather than as two separate hostnames. A border
+   around each says where one ends. They differ only in their first label —
+   brad.ns, jule.ns — so the boxes align and the odd one out is visible at a
+   glance straight down the column. */
 .logs td.ns {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  font-size: 11.5px;
+  align-items: flex-start;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.ns-chip {
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel-2);
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: var(--ink-2);
-  white-space: nowrap;
 }
 
 .domain-note {

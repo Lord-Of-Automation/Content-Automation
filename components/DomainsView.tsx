@@ -337,11 +337,19 @@ export default function DomainsView() {
                   ))}
                 </div>
 
+                {/* Boxed, and split into parts with a rule between them. As a
+                    run of grey text with a middle dot it read as a caption on
+                    the search box; it is a result, and the two halves answer
+                    two different questions. */}
                 {shown.length !== domains.length ? (
                   <span className="domain-counts">
-                    {shown.length} of {domains.length} shown
+                    <span className="domain-count">
+                      <strong>{shown.length}</strong> of {domains.length} shown
+                    </span>
                     {shownYearly.totals.map(([currency, total]) => (
-                      <span key={currency}> &middot; {money(total, currency)} a year</span>
+                      <span className="domain-count" key={currency}>
+                        <strong>{money(total, currency)}</strong> a year
+                      </span>
                     ))}
                   </span>
                 ) : null}
@@ -427,7 +435,11 @@ export default function DomainsView() {
                             is a predictable height. */}
                         <td className="ns">
                           {d.nameServers.length ? (
-                            d.nameServers.map((ns) => <span key={ns}>{ns}</span>)
+                            d.nameServers.map((ns) => (
+                              <span className="ns-chip" key={ns}>
+                                {ns}
+                              </span>
+                            ))
                           ) : (
                             <span className="quiet">none recorded</span>
                           )}
