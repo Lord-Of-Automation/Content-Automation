@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  orderDomains, pointsAt, statusTone, type Direction, type SortKey,
+} from "@/lib/domainsort";
+
 type Domain = {
   domain: string;
   domainId: number | null;
@@ -41,6 +45,32 @@ function money(micro: number, currency: string): string {
 const PAGE = 50;
 
 /**
+ * Which way each column reads first.
+ *
+ * Clicking a column should show you the interesting end of it straight away.
+ * For a name that is A to Z; for money and for time it is the largest and the
+ * soonest, because nobody clicks "expires" hoping to see the domain furthest
+ * from expiring.
+ */
+const FIRST_DIRECTION: Record<SortKey, Direction> = {
+  domain: "asc",
+  status: "asc",
+  expires: "asc",
+  renewal: "asc",
+  price: "desc",
+  ns: "asc",
+};
+
+function Chevrons({ state }: { state: "none" | "asc" | "desc" }) {
+  return (
+    <svg className={`sortmark is-${state}`} viewBox="0 0 10 14" aria-hidden>
+      <path className="sortmark-up" d="M5 1.5 8.2 5.4H1.8z" />
+      <path className="sortmark-down" d="M5 12.5 1.8 8.6h6.4z" />
+    </svg>
+  );
+}
+
+/**
  * How urgent an expiry is.
  *
  * Thirty days is the line because that is roughly when a renewal stops being
@@ -68,55 +98,11 @@ function expiryText(days: number | null, expires: string | null): string {
   });
 }
 
-/**
- * GoDaddy's statuses are SHOUTED enum names, and there are over two hundred of
- * them. Only ACTIVE is unremarkable; everything else is matched on the word
- * that carries the meaning.
- *
- * ABUSE and LOCKED_ are here because this account actually holds a
- * LOCKED_ABUSE domain, and neither the word "locked" nor "abuse" appeared in
- * the first version of this list — so the one domain on the account in real
- * trouble rendered in the same grey as an unknown status. Registry suspension
- * and redemption are the other two that turn up.
- */
-function statusTone(status: string): string {
-  if (status === "ACTIVE") return "ok";
-  if (/EXPIRED|CANCELL?ED|SUSPENDED|ABUSE|LOCKED_|HELD|HOLD|REDEMPTION|INVALID/i.test(status)) {
-    return "bad";
-  }
-  if (/PENDING|TRANSFER|VERIFICATION|RENEWAL|AWAITING/i.test(status)) return "warn";
-  return "idle";
-}
 
 function prettyStatus(status: string): string {
   return status.toLowerCase().replace(/_/g, " ");
 }
 
-/**
- * Where a domain actually points.
- *
- * The registrar's default name servers mean the domain is parked: registered
- * and doing nothing. That is the single most useful thing this list can say
- * beyond the expiry date, and it is invisible in GoDaddy's own interface
- * without opening each domain in turn.
- */
-function pointsAt(nameServers: string[]): { label: string; tone: string } {
-  if (!nameServers.length) return { label: "unknown", tone: "idle" };
-  const hosts = nameServers.map((n) => n.toLowerCase());
-  if (hosts.some((h) => /(^|\.)domaincontrol\.com$/.test(h))) {
-    return { label: "parked at GoDaddy", tone: "idle" };
-  }
-  if (hosts.some((h) => /(^|\.)cloudflare\.com$/.test(h))) {
-    return { label: "Cloudflare", tone: "ok" };
-  }
-  if (hosts.some((h) => /(^|\.)vercel-dns\.com$/.test(h))) {
-    return { label: "Vercel", tone: "ok" };
-  }
-  // The registrable part of the first name server, which is the host that
-  // actually answers for this domain.
-  const parts = hosts[0].split(".").filter(Boolean);
-  return { label: parts.slice(-2).join(".") || hosts[0], tone: "ok" };
-}
 
 export default function DomainsView() {
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -129,6 +115,20 @@ export default function DomainsView() {
   const [configError, setConfigError] = useState(false);
   const [query, setQuery] = useState("");
   const [visible, setVisible] = useState(PAGE);
+  const [sortKey, setSortKey] = useState<SortKey>("expires");
+  const [direction, setDirection] = useState<Direction>("asc");
+  const [only, setOnly] = useState<"all" | "soon" | "manual" | "parked" | "trouble">("all");
+
+  function sortBy(key: SortKey) {
+    // Same column flips; a new column starts at its own natural end rather
+    // than inheriting whichever direction the last one happened to be in.
+    if (key === sortKey) setDirection((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setDirection(FIRST_DIRECTION[key]);
+    }
+    setVisible(PAGE);
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -163,9 +163,18 @@ export default function DomainsView() {
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return domains;
-    return domains.filter((d) => d.domain.toLowerCase().includes(needle));
-  }, [domains, query]);
+
+    const kept = domains.filter((d) => {
+      if (needle && !d.domain.toLowerCase().includes(needle)) return false;
+      if (only === "soon") return d.daysLeft !== null && d.daysLeft <= 30;
+      if (only === "manual") return !d.renewAuto;
+      if (only === "parked") return pointsAt(d.nameServers).label === "parked at GoDaddy";
+      if (only === "trouble") return statusTone(d.status) !== "ok";
+      return true;
+    });
+
+    return orderDomains(kept, sortKey, direction, prices);
+  }, [domains, query, only, sortKey, direction, prices]);
 
   // Counted over everything, not over what the search box left behind: these
   // are facts about the account, and they should not change as you type.
@@ -301,7 +310,34 @@ export default function DomainsView() {
                 {/* What the filter left, when it left something different.
                     Silent otherwise, so the line only appears when it says
                     something the tiles above do not. */}
-                {query.trim() ? (
+                {/* The four questions actually asked of this list, as one
+                    control rather than four columns to eyeball. Each is a
+                    filter somebody would otherwise apply by scrolling. */}
+                <div className="seg seg-sm">
+                  {(
+                    [
+                      ["all", "All"],
+                      ["soon", "Expiring"],
+                      ["manual", "Manual"],
+                      ["parked", "Parked"],
+                      ["trouble", "Trouble"],
+                    ] as Array<[typeof only, string]>
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={only === key ? "seg-btn is-on" : "seg-btn"}
+                      onClick={() => {
+                        setOnly(key);
+                        setVisible(PAGE);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {shown.length !== domains.length ? (
                   <span className="domain-counts">
                     {shown.length} of {domains.length} shown
                     {shownYearly.totals.map(([currency, total]) => (
@@ -314,12 +350,28 @@ export default function DomainsView() {
               <table className="logs">
                 <thead>
                   <tr>
-                    <th>Domain</th>
-                    <th>Status</th>
-                    <th>Expires</th>
-                    <th>Renewal</th>
-                    <th className="num">Renews for</th>
-                    <th>NS Points At</th>
+                    {/* Every column sorts except the name servers themselves,
+                        which have no order anyone would want: they are already
+                        summarised by NS Points At, and sorting on the literal
+                        hostname would group by whichever letter Cloudflare
+                        happened to assign. */}
+                    {(
+                      [
+                        ["domain", "Domain", false],
+                        ["status", "Status", false],
+                        ["expires", "Expires", false],
+                        ["renewal", "Renewal", false],
+                        ["price", "Renews for", true],
+                        ["ns", "NS Points At", false],
+                      ] as Array<[SortKey, string, boolean]>
+                    ).map(([key, label, numeric]) => (
+                      <th key={key} className={numeric ? "num sortable" : "sortable"}>
+                        <button type="button" onClick={() => sortBy(key)}>
+                          {label}
+                          <Chevrons state={sortKey === key ? direction : "none"} />
+                        </button>
+                      </th>
+                    ))}
                     <th>Name servers</th>
                   </tr>
                 </thead>
@@ -399,7 +451,11 @@ export default function DomainsView() {
               ) : null}
 
               {!shown.length ? (
-                <div className="empty">No domain matches &ldquo;{query}&rdquo;.</div>
+                <div className="empty">
+                  {query.trim()
+                    ? `No domain matches “${query}”${only === "all" ? "" : " in this filter"}.`
+                    : "Nothing in this filter."}
+                </div>
               ) : null}
 
               <p className="domain-note">

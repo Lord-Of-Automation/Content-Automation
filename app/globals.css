@@ -2499,7 +2499,13 @@ button,
 .domain-counts {
   font-size: 12.5px;
   color: var(--ink-3);
+  /* Pushed to the far end, so the search box and the filter stay together as
+     the two things you touch and the count sits apart as the thing you read. */
   margin-left: auto;
+}
+
+.domain-bar .seg {
+  flex: none;
 }
 
 .domain-name {
@@ -2511,6 +2517,68 @@ button,
 .domain-name:hover {
   color: var(--accent);
   text-decoration: underline;
+}
+
+/* ---------- sortable columns ---------- */
+
+/* The whole heading is the target, not the little arrow beside it. A 10px
+   chevron is a hard thing to hit and there is no reason to make anyone try. */
+.logs th.sortable {
+  padding: 0;
+}
+
+.logs th.sortable button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-3);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.logs th.num.sortable button {
+  justify-content: flex-end;
+}
+
+.logs th.sortable button:hover {
+  color: var(--ink);
+}
+
+.sortmark {
+  width: 9px;
+  height: 13px;
+  flex: none;
+  fill: currentColor;
+}
+
+/* Both arrows dimmed until the column is the one in use, so every heading
+   advertises that it sorts without four of them claiming to be active. */
+.sortmark.is-none .sortmark-up,
+.sortmark.is-none .sortmark-down {
+  opacity: 0.28;
+}
+
+.sortmark.is-asc .sortmark-down,
+.sortmark.is-desc .sortmark-up {
+  opacity: 0.2;
+}
+
+.logs th.sortable button:hover .sortmark {
+  color: var(--accent);
+}
+
+.sortmark.is-asc,
+.sortmark.is-desc {
+  color: var(--accent);
 }
 
 /* One name server per line, in the same tabular face the cost column uses.
