@@ -180,17 +180,25 @@ export default function DomainsView() {
    * kept apart rather than added together — the list is quoted in one currency
    * today, but summing two would be quietly wrong on the day it is not.
    */
-  const yearly = useMemo(() => {
-    const totals = new Map<string, number>();
-    let counted = 0;
-    for (const d of domains) {
-      const price = prices[d.suffix];
-      if (!price?.renewal) continue;
-      totals.set(price.currency, (totals.get(price.currency) ?? 0) + price.renewal);
-      counted += 1;
-    }
-    return { totals: [...totals.entries()], counted };
-  }, [domains, prices]);
+  const totalOver = useCallback(
+    (list: Domain[]) => {
+      const totals = new Map<string, number>();
+      let counted = 0;
+      for (const d of list) {
+        const price = prices[d.suffix];
+        if (!price?.renewal) continue;
+        totals.set(price.currency, (totals.get(price.currency) ?? 0) + price.renewal);
+        counted += 1;
+      }
+      return { totals: [...totals.entries()], counted };
+    },
+    [prices],
+  );
+
+  const yearly = useMemo(() => totalOver(domains), [domains, totalOver]);
+  // What the filter is showing, so narrowing to one brand answers "and what
+  // does that cost" without a calculator.
+  const shownYearly = useMemo(() => totalOver(shown), [shown, totalOver]);
 
   return (
     <div className="stack">
@@ -235,6 +243,50 @@ export default function DomainsView() {
             <div className="empty">This account holds no domains.</div>
           ) : domains.length ? (
             <>
+              {/* The four numbers worth having before the table.
+                  The renewal total leads because it is the one that decides
+                  anything: it is what the account costs to keep, and GoDaddy
+                  shows one price at a time so nowhere else adds it up. It was
+                  previously a clause in a line of grey text beside the search
+                  box, where it read as a footnote to a filter. */}
+              <div className="domain-stats">
+                {yearly.totals.length ? (
+                  yearly.totals.map(([currency, total]) => (
+                    <div className="domain-stat is-lead" key={currency}>
+                      <span className="domain-stat-value">{money(total, currency)}</span>
+                      <span className="domain-stat-label">
+                        renewals a year
+                        {yearly.counted < domains.length ? (
+                          <> &middot; {domains.length - yearly.counted} unpriced</>
+                        ) : null}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="domain-stat is-lead">
+                    <span className="domain-stat-value">&mdash;</span>
+                    <span className="domain-stat-label">renewals a year</span>
+                  </div>
+                )}
+
+                <div className="domain-stat">
+                  <span className="domain-stat-value">{domains.length}</span>
+                  <span className="domain-stat-label">
+                    domain{domains.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                <div className={soon ? "domain-stat is-bad" : "domain-stat"}>
+                  <span className="domain-stat-value">{soon}</span>
+                  <span className="domain-stat-label">expiring within 30 days</span>
+                </div>
+
+                <div className={manual ? "domain-stat is-warn" : "domain-stat"}>
+                  <span className="domain-stat-value">{manual}</span>
+                  <span className="domain-stat-label">not on auto-renew</span>
+                </div>
+              </div>
+
               <div className="domain-bar">
                 <input
                   type="search"
@@ -246,14 +298,17 @@ export default function DomainsView() {
                     setVisible(PAGE);
                   }}
                 />
-                <span className="domain-counts">
-                  {domains.length} domain{domains.length === 1 ? "" : "s"}
-                  {soon ? <> &middot; {soon} expiring within 30 days</> : null}
-                  {manual ? <> &middot; {manual} not on auto-renew</> : null}
-                  {yearly.totals.map(([currency, total]) => (
-                    <span key={currency}> &middot; {money(total, currency)} a year</span>
-                  ))}
-                </span>
+                {/* What the filter left, when it left something different.
+                    Silent otherwise, so the line only appears when it says
+                    something the tiles above do not. */}
+                {query.trim() ? (
+                  <span className="domain-counts">
+                    {shown.length} of {domains.length} shown
+                    {shownYearly.totals.map(([currency, total]) => (
+                      <span key={currency}> &middot; {money(total, currency)} a year</span>
+                    ))}
+                  </span>
+                ) : null}
               </div>
 
               <table className="logs">
