@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { LANGUAGES, MARKETS } from "@/lib/markets";
 import type { Schedule } from "@/lib/schedules";
@@ -148,6 +148,13 @@ function untilNext(iso: string): string {
   return `in ${Math.round(hours / 24)} days`;
 }
 
+/** What /api/sites returns. The password is never part of it. */
+type Site = {
+  domain: string;
+  username: string;
+  readable: boolean;
+};
+
 export default function LoopView() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -168,6 +175,14 @@ export default function LoopView() {
    * question you can answer.
    */
   const [deleting, setDeleting] = useState<Schedule | null>(null);
+  /**
+   * The sites a loop may publish to.
+   *
+   * Read from the same store the Website Accounts page writes, because those
+   * are exactly the sites a stored WordPress login exists for — and a loop
+   * without one fires on schedule and fails at the last step.
+   */
+  const [sites, setSites] = useState<Site[]>([]);
   const { toasts, push, dismiss } = useToasts();
 
   const load = useCallback(async () => {
@@ -188,13 +203,60 @@ export default function LoopView() {
     }
   }, []);
 
+  /**
+   * Loaded once rather than on the poll.
+   *
+   * The site list changes when somebody adds a login, which is not something
+   * that happens while this page sits open, and re-reading it every minute
+   * would be a request a minute for an answer that never moves.
+   */
+  const loadSites = useCallback(async () => {
+    try {
+      const response = await fetch("/api/sites", { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = (await response.json()) as { sites?: Site[] };
+      setSites(payload.sites ?? []);
+    } catch {
+      // The form says no sites are registered, which is the same thing from
+      // where the person is standing and is better than an error about a list
+      // they did not ask for.
+    }
+  }, []);
+
   useEffect(() => {
     void load();
+    void loadSites();
     // Slow on purpose. Nothing here changes faster than hourly, and the only
     // moving part is a countdown this recomputes locally anyway.
     const timer = setInterval(() => void load(), 60_000);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load, loadSites]);
+
+  /**
+   * The registered sites, and whatever this loop already points at.
+   *
+   * A loop edited after its site was removed from Website Accounts, or created
+   * back when this was a free-text box, holds a URL with no matching option —
+   * and the Select renders a value it has no option for as an empty control.
+   * That reads as "nothing chosen" on a loop that is aimed somewhere perfectly
+   * definite, and the next save would have looked like a correction rather than
+   * a change. So its own address is always in the list, labelled as the
+   * unregistered thing it is.
+   */
+  const siteOptions = useMemo(() => {
+    const options = sites.map((site) => ({
+      value: `https://${site.domain}`,
+      label: site.domain,
+      hint: site.readable ? site.username : "login unreadable",
+    }));
+
+    const chosen = draft?.website_url?.trim();
+    if (chosen && !options.some((o) => o.value === chosen)) {
+      const shown = chosen.replace(/^https?:\/\//, "").replace(/\/$/, "");
+      options.unshift({ value: chosen, label: shown, hint: "not registered" });
+    }
+    return options;
+  }, [sites, draft?.website_url]);
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((current) => (current ? { ...current, [key]: value } : current));
@@ -468,17 +530,33 @@ export default function LoopView() {
               </div>
 
               <div className="field">
-                <label htmlFor="loop_url">Website URL</label>
-                <input
-                  id="loop_url"
-                  type="url"
-                  className="mono"
-                  value={draft.website_url}
-                  placeholder="https://example.com"
-                  onChange={(e) => set("website_url", e.target.value)}
-                />
+                <label id="loop_site_label">Website</label>
+                {/* A list rather than a box.
+                    A loop publishes to the site it names, and publishing needs
+                    a WordPress login — which only exists for a site registered
+                    on the Website Accounts page. Typed by hand, a URL that was
+                    one character out, or simply not registered, produced a loop
+                    that fired on schedule and failed at the last step every
+                    time. Choosing from the registered sites makes that
+                    impossible to get wrong. */}
+                {siteOptions.length ? (
+                  <Select
+                    id="loop_site"
+                    labelledBy="loop_site_label"
+                    value={draft.website_url}
+                    onChange={(v) => set("website_url", v)}
+                    options={siteOptions}
+                  />
+                ) : (
+                  <div className="notice warn">
+                    <strong>No websites are registered.</strong> A loop
+                    publishes with a stored WordPress login, so add the site
+                    under Website Accounts first.
+                  </div>
+                )}
                 <div className="note">
-                  Our site — the one pages are published to. On a gap fill the
+                  Our site &mdash; the one pages are published to, chosen from
+                  the logins on the Website Accounts page. On a gap fill the
                   competitor comes from the ideas sheet, not from here.
                 </div>
               </div>
