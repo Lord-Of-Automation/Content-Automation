@@ -2291,13 +2291,24 @@ button,
   color: var(--accent);
 }
 
-.profile-item-bad:hover {
+/* Tinted all the time rather than only under the pointer. Sign out is the one
+   item here that cannot be undone by clicking again, so it should look unlike
+   its neighbours before anyone reaches it, not once they already have. */
+.profile-item-bad {
   background: var(--bad-soft);
   color: var(--bad);
 }
 
-.profile-item-bad:hover > svg {
+.profile-item-bad > svg {
   color: var(--bad);
+}
+
+.profile-item-bad:hover {
+  background: color-mix(in srgb, var(--bad-soft) 78%, var(--bad));
+}
+
+.profile-menu form {
+  margin: 0;
 }
 
 .profile-item-toggle:disabled {

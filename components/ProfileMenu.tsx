@@ -124,11 +124,13 @@ export default function ProfileMenu({
             }
             onClick={() => setOpen(false)}
           >
+            {/* A globe, not a person. These are logins to other people's
+                WordPress sites, not accounts on this console. */}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
+              <circle cx="12" cy="12" r="9" />
+              <path d="M3 12h18M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18Z" />
             </svg>
-            Accounts
+            Website Accounts
           </Link>
 
           <Link
