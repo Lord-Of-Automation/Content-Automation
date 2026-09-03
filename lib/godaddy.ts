@@ -12,7 +12,7 @@
  * ever returns it, not even masked.
  */
 
-import { currentKey } from "./godaddykey";
+import { credentialFor } from "./providers";
 
 export class GoDaddyConfigError extends Error {
   constructor(message: string) {
@@ -354,8 +354,8 @@ export async function listDomains(): Promise<DomainList> {
   const tried: string[] = [];
   let lastAuthError = "";
 
-  // Whatever the Keys page holds, falling back to the environment.
-  const token = await currentKey();
+  // Whatever the Keys page holds for GoDaddy, falling back to the environment.
+  const token = (await credentialFor("godaddy"))?.token ?? null;
 
   for (const scheme of schemes(token)) {
     const first = await fetchPage(scheme.value, "");

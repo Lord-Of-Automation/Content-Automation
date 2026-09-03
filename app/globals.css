@@ -2533,3 +2533,278 @@ button,
   font-size: 11.5px;
   color: var(--ink-3);
 }
+
+/* ---------- domain providers ---------- */
+
+/* One block per registrar, separated by a rule rather than a card each. Three
+   nested cards on one page reads as three unrelated things; these are three
+   forms of the same kind. */
+.provider {
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+}
+
+.provider:first-of-type {
+  border-top: 0;
+  padding-top: 4px;
+}
+
+.provider-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.provider-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+.provider-blurb {
+  margin: 0 0 14px;
+  max-width: 62ch;
+}
+
+.provider-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px 16px;
+  align-items: start;
+}
+
+.provider-field label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 5px;
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--ink-2);
+}
+
+/* What is stored now, beside the label rather than inside the box: an input
+   showing "ends 0251" as its value invites you to edit it, and you cannot. */
+.provider-current {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.provider-hint {
+  margin: 5px 0 0;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.45;
+}
+
+.provider-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 15px;
+}
+
+.provider-saved {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  margin-left: auto;
+}
+
+/* ---------- date picker ---------- */
+
+.datepick {
+  position: relative;
+}
+
+/* Sized and coloured like the text inputs beside it, which is the whole point:
+   a native date field is drawn by the browser and takes none of this. */
+.datepick-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.datepick-trigger:hover,
+.datepick-trigger.is-open {
+  border-color: var(--accent);
+}
+
+.datepick-trigger > svg {
+  width: 15px;
+  height: 15px;
+  color: var(--ink-3);
+  flex: none;
+}
+
+.datepick-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.datepick-value.is-empty {
+  color: var(--ink-3);
+}
+
+.datepick-clear {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.datepick-clear:hover {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.datepick-panel {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 268px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 11px;
+  box-shadow: var(--shadow);
+  animation: datepick-in 120ms ease-out;
+  transform-origin: top left;
+}
+
+@keyframes datepick-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.datepick-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.datepick-month {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.datepick-step {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-2);
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.datepick-step:hover {
+  border-color: var(--line-2);
+  color: var(--ink);
+}
+
+.datepick-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.datepick-dayname {
+  display: grid;
+  place-items: center;
+  height: 24px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+
+.datepick-day,
+.datepick-pad {
+  height: 31px;
+  border-radius: 7px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.datepick-day:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Dimmed rather than disabled. Every date here is in the future, but a past one
+   is occasionally the truthful answer — a token that already lapsed — and
+   refusing to record that would only mean recording nothing. */
+.datepick-day.is-past {
+  color: var(--ink-3);
+}
+
+.datepick-day.is-today {
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+
+.datepick-day.is-selected,
+.datepick-day.is-selected:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 620;
+}
+
+.datepick-foot {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.datepick-shortcut {
+  width: 100%;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.datepick-shortcut:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
