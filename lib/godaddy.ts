@@ -19,6 +19,30 @@ export class GoDaddyConfigError extends Error {
   }
 }
 
+/**
+ * What a year costs, for one suffix.
+ *
+ * GoDaddy will not tell you what an owned domain renews for. There is no price
+ * on the domain record, no price on the domain detail, and the endpoints that
+ * would know — subscriptions and orders — refuse this token outright. What it
+ * will tell you is the price of a domain that is still available, and that
+ * response carries a renewalPrice as well as a registration price.
+ *
+ * So the price is looked up once per suffix, against a name nobody has
+ * registered, and applied to every domain on that suffix. It is GoDaddy's list
+ * price for the extension rather than a quote for the specific domain, which
+ * matters: a Discount Domain Club membership, a multi-year deal, a promotional
+ * first year, or a premium name will all differ from it. The page says so
+ * rather than presenting it as an invoice.
+ */
+export interface TldPrice {
+  suffix: string;
+  /** Micro-units, as GoDaddy sends them. 22990000 is 22.99. */
+  renewal: number | null;
+  register: number | null;
+  currency: string;
+}
+
 /** What the list page shows for one domain. */
 export interface Domain {
   domain: string;
@@ -33,6 +57,8 @@ export interface Domain {
   /** Days until expiry, negative once past. Null when there is no expiry. */
   daysLeft: number | null;
   nameServers: string[];
+  /** Everything after the first dot: "com", "co.uk". Keys the price lookup. */
+  suffix: string;
 }
 
 export interface DomainList {
@@ -41,6 +67,10 @@ export interface DomainList {
   scheme: string;
   /** True when the account holds more than this page fetched. */
   truncated: boolean;
+  /** List renewal price per suffix, keyed by suffix. Best effort. */
+  prices: Record<string, TldPrice>;
+  /** Suffixes GoDaddy would not price, so the page can say which and why. */
+  unpriced: string[];
 }
 
 const HOST = "https://api.godaddy.com";
@@ -172,10 +202,18 @@ function daysUntil(iso: string | null): number | null {
   return Math.round((at - Date.now()) / 86_400_000);
 }
 
+/** "shop.example.co.uk" -> "co.uk". Everything after the first label. */
+function suffixOf(domain: string): string {
+  const at = domain.indexOf(".");
+  return at < 0 ? "" : domain.slice(at + 1).toLowerCase();
+}
+
 function shape(raw: Record<string, unknown>): Domain {
   const expires = typeof raw.expires === "string" ? raw.expires : null;
+  const domain = String(raw.domain ?? "");
   return {
-    domain: String(raw.domain ?? ""),
+    suffix: suffixOf(domain),
+    domain,
     domainId: typeof raw.domainId === "number" ? raw.domainId : null,
     status: String(raw.status ?? "UNKNOWN"),
     expires,
@@ -188,6 +226,119 @@ function shape(raw: Record<string, unknown>): Domain {
       ? (raw.nameServers as unknown[]).map(String).slice(0, 6)
       : [],
   };
+}
+
+/**
+ * Prices change rarely and this costs a request per suffix, so they are held
+ * for half a day. Per server instance, which is enough: a cold instance simply
+ * looks them up again, and a stale price for a few hours is not a problem worth
+ * a shared cache.
+ */
+const priceCache = new Map<string, { at: number; price: TldPrice | null }>();
+const PRICE_TTL = 12 * 60 * 60 * 1000;
+
+/**
+ * Names that will not be registered, used to ask what a suffix costs.
+ *
+ * Two of them, because the answer only carries prices when the name is
+ * actually available — a probe that happened to be taken would come back with
+ * nothing to read and look like an unpriceable suffix.
+ */
+const PROBES = ["zq7x-probe-8813", "vk42-probe-1197"];
+
+async function priceOf(suffix: string, authorization: string): Promise<TldPrice | null> {
+  const cached = priceCache.get(suffix);
+  if (cached && Date.now() - cached.at < PRICE_TTL) return cached.price;
+
+  let found: TldPrice | null = null;
+
+  for (const stem of PROBES) {
+    try {
+      const url = new URL(`${HOST}/v1/domains/available`);
+      url.searchParams.set("domain", `${stem}.${suffix}`);
+      // FULL is what carries the money. The quick check answers only whether
+      // the name is taken.
+      url.searchParams.set("checkType", "FULL");
+
+      const response = await fetch(url, {
+        headers: { authorization, accept: "application/json" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(15_000),
+      });
+      // Several country registries refuse this check outright with a 422,
+      // whatever name is asked about. Those suffixes simply have no price here.
+      if (!response.ok) continue;
+
+      const body = (await response.json()) as {
+        available?: boolean;
+        currency?: string;
+        price?: number;
+        renewalPrice?: number;
+      };
+      if (!body.available || typeof body.renewalPrice !== "number") continue;
+
+      found = {
+        suffix,
+        renewal: body.renewalPrice,
+        register: typeof body.price === "number" ? body.price : null,
+        currency: body.currency ?? "USD",
+      };
+      break;
+    } catch {
+      // A price is a nicety. Nothing here may take the domain list down.
+    }
+  }
+
+  priceCache.set(suffix, { at: Date.now(), price: found });
+  return found;
+}
+
+/**
+ * A price for every suffix the account holds.
+ *
+ * One lookup per suffix rather than per domain: this account has 388 domains
+ * across 25 suffixes, so it is 25 requests instead of 388, and the answer is
+ * the same either way because GoDaddy prices by extension.
+ *
+ * Run in small batches. Twenty-five requests fired at once is the shape of
+ * traffic that earns a rate limit, and the whole thing is decoration on a page
+ * that has already loaded its real content.
+ */
+async function pricesFor(
+  suffixes: string[],
+  authorization: string,
+): Promise<{ prices: Record<string, TldPrice>; unpriced: string[] }> {
+  const prices: Record<string, TldPrice> = {};
+  const unpriced: string[] = [];
+
+  for (let i = 0; i < suffixes.length; i += 5) {
+    const batch = suffixes.slice(i, i + 5);
+    const found = await Promise.all(batch.map((s) => priceOf(s, authorization)));
+    batch.forEach((suffix, at) => {
+      const price = found[at];
+      if (price) prices[suffix] = price;
+      else unpriced.push(suffix);
+    });
+  }
+
+  return { prices, unpriced };
+}
+
+
+/**
+ * The answer, with prices attached.
+ *
+ * Both exits from the paging loop come through here so they cannot drift
+ * apart, and so the price lookup is written once rather than twice.
+ */
+async function finish(
+  collected: Domain[],
+  scheme: { name: string; value: string },
+  truncated: boolean,
+): Promise<DomainList> {
+  const suffixes = [...new Set(collected.map((d) => d.suffix).filter(Boolean))].sort();
+  const { prices, unpriced } = await pricesFor(suffixes, scheme.value);
+  return { domains: sort(collected), scheme: scheme.name, truncated, prices, unpriced };
 }
 
 /**
@@ -233,11 +384,7 @@ export async function listDomains(): Promise<DomainList> {
 
       collected.push(...rows.map((r) => shape(r as Record<string, unknown>)));
       if (rows.length < PAGE) {
-        return {
-          domains: sort(collected),
-          scheme: scheme.name,
-          truncated: false,
-        };
+        return finish(collected, scheme, false);
       }
 
       const last = collected[collected.length - 1]?.domain ?? "";
@@ -246,7 +393,7 @@ export async function listDomains(): Promise<DomainList> {
       if (page.status < 200 || page.status >= 300) break;
     }
 
-    return { domains: sort(collected), scheme: scheme.name, truncated: true };
+    return finish(collected, scheme, true);
   }
 
   throw new Error(

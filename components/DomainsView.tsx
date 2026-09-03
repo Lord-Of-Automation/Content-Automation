@@ -13,7 +13,30 @@ type Domain = {
   privacy: boolean;
   daysLeft: number | null;
   nameServers: string[];
+  suffix: string;
 };
+
+type TldPrice = {
+  suffix: string;
+  /** Micro-units, as GoDaddy sends them. 22990000 is 22.99. */
+  renewal: number | null;
+  register: number | null;
+  currency: string;
+};
+
+/** GoDaddy prices in millionths. Rendered in the viewer's own locale. */
+function money(micro: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2,
+    }).format(micro / 1_000_000);
+  } catch {
+    // An unexpected currency code would otherwise throw and take the row down.
+    return `${(micro / 1_000_000).toFixed(2)} ${currency}`;
+  }
+}
 
 const PAGE = 50;
 
@@ -99,6 +122,8 @@ export default function DomainsView() {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [scheme, setScheme] = useState<string>("");
   const [truncated, setTruncated] = useState(false);
+  const [prices, setPrices] = useState<Record<string, TldPrice>>({});
+  const [unpriced, setUnpriced] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [configError, setConfigError] = useState(false);
@@ -121,6 +146,8 @@ export default function DomainsView() {
       setDomains(payload.domains ?? []);
       setScheme(payload.scheme ?? "");
       setTruncated(!!payload.truncated);
+      setPrices(payload.prices ?? {});
+      setUnpriced(payload.unpriced ?? []);
       setConfigError(false);
       setError(null);
     } catch (e) {
@@ -144,6 +171,26 @@ export default function DomainsView() {
   // are facts about the account, and they should not change as you type.
   const soon = domains.filter((d) => d.daysLeft !== null && d.daysLeft <= 30).length;
   const manual = domains.filter((d) => !d.renewAuto).length;
+
+  /**
+   * What a full year of renewals comes to.
+   *
+   * The number nobody has, because GoDaddy's own interface shows one price at a
+   * time. Only over the domains that could be priced, and the currencies are
+   * kept apart rather than added together — the list is quoted in one currency
+   * today, but summing two would be quietly wrong on the day it is not.
+   */
+  const yearly = useMemo(() => {
+    const totals = new Map<string, number>();
+    let counted = 0;
+    for (const d of domains) {
+      const price = prices[d.suffix];
+      if (!price?.renewal) continue;
+      totals.set(price.currency, (totals.get(price.currency) ?? 0) + price.renewal);
+      counted += 1;
+    }
+    return { totals: [...totals.entries()], counted };
+  }, [domains, prices]);
 
   return (
     <div className="stack">
@@ -203,6 +250,9 @@ export default function DomainsView() {
                   {domains.length} domain{domains.length === 1 ? "" : "s"}
                   {soon ? <> &middot; {soon} expiring within 30 days</> : null}
                   {manual ? <> &middot; {manual} not on auto-renew</> : null}
+                  {yearly.totals.map(([currency, total]) => (
+                    <span key={currency}> &middot; {money(total, currency)} a year</span>
+                  ))}
                 </span>
               </div>
 
@@ -213,6 +263,7 @@ export default function DomainsView() {
                     <th>Status</th>
                     <th>Expires</th>
                     <th>Renewal</th>
+                    <th className="num">Renews for</th>
                     <th>NS Points At</th>
                     <th>Name servers</th>
                   </tr>
@@ -220,6 +271,7 @@ export default function DomainsView() {
                 <tbody>
                   {shown.slice(0, visible).map((d) => {
                     const where = pointsAt(d.nameServers);
+                    const price = prices[d.suffix];
                     return (
                       <tr key={d.domain}>
                         <td>
@@ -247,6 +299,13 @@ export default function DomainsView() {
                             <span className="quiet">automatic</span>
                           ) : (
                             <span className="pill pill-warn">manual</span>
+                          )}
+                        </td>
+                        <td className="num">
+                          {price?.renewal ? (
+                            money(price.renewal, price.currency)
+                          ) : (
+                            <span className="quiet">not priced</span>
                           )}
                         </td>
                         <td className="detail">
@@ -288,11 +347,25 @@ export default function DomainsView() {
                 <div className="empty">No domain matches &ldquo;{query}&rdquo;.</div>
               ) : null}
 
-              {scheme ? (
-                <p className="domain-note">
-                  Read from GoDaddy with the {scheme} authorization scheme.
-                </p>
-              ) : null}
+              <p className="domain-note">
+                Prices are GoDaddy&rsquo;s published renewal rate for each
+                extension, looked up once per extension and applied to every
+                domain on it. They are not a quote for your account: a Discount
+                Domain Club membership, a multi-year term or a premium name will
+                all differ. GoDaddy does not publish what was originally paid,
+                so that is not shown at all.
+                {unpriced.length ? (
+                  <>
+                    {" "}
+                    {unpriced.length} extension
+                    {unpriced.length === 1 ? "" : "s"} could not be priced
+                    because GoDaddy refuses a price check on{" "}
+                    {unpriced.length === 1 ? "it" : "them"}:{" "}
+                    {unpriced.map((s) => `.${s}`).join(", ")}.
+                  </>
+                ) : null}
+                {scheme ? <> Read with the {scheme} authorization scheme.</> : null}
+              </p>
             </>
           ) : null}
         </div>
