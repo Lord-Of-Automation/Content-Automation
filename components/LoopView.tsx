@@ -148,6 +148,23 @@ function untilNext(iso: string): string {
   return `in ${Math.round(hours / 24)} days`;
 }
 
+/**
+ * The part of an address that says which site it is.
+ *
+ * A trailing slash, a www, a capital letter and http rather than https are all
+ * the same site, and the account list stores none of them — normaliseDomain on
+ * the server has already stripped them. So anything compared against it has to
+ * be stripped the same way, or the same site reads as two.
+ */
+function hostOf(url: string): string {
+  return String(url || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\/.*$/, "");
+}
+
 /** What /api/sites returns. The password is never part of it. */
 type Site = {
   domain: string;
@@ -238,10 +255,15 @@ export default function LoopView() {
    * A loop edited after its site was removed from Website Accounts, or created
    * back when this was a free-text box, holds a URL with no matching option —
    * and the Select renders a value it has no option for as an empty control.
-   * That reads as "nothing chosen" on a loop that is aimed somewhere perfectly
-   * definite, and the next save would have looked like a correction rather than
-   * a change. So its own address is always in the list, labelled as the
-   * unregistered thing it is.
+   * That reads as "nothing chosen" on a loop aimed somewhere perfectly
+   * definite, so its own address goes in the list, labelled unregistered.
+   *
+   * Matched on the host rather than on the string. Comparing the two literally
+   * put the same site in the list twice: once from the account list as
+   * "example.com — admin" and once from the loop as "example.com — not
+   * registered", because the stored URL carried a trailing slash and
+   * "https://example.com/" is not "https://example.com". A www prefix, a
+   * capital letter or http did the same. None of those are a different site.
    */
   const siteOptions = useMemo(() => {
     const options = sites.map((site) => ({
@@ -251,12 +273,25 @@ export default function LoopView() {
     }));
 
     const chosen = draft?.website_url?.trim();
-    if (chosen && !options.some((o) => o.value === chosen)) {
-      const shown = chosen.replace(/^https?:\/\//, "").replace(/\/$/, "");
-      options.unshift({ value: chosen, label: shown, hint: "not registered" });
+    if (chosen && !options.some((o) => hostOf(o.value) === hostOf(chosen))) {
+      options.unshift({ value: chosen, label: hostOf(chosen), hint: "not registered" });
     }
     return options;
   }, [sites, draft?.website_url]);
+
+  /**
+   * Which option the Select should show as chosen.
+   *
+   * The registered option's exact value where the host matches, so a loop
+   * holding "https://example.com/" highlights the "example.com" row rather than
+   * neither. Left as the draft's own value when nothing matches, which is the
+   * unregistered entry added above.
+   */
+  const chosenSite = useMemo(() => {
+    const chosen = draft?.website_url?.trim() ?? "";
+    if (!chosen) return "";
+    return siteOptions.find((o) => hostOf(o.value) === hostOf(chosen))?.value ?? chosen;
+  }, [siteOptions, draft?.website_url]);
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((current) => (current ? { ...current, [key]: value } : current));
@@ -543,7 +578,7 @@ export default function LoopView() {
                   <Select
                     id="loop_site"
                     labelledBy="loop_site_label"
-                    value={draft.website_url}
+                    value={chosenSite}
                     onChange={(v) => set("website_url", v)}
                     options={siteOptions}
                   />
