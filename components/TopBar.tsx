@@ -2,17 +2,7 @@ import Link from "next/link";
 
 import { auth } from "@/auth";
 import { logout } from "@/app/actions";
-import ThemeToggle from "@/components/ThemeToggle";
-
-/** Matches the one on the Accounts page, so a user reads the same either side. */
-function UserIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-}
+import ProfileMenu from "@/components/ProfileMenu";
 
 export default async function TopBar({
   current,
@@ -29,6 +19,9 @@ export default async function TopBar({
           <span>SEO Automation</span>
         </div>
 
+        {/* Only the pages work happens on. Accounts and Keys are settings and
+            live in the profile menu, where they stop reading as somewhere to
+            go and start reading as something to change. */}
         <nav className="topnav">
           <Link
             href="/runs"
@@ -48,35 +41,17 @@ export default async function TopBar({
           >
             Logs
           </Link>
-          <Link
-            href="/accounts"
-            className={
-              current === "accounts" ? "topnav-link is-current" : "topnav-link"
-            }
-          >
-            Accounts
-          </Link>
-          <Link
-            href="/keys"
-            className={current === "keys" ? "topnav-link is-current" : "topnav-link"}
-          >
-            Keys
-          </Link>
         </nav>
 
         <div className="spacer" />
+
         {session?.user ? (
-          <span className="who">
-            <UserIcon />
-            <span className="who-name">{session.user.name}</span>
-          </span>
+          <ProfileMenu
+            name={session.user.name ?? "Signed in"}
+            current={current}
+            signOut={logout}
+          />
         ) : null}
-        <ThemeToggle />
-        <form action={logout}>
-          <button type="submit" className="btn btn-danger">
-            Sign out
-          </button>
-        </form>
       </div>
     </header>
   );

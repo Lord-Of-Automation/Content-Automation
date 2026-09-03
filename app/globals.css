@@ -156,34 +156,8 @@ a {
   flex: 1;
 }
 
-.who {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 12px 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--panel) 70%, transparent);
-  font-size: 13px;
-  color: var(--ink-2, var(--ink-3));
-  /* The name is the one bit of chrome that changes per person, so it reads as
-     a chip rather than loose text next to the buttons. */
-  white-space: nowrap;
-}
 
-.who svg {
-  width: 15px;
-  height: 15px;
-  color: var(--ink-3);
-  flex: none;
-}
 
-.who-name {
-  font-weight: 550;
-  max-width: 18ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 main {
   max-width: 1120px;
@@ -2173,4 +2147,195 @@ button,
   border-color: var(--pin-line);
 }
 
+/* ---------- profile menu ---------- */
 
+.profile {
+  position: relative;
+}
+
+.profile-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.profile-trigger:hover,
+.profile-trigger.is-open {
+  border-color: var(--line-2);
+  color: var(--ink);
+  background: var(--panel-2);
+}
+
+.profile-trigger > svg {
+  width: 15px;
+  height: 15px;
+  color: var(--ink-3);
+  flex: none;
+}
+
+.profile-name {
+  font-weight: 550;
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-caret {
+  width: 13px;
+  height: 13px;
+  transition: transform 120ms ease;
+}
+
+.profile-trigger.is-open .profile-caret {
+  transform: rotate(180deg);
+}
+
+.profile-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 228px;
+  padding: 5px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 11px;
+  box-shadow: var(--shadow);
+  /* Opens downward from the trigger rather than fading in place, so it reads
+     as coming out of the button it belongs to. */
+  animation: profile-in 120ms ease-out;
+  transform-origin: top right;
+}
+
+@keyframes profile-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.profile-menu-head {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px 9px;
+}
+
+.profile-menu-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-menu-note {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.profile-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--line);
+}
+
+/* One rule for the links and the buttons, so a menu of three different
+   elements still reads as one list. */
+.profile-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.profile-item > svg {
+  width: 15px;
+  height: 15px;
+  color: var(--ink-3);
+  flex: none;
+}
+
+.profile-item:hover {
+  background: var(--accent-soft);
+}
+
+.profile-item:hover > svg {
+  color: var(--accent);
+}
+
+.profile-item.is-current {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.profile-item.is-current > svg {
+  color: var(--accent);
+}
+
+.profile-item-bad:hover {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.profile-item-bad:hover > svg {
+  color: var(--bad);
+}
+
+.profile-item-toggle:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* The switch pushes to the right edge, which is what makes the row read as a
+   setting rather than a link that goes somewhere. */
+.profile-item-toggle .switch {
+  margin-left: auto;
+}
+
+.switch {
+  position: relative;
+  width: 30px;
+  height: 17px;
+  border-radius: 999px;
+  background: var(--line-2);
+  flex: none;
+  transition: background 140ms ease;
+}
+
+.switch.is-on {
+  background: var(--accent);
+}
+
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 140ms ease;
+}
+
+.switch.is-on .switch-knob {
+  transform: translateX(13px);
+}
