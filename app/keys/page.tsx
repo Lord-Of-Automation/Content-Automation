@@ -1,5 +1,6 @@
 import TopBar from "@/components/TopBar";
 import KeysView from "@/components/KeysView";
+import GoDaddyKey from "@/components/GoDaddyKey";
 
 export const metadata = { title: "Keys — Content Automation" };
 export const dynamic = "force-dynamic";
@@ -10,6 +11,10 @@ export default function KeysPage() {
       <TopBar current="keys" />
       <main>
         <div className="stack">
+          {/* Above the engine's keys because it belongs to a different thing:
+              these live in the console and the ones below live on the engine.
+              Two cards say that; one long list would not. */}
+          <GoDaddyKey />
           <KeysView />
         </div>
       </main>

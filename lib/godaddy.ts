@@ -12,6 +12,8 @@
  * ever returns it, not even masked.
  */
 
+import { currentKey } from "./godaddykey";
+
 export class GoDaddyConfigError extends Error {
   constructor(message: string) {
     super(message);
@@ -97,14 +99,14 @@ const MAX_PAGES = 10;
  * costs no wasted round trip. Anything else is a shape we cannot read off the
  * string, and there both are tried in turn.
  */
-function schemes(): Array<{ name: string; value: string }> {
-  const key = process.env.GODADDY_API_KEY?.trim();
+function schemes(key: string | null): Array<{ name: string; value: string }> {
   const secret = process.env.GODADDY_API_SECRET?.trim();
 
   if (!key) {
     throw new GoDaddyConfigError(
-      "GODADDY_API_KEY is not set, so there is no account to list domains for. " +
-        "Add it in the project's environment variables and redeploy.",
+      "No GoDaddy token is set, so there is no account to list domains for. " +
+        "Add one on the Keys page, or set GODADDY_API_KEY in the project's " +
+        "environment variables.",
     );
   }
 
@@ -352,7 +354,10 @@ export async function listDomains(): Promise<DomainList> {
   const tried: string[] = [];
   let lastAuthError = "";
 
-  for (const scheme of schemes()) {
+  // Whatever the Keys page holds, falling back to the environment.
+  const token = await currentKey();
+
+  for (const scheme of schemes(token)) {
     const first = await fetchPage(scheme.value, "");
 
     if (isAuthFailure(first.status)) {
