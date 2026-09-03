@@ -37,7 +37,17 @@ export default function Console() {
   const [retrying, setRetrying] = useState(false);
   const [pinning, setPinning] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  // Two slots, because they have different lifetimes. An error from something
+  // the person just did has to stay on screen until they do something else;
+  // one from a background poll is about right now and goes as soon as the next
+  // poll succeeds. Sharing one slot meant the pollers cleared it: a run that
+  // failed to start showed why for as long as it took the history poll to come
+  // back, a few seconds, and then the reason was simply gone.
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Which steps are pinned right now, as opposed to which steps some past run
+  // happened to return a pinned value for.
+  const [pinnedSteps, setPinnedSteps] = useState<Set<string>>(new Set());
   const [notice, setNotice] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   // The list is long and mostly noise, so it starts collapsed and grows a page
@@ -59,16 +69,36 @@ export default function Console() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Could not load runs.");
       setHistory(payload.executions ?? []);
-      setError(null);
+      setLoadError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not reach n8n.");
+      setLoadError(e instanceof Error ? e.message : "Could not reach n8n.");
+    }
+  }, []);
+
+  // Which run the newest request was for. A poll every few seconds against a
+  // list the person is clicking through means responses do come back out of
+  // order, and the loser used to win: select a run, select another before the
+  // first answers, and the first answer overwrites the second run's detail with
+  // the wrong run's steps — under the right run's heading.
+  const wantedDetail = useRef<string | null>(null);
+
+  const loadPins = useCallback(async () => {
+    try {
+      const response = await fetch("/api/pins", { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = (await response.json()) as { pins?: { step: string }[] };
+      setPinnedSteps(new Set((payload.pins ?? []).map((p) => p.step)));
+    } catch {
+      /* the buttons fall back to the run's own flag */
     }
   }, []);
 
   const loadDetail = useCallback(async (id: string) => {
+    wantedDetail.current = id;
     setDetailLoading(true);
     try {
       const response = await fetch(`/api/runs/${id}`, { cache: "no-store" });
+      if (wantedDetail.current !== id) return;
       if (response.status === 401) {
         window.location.href = "/login";
         return;
@@ -92,11 +122,15 @@ export default function Console() {
 
       if (!response.ok) throw new Error(payload.error ?? "Could not load run.");
       setDetail(payload.execution);
-      setError(null);
+      setLoadError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not reach the backend.");
+      if (wantedDetail.current !== id) return;
+      setLoadError(e instanceof Error ? e.message : "Could not reach the backend.");
     } finally {
-      setDetailLoading(false);
+      // Only the newest request may turn the spinner off, or a slow answer for
+      // a run nobody is looking at any more clears the spinner for one that is
+      // still loading.
+      if (wantedDetail.current === id) setDetailLoading(false);
     }
   }, []);
 
@@ -153,6 +187,7 @@ export default function Console() {
 
   useEffect(() => {
     void loadHistory();
+    void loadPins();
 
     let saved: string | null = null;
     try {
@@ -165,7 +200,7 @@ export default function Console() {
       setSelectedId(saved);
       void loadDetail(saved);
     }
-  }, [loadHistory, loadDetail]);
+  }, [loadHistory, loadPins, loadDetail]);
 
   useEffect(() => {
     const timer = window.setInterval(() => void loadHistory(), HISTORY_POLL);
@@ -325,7 +360,7 @@ export default function Console() {
           ? `Pinned "${step}". Every run from now on returns this saved value instead of running that step, until you unpin it.`
           : `Unpinned "${step}". It runs again from the next run.`,
       );
-      await loadDetail(selectedId);
+      await Promise.all([loadPins(), loadDetail(selectedId)]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "That did not work.");
     } finally {
@@ -420,6 +455,11 @@ export default function Console() {
                 {error}
               </div>
             ) : null}
+            {loadError && loadError !== error ? (
+              <div className="alert alert-bad" role="alert">
+                {loadError}
+              </div>
+            ) : null}
             {notice ? <div className="alert alert-warn">{notice}</div> : null}
 
             <RunForm
@@ -493,6 +533,7 @@ export default function Console() {
           retrying={retrying}
           onPin={pinStep}
           pinning={pinning}
+          pinnedSteps={pinnedSteps}
         />
       </div>
     </div>

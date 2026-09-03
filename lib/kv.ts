@@ -59,12 +59,20 @@ export async function kvGetJSON<T>(key: string): Promise<T | null> {
   }
 }
 
-/** Never throws: a cache that fails should slow things down, not break them. */
-export async function kvSetJSON(key: string, value: unknown): Promise<void> {
-  if (!kvConfigured()) return;
+/**
+ * Never throws: a cache that fails should slow things down, not break them.
+ *
+ * It does say whether it wrote, though, because not every caller is a cache.
+ * Site logins are stored through this, and a silent false there is a password
+ * the console reported as saved and does not have. A caller that is genuinely
+ * caching can carry on ignoring the answer.
+ */
+export async function kvSetJSON(key: string, value: unknown): Promise<boolean> {
+  if (!kvConfigured()) return false;
   try {
     await kv(["SET", key, JSON.stringify(value)]);
+    return true;
   } catch {
-    /* ignored */
+    return false;
   }
 }

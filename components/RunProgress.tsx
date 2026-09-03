@@ -266,6 +266,7 @@ export default function RunProgress({
   retrying,
   onPin,
   pinning,
+  pinnedSteps,
 }: {
   execution: ExecutionDetail | null;
   loading: boolean;
@@ -277,8 +278,25 @@ export default function RunProgress({
   onPin?: (step: string, pin: boolean) => void;
   /** The step a pin request is in flight for, so its button can say so. */
   pinning?: string | null;
+  /**
+   * Step names that are pinned right now.
+   *
+   * Not the same thing as stage.pinned, which says this run RETURNED a pinned
+   * value — true only for runs that happened after the pin was made. Reading
+   * the button's state off that meant pinning a step on the run you were
+   * looking at left the button reading "Pin", because that run had genuinely
+   * run the step. It looked like the pin had not taken.
+   */
+  pinnedSteps?: Set<string>;
 }) {
   const [confirming, setConfirming] = useState(false);
+
+  // The live list wins where the caller supplied one. Falling back to the run's
+  // own flag keeps this component usable on its own and keeps a historic run
+  // showing which of its steps actually returned a pinned value.
+  const isPinned = (stage: { stepName?: string; pinned?: boolean }): boolean =>
+    pinnedSteps && stage.stepName ? pinnedSteps.has(stage.stepName) : !!stage.pinned;
+
   if (!execution) {
     return (
       <div className="empty">
@@ -390,7 +408,7 @@ export default function RunProgress({
                   {stage.state === "failed" ? (
                     <span className="stage-tag">failed</span>
                   ) : null}
-                  {stage.state === "done" && stage.nodesRun > 0 && !stage.pinned ? (
+                  {stage.state === "done" && stage.nodesRun > 0 && !isPinned(stage) ? (
                     <span className="stage-tag">{stage.nodesRun} steps</span>
                   ) : null}
                   {/* Only where there is something to pin. A skipped step
@@ -402,16 +420,16 @@ export default function RunProgress({
                       /* The button is the state as well as the control. A
                          separate "pinned" tag beside a button reading the same
                          word was the label twice and the meaning once. */
-                      className={stage.pinned ? "stage-pin is-pinned" : "stage-pin"}
+                      className={isPinned(stage) ? "stage-pin is-pinned" : "stage-pin"}
                       disabled={pinning === stage.stepName}
                       title={
-                        stage.pinned
+                        isPinned(stage)
                           ? "Pinned: this step returns a saved value instead of running. Click to unpin."
                           : "Pin this result: the step stops running and returns it instead"
                       }
-                      onClick={() => onPin(stage.stepName!, !stage.pinned)}
+                      onClick={() => onPin(stage.stepName!, !isPinned(stage))}
                     >
-                      {pinning === stage.stepName ? "…" : stage.pinned ? "pinned" : "Pin"}
+                      {pinning === stage.stepName ? "…" : isPinned(stage) ? "pinned" : "Pin"}
                     </button>
                   ) : null}
                 </span>

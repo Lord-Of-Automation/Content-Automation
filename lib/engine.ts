@@ -353,7 +353,21 @@ export async function retryExecution(id: string): Promise<{ id: string; status: 
   if (!inputs?.website_url) {
     throw new Error(`Run ${id} has no recorded input to retry from.`);
   }
+  // Everything the run was given, carried whole.
+  //
+  // This used to name each field, and every setting added since was quietly
+  // absent from every retry — a gap run retried without style_reference_url
+  // published pages that matched nothing on the site, and one retried without
+  // publish_new_pages wrote drafts when the original had published. Nothing
+  // failed; the retry simply did different work. Naming fields means the list
+  // has to be updated in step with the form forever, and it never was. What is
+  // named below are the defaults for a field the original run left empty.
+  const { wp_username, wp_password, wp_domain, resume_from, ...carried } =
+    (run.input ?? {}) as Record<string, unknown>;
+  void wp_username; void wp_password; void wp_domain; void resume_from;
+
   const started = await startRun({
+    ...carried,
     website_url: inputs.website_url,
     market: inputs.market ?? "gb",
     language: inputs.language ?? "en",
@@ -368,7 +382,6 @@ export async function retryExecution(id: string): Promise<{ id: string; status: 
     // optimiser would rewrite the site's existing pages instead of writing the
     // missing ones — the wrong work entirely, done quietly and successfully.
     mode: run.mode ?? "optimise",
-    ideas_sheet_id: (run.input?.ideas_sheet_id as string) ?? "",
   }, id);
   return { id: started.executionId ?? "", status: "new" };
 }

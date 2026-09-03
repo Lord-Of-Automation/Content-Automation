@@ -2,31 +2,22 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import type { AuditAction } from "@/lib/audit";
+
+// The action type comes from the server rather than being copied here. The
+// copy had drifted: "keys-updated" existed on the server and not in this list,
+// so an entry for it rendered with no label and a pill class of
+// "pill-undefined". Importing it means adding an action anywhere makes this
+// file fail to compile until it has a label and a tone, which is the only way
+// a table like this stays complete.
 type AuditEvent = {
   at: string;
   actor: string;
-  action:
-    | "sign-in"
-    | "sign-in-failed"
-    | "sign-out"
-    | "run-started"
-    | "run-failed"
-    | "account-created"
-    | "run-canceled"
-    | "run-cancel-failed"
-    | "run-retried"
-    | "run-retry-failed"
-    | "site-saved"
-    | "site-removed"
-    | "schedule-created"
-    | "schedule-updated"
-    | "schedule-deleted"
-    | "step-pinned"
-    | "step-unpinned";
+  action: AuditAction;
   detail: string;
 };
 
-const LABEL: Record<AuditEvent["action"], string> = {
+const LABEL: Record<AuditAction, string> = {
   "sign-in": "Signed in",
   "sign-in-failed": "Sign in failed",
   "sign-out": "Signed out",
@@ -39,6 +30,7 @@ const LABEL: Record<AuditEvent["action"], string> = {
   "run-retry-failed": "Resume failed",
   "site-saved": "Saved a site login",
   "site-removed": "Removed a site login",
+  "keys-updated": "Changed engine credentials",
   "schedule-created": "Created a loop",
   "schedule-updated": "Changed a loop",
   "schedule-deleted": "Deleted a loop",
@@ -46,7 +38,7 @@ const LABEL: Record<AuditEvent["action"], string> = {
   "step-unpinned": "Unpinned a step",
 };
 
-const TONE: Record<AuditEvent["action"], string> = {
+const TONE: Record<AuditAction, string> = {
   "sign-in": "ok",
   "sign-in-failed": "bad",
   "sign-out": "idle",
@@ -59,6 +51,7 @@ const TONE: Record<AuditEvent["action"], string> = {
   "run-retry-failed": "bad",
   "site-saved": "run",
   "site-removed": "idle",
+  "keys-updated": "warn",
   "schedule-created": "run",
   "schedule-updated": "run",
   "schedule-deleted": "idle",

@@ -74,11 +74,50 @@ async function readAll(): Promise<StoredSite[]> {
 
 async function writeAll(rows: StoredSite[]): Promise<void> {
   if (kvConfigured()) {
-    await kvSetJSON(KEY, rows);
-    return;
+    // A failed write is not something to shrug at here. kvSetJSON swallows its
+    // own errors because most of what goes through it is a cache, but this is
+    // the store of record for site logins — and the early return meant an
+    // unreachable KV lost the password while the console said it was saved.
+    // The next run then failed to publish with a 401 nobody could account for.
+    if (await kvSetJSON(KEY, rows)) return;
+    throw new Error(
+      "The key store did not accept the write, so nothing was saved. " +
+        "Check KV_REST_API_URL and KV_REST_API_TOKEN, then try again.",
+    );
   }
   mkdirSync(DIR, { recursive: true });
   writeFileSync(FILE, JSON.stringify(rows, null, 2), "utf8");
+}
+
+/**
+ * Strip what a copied password brings with it.
+ *
+ * WordPress prints an application password as "abcd EFGH ijkl MNOP", and
+ * copying it off that screen routinely picks up a trailing space or newline.
+ * Those go into the Basic auth header verbatim and the site rejects the login,
+ * while the same password typed by hand works — so it looks like the wrong
+ * password rather than a stray character.
+ *
+ * The interior spaces stay: they are part of the format WordPress prints and it
+ * accepts them. What does not stay is a space that only looks like one.
+ *
+ * One function now, because there used to be two copies and they had drifted.
+ * Both were written with the invisible character sitting in the pattern
+ * literally; on the read path something normalised it into an ordinary space,
+ * leaving a rule that replaced a space with a space and did nothing at all. So
+ * a password saved before any of this existed was cleaned on the way in but not
+ * on the way out — which is the one case the read path was added for. Escapes
+ * survive being reformatted, and an invisible character never will.
+ */
+function tidyPassword(input: string): string {
+  return input
+    // No-break space, narrow no-break space, and the typographic spaces that
+    // come from copying rendered HTML. All meant to be an ordinary space.
+    .replace(/[\u00a0\u202f\u2000-\u200a\u2028\u2029\u3000]/g, " ")
+    // Zero-width characters and the byte-order mark carry no width at all, so
+    // they cannot be seen in the field and must simply go.
+    .replace(/[\u200b\u200c\u200d\u2060\ufeff]/g, "")
+    .trim();
 }
 
 export async function listSites(): Promise<SiteSummary[]> {
@@ -122,16 +161,7 @@ export async function saveSite(
     return { ok: false, error: "A password is required." };
   }
 
-  // WordPress shows an application password as "abcd EFGH ijkl MNOP", and
-  // copying it off that screen routinely brings a trailing space or newline
-  // with it. Those go into the Basic auth header verbatim and the site rejects
-  // the login — while the same password pasted by hand elsewhere works, which
-  // makes it look like the wrong password rather than a stray character.
-  //
-  // Ends only. The spaces inside are part of the format WordPress prints, and
-  // it accepts them. A non-breaking space is never intentional and comes from
-  // copying rendered HTML, so it becomes an ordinary one.
-  const cleanPassword = password.replace(/ /g, " ").trim();
+  const cleanPassword = tidyPassword(password);
 
   let secret: string;
   try {
@@ -193,7 +223,7 @@ export async function credentialsFor(
       username: match.username.trim(),
       // Cleaned on the way out as well as in, so an entry saved before this
       // existed does not need re-typing to start working.
-      password: decrypt(match.secret).replace(/ /g, " ").trim(),
+      password: tidyPassword(decrypt(match.secret)),
     };
   } catch {
     // Unreadable is the same as absent: better no credentials than wrong ones.

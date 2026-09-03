@@ -86,6 +86,55 @@ export const DEFAULT_VALUES: RunValues = {
   body_classes: { casino_review: "", game_review: "", promocodes: "", blog: "" },
 };
 
+/**
+ * A number box that survives being emptied.
+ *
+ * Each of these sits beside a checkbox, and zero is what the checkbox means:
+ * every page, all pages, always crawl fresh. Parsing the box straight into the
+ * value made an empty box mean zero — so backspacing over a single digit to
+ * type a different one ticked the checkbox and disabled the input mid-keystroke.
+ * You could not edit the number at all, only replace it in one go, and the run
+ * quietly changed to whole-site while it happened.
+ *
+ * So the text being typed lives here and only a real number is committed. An
+ * empty box stays empty and stays enabled; leaving it empty puts the committed
+ * number back, because the checkbox is how you ask for zero.
+ */
+function LimitField({
+  id, value, min, max, placeholder, onCommit,
+}: {
+  id: string;
+  value: number;
+  min: number;
+  max: number;
+  placeholder: string;
+  onCommit: (n: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const unlimited = value === 0;
+
+  return (
+    <input
+      id={id}
+      type="number"
+      min={min}
+      max={max}
+      step={1}
+      disabled={unlimited}
+      value={draft ?? (unlimited ? "" : String(value))}
+      placeholder={placeholder}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setDraft(raw);
+        const n = Number.parseInt(raw, 10);
+        if (Number.isFinite(n) && n >= min) onCommit(Math.min(n, max));
+      }}
+      onBlur={() => setDraft(null)}
+    />
+  );
+}
+
+
 export default function RunForm({
   busy,
   fieldErrors,
@@ -304,19 +353,13 @@ export default function RunForm({
             />
             Every page
           </label>
-          <input
+          <LimitField
             id="max_crawl_pages"
-            type="number"
+            value={values.max_crawl_pages}
             min={1}
             max={1000}
-            step={1}
-            disabled={values.max_crawl_pages === 0}
-            value={values.max_crawl_pages === 0 ? "" : values.max_crawl_pages}
             placeholder="every page"
-            onChange={(e) => {
-              const n = Number.parseInt(e.target.value, 10);
-              set("max_crawl_pages", Number.isFinite(n) ? n : 0);
-            }}
+            onCommit={(n) => set("max_crawl_pages", n)}
           />
         </div>
         <div className="note">
@@ -368,19 +411,13 @@ export default function RunForm({
             />
             Always crawl fresh
           </label>
-          <input
+          <LimitField
             id="reuse_crawl_days"
-            type="number"
+            value={values.reuse_crawl_days}
             min={1}
             max={90}
-            step={1}
-            disabled={values.reuse_crawl_days === 0}
-            value={values.reuse_crawl_days === 0 ? "" : values.reuse_crawl_days}
             placeholder="days"
-            onChange={(e) => {
-              const n = Number.parseInt(e.target.value, 10);
-              set("reuse_crawl_days", Number.isFinite(n) ? n : 0);
-            }}
+            onCommit={(n) => set("reuse_crawl_days", n)}
           />
         </div>
         <div className="note">
@@ -403,19 +440,13 @@ export default function RunForm({
             />
             All crawled pages
           </label>
-          <input
+          <LimitField
             id="pages_to_optimise"
-            type="number"
+            value={values.pages_to_optimise}
             min={1}
             max={1000}
-            step={1}
-            disabled={values.pages_to_optimise === 0}
-            value={values.pages_to_optimise === 0 ? "" : values.pages_to_optimise}
             placeholder="all"
-            onChange={(e) => {
-              const n = Number.parseInt(e.target.value, 10);
-              set("pages_to_optimise", Number.isFinite(n) ? n : 0);
-            }}
+            onCommit={(n) => set("pages_to_optimise", n)}
           />
         </div>
         <div className="note">

@@ -38,6 +38,31 @@ async function callEngine(init: RequestInit): Promise<Response> {
   });
 }
 
+/**
+ * Turn the engine's answer into ours.
+ *
+ * The engine's 401 means our ENGINE_TOKEN does not match its own. This app's
+ * 401 means the person is not signed in, and every view in the console acts on
+ * that by sending the browser to /login. Forwarding the engine's status put a
+ * signed-in user in a loop: open Keys, get bounced to a login they have already
+ * passed, sign in, open Keys, bounce — with the actual cause never once shown.
+ * A misconfigured upstream is a 502, and it says which upstream.
+ */
+function relay(body: unknown, status: number): NextResponse {
+  if (status !== 401 && status !== 403) return NextResponse.json(body, { status });
+
+  const said = (body as { error?: string; message?: string } | null);
+  return NextResponse.json(
+    {
+      error:
+        `The engine refused the console's credentials (${status}). ` +
+        "ENGINE_TOKEN here does not match the token the engine was started with." +
+        (said?.error || said?.message ? ` It said: ${said.error ?? said.message}` : ""),
+    },
+    { status: 502 },
+  );
+}
+
 export async function GET() {
   const denied = await requireSession();
   if (denied) return denied;
@@ -52,7 +77,7 @@ export async function GET() {
   try {
     const response = await callEngine({ method: "GET" });
     const body = await response.json();
-    return NextResponse.json(body, { status: response.status });
+    return relay(body, response.status);
   } catch (error) {
     return errorResponse(error);
   }
@@ -82,7 +107,7 @@ export async function POST(request: Request) {
       await record(actor, "keys-updated", result.changed.join(", "));
     }
 
-    return NextResponse.json(result, { status: response.status });
+    return relay(result, response.status);
   } catch (error) {
     return errorResponse(error);
   }
