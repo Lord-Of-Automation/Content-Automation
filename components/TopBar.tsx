@@ -2,12 +2,16 @@ import Link from "next/link";
 
 import { auth } from "@/auth";
 import { logout } from "@/app/actions";
+import NavMenu from "@/components/NavMenu";
 import ProfileMenu from "@/components/ProfileMenu";
 
 export default async function TopBar({
   current,
 }: {
-  current: "runs" | "loop" | "logs" | "domains" | "accounts" | "keys";
+  current:
+    | "runs" | "loop" | "logs"
+    | "domains" | "generator"
+    | "accounts" | "keys";
 }) {
   const session = await auth();
 
@@ -37,12 +41,26 @@ export default async function TopBar({
           >
             Loop
           </Link>
-          <Link
-            href="/domains"
-            className={current === "domains" ? "topnav-link is-current" : "topnav-link"}
-          >
-            Domains
-          </Link>
+          {/* Not a link. Domains is two pages now, and a parent that both
+              navigates and opens a menu makes you guess which it will do. */}
+          <NavMenu
+            label="Domains"
+            active={current === "domains" || current === "generator"}
+            items={[
+              {
+                href: "/domains",
+                label: "My Domains",
+                note: "everything the accounts hold",
+                current: current === "domains",
+              },
+              {
+                href: "/domains/generate",
+                label: "Name generator",
+                note: "find one that is free, with its price",
+                current: current === "generator",
+              },
+            ]}
+          />
           <Link
             href="/logs"
             className={current === "logs" ? "topnav-link is-current" : "topnav-link"}

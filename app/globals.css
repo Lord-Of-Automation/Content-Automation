@@ -2946,3 +2946,130 @@ button,
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* ---------- nav menu ---------- */
+
+.navmenu {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Sized as the sibling links are, so the row does not shift when one of them
+   becomes a menu. */
+.navmenu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.navmenu-caret {
+  width: 12px;
+  height: 12px;
+  transition: transform 120ms ease;
+}
+
+.navmenu-trigger.is-open .navmenu-caret {
+  transform: rotate(180deg);
+}
+
+.navmenu-panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 232px;
+  padding: 5px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 11px;
+  box-shadow: var(--shadow);
+  animation: navmenu-in 120ms ease-out;
+}
+
+@keyframes navmenu-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* The gap between the button and the panel is a few pixels of nothing, and the
+   pointer has to cross it. This makes that space part of the menu so the
+   crossing does not close it. */
+.navmenu-panel::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -10px;
+  height: 10px;
+}
+
+.navmenu-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  text-decoration: none;
+}
+
+.navmenu-item:hover {
+  background: var(--accent-soft);
+}
+
+.navmenu-item-label {
+  font-size: 13.5px;
+  font-weight: 560;
+  color: var(--ink);
+}
+
+.navmenu-item-note {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.navmenu-item.is-current .navmenu-item-label {
+  color: var(--accent);
+  font-weight: 620;
+}
+
+/* ---------- extension chooser ---------- */
+
+.tldpick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 9px;
+}
+
+.tld {
+  padding: 5px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--panel-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--ink-2);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.tld:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tld.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.tld-extra {
+  max-width: 320px;
+}

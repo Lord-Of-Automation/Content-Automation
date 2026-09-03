@@ -49,7 +49,10 @@ export default function ProfileMenu({
   signOut,
 }: {
   name: string;
-  current: "runs" | "loop" | "logs" | "domains" | "accounts" | "keys";
+  current:
+    | "runs" | "loop" | "logs"
+    | "domains" | "generator"
+    | "accounts" | "keys";
   /** The logout server action, handed down from the server component. */
   signOut: () => void | Promise<void>;
 }) {
