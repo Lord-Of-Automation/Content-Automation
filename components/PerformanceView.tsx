@@ -221,8 +221,7 @@ export default function PerformanceView() {
               {configError ? (
                 <>
                   {" "}
-                  Add the Search Console service account on the Keys page, under
-                  Domain providers.
+                  <a href="/keys">Open the Keys page</a> to fix it.
                 </>
               ) : null}
             </div>

@@ -84,9 +84,28 @@ async function credentials(): Promise<ServiceAccount> {
   const found = await credentialFor("searchconsole");
   const raw = found?.serviceAccount?.trim();
   if (!raw) {
+    // What to say depends on how far the setup got, because "add a service
+    // account" is the wrong instruction for somebody who has an OAuth client
+    // and simply has not pressed Connect — and it is the actively misleading
+    // one for somebody whose sign-in has lapsed.
+    const hasClient = !!found?.clientId?.trim() && !!found?.clientSecret?.trim();
+    const hasToken = !!found?.refreshToken?.trim();
+
+    if (hasToken) {
+      throw new SearchConsoleConfigError(
+        "The Google sign-in stored here is no longer accepted. Press Connect " +
+          "Google on the Keys page to sign in again.",
+      );
+    }
+    if (hasClient) {
+      throw new SearchConsoleConfigError(
+        "No Google account is connected yet. Press Connect Google on the Keys " +
+          "page and sign in with the account that owns your properties.",
+      );
+    }
     throw new SearchConsoleConfigError(
-      "No Search Console service account is set. Add it on the Keys page under " +
-        "Domain providers.",
+      "Search Console is not set up. On the Keys page, add a Google OAuth " +
+        "client ID and secret, then press Connect Google.",
     );
   }
   return account(raw);
@@ -111,6 +130,7 @@ async function accessToken(): Promise<string> {
   if (signedIn) return signedIn;
 
   if (token && Date.now() < token.expiresAt) return token.value;
+
 
   const { client_email, private_key } = await credentials();
   const now = Math.floor(Date.now() / 1000);
@@ -180,9 +200,14 @@ async function accessToken(): Promise<string> {
  */
 export async function readingAs(): Promise<{ email: string; kind: "signin" | "service" }> {
   const found = await credentialFor("searchconsole");
-  if (await accessTokenFromRefresh().catch(() => null)) {
-    return { email: found?.googleEmail?.trim() || "a signed-in Google account", kind: "signin" };
+
+  // Not swallowed. A sign-in that fails is the answer, and hiding it behind a
+  // fallback made the page complain about a service account nobody was using.
+  if (found?.refreshToken?.trim()) {
+    await accessTokenFromRefresh();
+    return { email: found.googleEmail?.trim() || "a signed-in Google account", kind: "signin" };
   }
+
   return { email: (await credentials()).client_email, kind: "service" };
 }
 

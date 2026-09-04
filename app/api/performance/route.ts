@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse, requireSession } from "@/lib/api-guard";
+import { GoogleOAuthError } from "@/lib/googleoauth";
 import { checkWindow, readPerformance, SearchConsoleConfigError } from "@/lib/searchconsole";
 
 export const runtime = "nodejs";
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
   } catch (error) {
     // A missing or malformed service account is something to fix on the Keys
     // page, not an upstream failure to retry.
-    if (error instanceof SearchConsoleConfigError) {
+    if (error instanceof SearchConsoleConfigError || error instanceof GoogleOAuthError) {
       return NextResponse.json({ error: error.message, kind: "config" }, { status: 500 });
     }
     return errorResponse(error);
