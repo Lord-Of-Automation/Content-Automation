@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import AddToCloudflare from "@/components/AddToCloudflare";
 import BulkBar from "@/components/BulkBar";
+import { Select } from "@/components/Select";
 import DomainDns from "@/components/DomainDns";
 import {
   orderDomains, pointsAt, statusTone, type Direction, type SortKey,
@@ -516,23 +517,30 @@ export default function DomainsView() {
                     run of grey text with a middle dot it read as a caption on
                     the search box; it is a result, and the two halves answer
                     two different questions. */}
+                {/* The console's own select, not the browser's. A native one
+                    takes styling on the closed control and none at all on the
+                    open list, which the OS draws in its own font — so on a dark
+                    page this list came up white, beside a search box and a
+                    filter that did not. */}
                 {groups.length ? (
-                  <select
-                    className="group-filter"
-                    value={inGroup}
-                    onChange={(e) => {
-                      setInGroup(e.target.value);
-                      setVisible(PAGE);
-                    }}
-                    aria-label="Show only one group"
-                  >
-                    <option value="">Every group</option>
-                    {groups.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.name} ({g.domains.length})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="group-filter">
+                    <Select
+                      id="group-filter"
+                      value={inGroup}
+                      onChange={(v) => {
+                        setInGroup(v);
+                        setVisible(PAGE);
+                      }}
+                      options={[
+                        { value: "", label: "Every group" },
+                        ...groups.map((g) => ({
+                          value: g.id,
+                          label: g.name,
+                          hint: `${g.domains.length}`,
+                        })),
+                      ]}
+                    />
+                  </div>
                 ) : null}
 
                 {shown.length !== domains.length ? (

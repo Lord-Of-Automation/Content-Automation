@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { Select } from "@/components/Select";
+
 type Group = { id: string; name: string; domains: string[] };
 
 /**
@@ -120,19 +122,23 @@ export default function GroupDialog({
 
           <section className="sheet-section">
             <div className="field">
-              <label htmlFor="group-choice">Group</label>
-              <select
+              <label id="group-choice-label" htmlFor="group-choice">
+                Group
+              </label>
+              <Select
                 id="group-choice"
+                labelledBy="group-choice-label"
                 value={choice}
-                onChange={(e) => setChoice(e.target.value)}
-              >
-                <option value="">New group…</option>
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name} ({g.domains.length})
-                  </option>
-                ))}
-              </select>
+                onChange={setChoice}
+                options={[
+                  { value: "", label: "New group…" },
+                  ...groups.map((g) => ({
+                    value: g.id,
+                    label: g.name,
+                    hint: `${g.domains.length}`,
+                  })),
+                ]}
+              />
               <div className="note">
                 Adding to a group never removes what is already in it.
               </div>
