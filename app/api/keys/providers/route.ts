@@ -76,7 +76,35 @@ export async function GET(request: Request) {
     if (new URL(request.url).searchParams.get("check")) {
       const { accountSummaries } = await import("@/lib/cloudflare");
       const cloudflare = await accountSummaries().catch(() => []);
-      return NextResponse.json({ ...payload(statuses, googleRedirect), cloudflare });
+
+      // Whether the stored sign-in still works, rather than whether one is
+      // stored. A refresh token survives the thing that made it valid — the
+      // OAuth client changing, the consent expiring, access being revoked — and
+      // a page reporting "Signed in" from its mere presence is reporting the
+      // wrong fact.
+      const { accessTokenFromRefresh, storedRefreshToken } = await import("@/lib/googleoauth");
+      let google: { stored: boolean; works: boolean; error: string } = {
+        stored: false,
+        works: false,
+        error: "",
+      };
+      try {
+        const stored = !!(await storedRefreshToken());
+        if (stored) {
+          const token = await accessTokenFromRefresh();
+          google = { stored, works: !!token, error: "" };
+        } else {
+          google = { stored: false, works: false, error: "" };
+        }
+      } catch (error) {
+        google = {
+          stored: true,
+          works: false,
+          error: error instanceof Error ? error.message : "The stored sign-in was refused.",
+        };
+      }
+
+      return NextResponse.json({ ...payload(statuses, googleRedirect), cloudflare, google });
     }
 
     return NextResponse.json(payload(statuses, googleRedirect));

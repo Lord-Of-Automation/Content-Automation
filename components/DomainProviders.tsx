@@ -83,6 +83,7 @@ export default function DomainProviders() {
    */
   const [cfEntry, setCfEntry] = useState<CfEntry>({ token: "", accountId: "" });
   const [cfChecked, setCfChecked] = useState<CfSummary[] | null>(null);
+  const [google, setGoogle] = useState<{ stored: boolean; works: boolean; error: string } | null>(null);
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   /** What the Google callback redirected back with, if anything. */
@@ -125,8 +126,12 @@ export default function DomainProviders() {
     try {
       const response = await fetch("/api/keys/providers?check=1", { cache: "no-store" });
       if (!response.ok) return;
-      const payload = (await response.json()) as { cloudflare?: CfSummary[] };
+      const payload = (await response.json()) as {
+        cloudflare?: CfSummary[];
+        google?: { stored: boolean; works: boolean; error: string };
+      };
       setCfChecked(payload.cloudflare ?? []);
+      setGoogle(payload.google ?? null);
     } catch {
       // The rows above still say what is stored, which is the important half.
     } finally {
@@ -283,7 +288,20 @@ export default function DomainProviders() {
                   fallback for the case where nobody can sign in. */}
               {spec.id === "searchconsole" ? (
                 <div className="google-connect">
-                  {status?.shown?.refreshToken ? (
+                  {/* Three states, not two. A token that is stored and refused
+                      is not "signed in", and calling it that sends somebody
+                      looking for the problem everywhere except here. */}
+                  {google?.stored && !google.works ? (
+                    <>
+                      <span className="pill pill-bad">Sign-in refused</span>
+                      <span className="google-who">
+                        {google.error || "Google no longer accepts the stored sign-in."}
+                      </span>
+                      <a className="btn btn-primary btn-sm" href="/api/google/connect">
+                        Connect again
+                      </a>
+                    </>
+                  ) : status?.shown?.refreshToken ? (
                     <>
                       <span className="pill pill-ok">Signed in</span>
                       <span className="google-who">
