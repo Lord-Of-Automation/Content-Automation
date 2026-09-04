@@ -51,7 +51,7 @@ export default function ProfileMenu({
   name: string;
   current:
     | "runs" | "loop" | "logs"
-    | "domains" | "generator"
+    | "domains" | "generator" | "performance"
     | "accounts" | "keys";
   /** The logout server action, handed down from the server component. */
   signOut: () => void | Promise<void>;

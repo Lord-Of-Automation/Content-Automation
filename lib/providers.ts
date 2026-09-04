@@ -29,7 +29,8 @@ const FILE = path.join(DIR, "providers.json");
 
 export type ProviderId =
   | "godaddy" | "gandi" | "namecheap" | "spaceship"
-  | "cloudflare";
+  | "cloudflare"
+  | "searchconsole";
 
 export interface ProviderField {
   name: string;
@@ -121,6 +122,28 @@ export const PROVIDERS: ProviderSpec[] = [
         hint:
           "One account per line. The id is the 32 hex characters in the " +
           "dashboard address bar, and is what new zones are created in.",
+      },
+    ],
+  },
+  {
+    id: "searchconsole",
+    label: "Search Console",
+    wired: true,
+    blurb:
+      "Not a registrar either. It reports what each site earns in Google, which " +
+      "is the Performance page. There is no API key for this one: paste the " +
+      "whole service account JSON file Google downloaded, then add that " +
+      "account's email address as a user on every property under Settings, " +
+      "Users and permissions. A property it has not been added to is simply " +
+      "invisible, which reads exactly like an empty account.",
+    fields: [
+      {
+        name: "serviceAccount",
+        label: "Service account JSON",
+        secret: true,
+        multiline: true,
+        placeholder: '{"type":"service_account","client_email":"…","private_key":"…"}',
+        hint: "The whole file, on one line or base64. Read-only access is all it uses.",
       },
     ],
   },
