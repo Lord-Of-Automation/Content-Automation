@@ -47,7 +47,7 @@ export async function POST(request: Request) {
   for (const t of body.targets ?? []) {
     const domain = String(t.domain ?? "").trim().toLowerCase();
     const provider = String(t.provider ?? "");
-    if (!/^[a-z0-9][a-z0-9.-]{1,252}\.[a-z]{2,63}$/.test(domain)) continue;
+    if (!/^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain)) continue;
     if (provider !== "godaddy" && provider !== "gandi") continue;
     targets.push({ domain, provider });
   }

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import ConfirmDialog from "@/components/ConfirmDialog";
+import GroupDialog from "@/components/GroupDialog";
 
 export type BulkAction =
   | "cloudflare-add"
@@ -77,6 +78,15 @@ export default function BulkBar({
   onClear: () => void;
   onDone: () => void;
 }) {
+  /**
+   * Grouping is not one of the actions above.
+   *
+   * Those all reach a registrar or Cloudflare and change something outside this
+   * console, which is why they are batched, confirmed and reported per domain.
+   * A group is a label held here. It needs none of that, and putting it through
+   * the same machinery would dress a harmless thing up as a dangerous one.
+   */
+  const [grouping, setGrouping] = useState(false);
   const [pending, setPending] = useState<BulkAction | null>(null);
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(0);
@@ -162,7 +172,19 @@ export default function BulkBar({
               </button>
             </div>
           ) : (
-            (Object.keys(ACTIONS) as BulkAction[]).map((key) => (
+            <>
+              <button
+                type="button"
+                className="bulkbar-action"
+                onClick={() => setGrouping(true)}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                  <path d="M3 7h7v5H3zM14 7h7v5h-7zM3 16h7v4H3zM14 16h7v4h-7z" />
+                </svg>
+                Group
+              </button>
+              <span className="bulkbar-sep" aria-hidden />
+              {(Object.keys(ACTIONS) as BulkAction[]).map((key) => (
               <button
                 key={key}
                 type="button"
@@ -176,7 +198,8 @@ export default function BulkBar({
                 </svg>
                 {ACTIONS[key].label}
               </button>
-            ))
+              ))}
+            </>
           )}
         </div>
       </div>
@@ -204,6 +227,14 @@ export default function BulkBar({
             </ul>
           ) : null}
         </div>
+      ) : null}
+
+      {grouping ? (
+        <GroupDialog
+          domains={targets.map((t) => t.domain)}
+          onClose={() => setGrouping(false)}
+          onSaved={onDone}
+        />
       ) : null}
 
       <ConfirmDialog

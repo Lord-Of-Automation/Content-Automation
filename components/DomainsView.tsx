@@ -167,6 +167,9 @@ export default function DomainsView() {
    * quietly drop it from what a bulk action is about to touch.
    */
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  /** Named groups, and which domains are in them. */
+  const [groups, setGroups] = useState<Array<{ id: string; name: string; domains: string[] }>>([]);
+  const [inGroup, setInGroup] = useState("");
   const [cfNote, setCfNote] = useState<{ ok: boolean; zones: number; note: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -213,8 +216,22 @@ export default function DomainsView() {
     }
   }, []);
 
+  const loadGroups = useCallback(async () => {
+    try {
+      const response = await fetch("/api/domaingroups", { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = (await response.json()) as {
+        groups?: Array<{ id: string; name: string; domains: string[] }>;
+      };
+      setGroups(payload.groups ?? []);
+    } catch {
+      // The table shows no group chips, which is honest rather than wrong.
+    }
+  }, []);
+
   useEffect(() => {
     void load();
+    void loadGroups();
     /**
      * Ask Cloudflare about anything still pending.
      *
@@ -226,7 +243,7 @@ export default function DomainsView() {
      * on the next load either way.
      */
     void fetch("/api/cloudflare?sweep=1", { cache: "no-store" }).catch(() => {});
-  }, [load]);
+  }, [load, loadGroups]);
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -238,10 +255,14 @@ export default function DomainsView() {
       if (only === "parked") return pointsAt(d.nameServers).label === "parked at GoDaddy";
       if (only === "trouble") return statusTone(d.status) !== "ok";
       return true;
+    }).filter((d) => {
+      if (!inGroup) return true;
+      const group = groups.find((g) => g.id === inGroup);
+      return !!group?.domains.includes(d.domain.toLowerCase());
     });
 
     return orderDomains(kept, sortKey, direction);
-  }, [domains, query, only, sortKey, direction]);
+  }, [domains, query, only, sortKey, direction, inGroup, groups]);
 
   // Counted over everything, not over what the search box left behind: these
   // are facts about the account, and they should not change as you type.
@@ -423,6 +444,25 @@ export default function DomainsView() {
                     run of grey text with a middle dot it read as a caption on
                     the search box; it is a result, and the two halves answer
                     two different questions. */}
+                {groups.length ? (
+                  <select
+                    className="group-filter"
+                    value={inGroup}
+                    onChange={(e) => {
+                      setInGroup(e.target.value);
+                      setVisible(PAGE);
+                    }}
+                    aria-label="Show only one group"
+                  >
+                    <option value="">Every group</option>
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name} ({g.domains.length})
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+
                 {shown.length !== domains.length ? (
                   <span className="domain-counts">
                     <span className="domain-count">
@@ -525,6 +565,30 @@ export default function DomainsView() {
                           >
                             {d.domain}
                           </a>
+                          {/* Under the name rather than in a column of its own.
+                              A domain can be in several groups, so a column
+                              would be as tall as the most-grouped row for every
+                              row that has none. */}
+                          {groups.some((g) => g.domains.includes(d.domain.toLowerCase())) ? (
+                            <div className="domain-groups">
+                              {groups
+                                .filter((g) => g.domains.includes(d.domain.toLowerCase()))
+                                .map((g) => (
+                                  <button
+                                    type="button"
+                                    className="group-chip"
+                                    key={g.id}
+                                    title={`Show only ${g.name}`}
+                                    onClick={() => {
+                                      setInGroup(g.id);
+                                      setVisible(PAGE);
+                                    }}
+                                  >
+                                    {g.name}
+                                  </button>
+                                ))}
+                            </div>
+                          ) : null}
                         </td>
                         <td>
                           <span className="registrar">{d.providerLabel}</span>
@@ -675,7 +739,10 @@ export default function DomainsView() {
             .filter((d) => picked.has(d.domain))
             .map((d) => ({ domain: d.domain, provider: d.provider }))}
           onClear={() => setPicked(new Set())}
-          onDone={() => void load()}
+          onDone={() => {
+            void load();
+            void loadGroups();
+          }}
         />
       ) : null}
 

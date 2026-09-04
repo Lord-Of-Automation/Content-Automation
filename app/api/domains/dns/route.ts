@@ -34,7 +34,7 @@ function providerOf(value: unknown): ProviderId {
 
 function domainOf(value: unknown): string {
   const domain = String(value ?? "").trim().toLowerCase();
-  if (!/^[a-z0-9][a-z0-9.-]{1,252}\.[a-z]{2,63}$/.test(domain)) {
+  if (!/^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain)) {
     throw new Error("That is not a domain name.");
   }
   return domain;
