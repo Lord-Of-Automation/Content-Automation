@@ -34,6 +34,18 @@ export interface Domain {
    */
   renewalPrice: number | null;
   currency: string;
+  /**
+   * Where this domain stands with Cloudflare.
+   *
+   * "active" is a zone this token can see that Cloudflare has verified.
+   * "pending" is a zone created but not yet picked up, which nearly always
+   * means its name servers have not been changed at the registrar yet.
+   * "none" means no zone this token can see — which is not the same as no zone
+   * at all, since a token only sees the accounts it was issued for.
+   */
+  cloudflare: "active" | "pending" | "none" | "unknown";
+  /** The zone id, when there is one, so the DNS panel can go straight to it. */
+  cloudflareZoneId: string | null;
 }
 
 /** How one registrar's read went, so a page can say what it is missing. */
@@ -51,6 +63,8 @@ export interface DomainSource {
 export interface DomainList {
   domains: Domain[];
   sources: DomainSource[];
+  /** How the Cloudflare read went, so "none" can be told from "not asked". */
+  cloudflare: { ok: boolean; zones: number; note: string };
 }
 
 /** "shop.example.co.uk" -> "co.uk". Everything after the first label. */
@@ -125,8 +139,43 @@ export async function listAllDomains(): Promise<DomainList> {
     }),
   );
 
-  return {
-    domains: byExpiry(results.flatMap((r) => r.domains)),
-    sources: results.map((r) => r.source),
-  };
+  const domains = byExpiry(results.flatMap((r) => r.domains));
+
+  /**
+   * Cloudflare's view, folded in.
+   *
+   * One listing for the whole estate rather than a call per domain: four
+   * hundred lookups to answer a column would make the page unusable, and the
+   * zone list is a handful of paged requests however many domains there are.
+   *
+   * A failure here leaves every row "unknown" rather than "none". Those mean
+   * opposite things — one is "Cloudflare does not have it", the other is "we
+   * could not ask" — and showing a red dot for the second would have people
+   * adding zones that already exist.
+   */
+  let cloudflare = { ok: false, zones: 0, note: "no Cloudflare token is set" };
+  try {
+    const { listZones } = await import("./cloudflare");
+    const zones = await listZones();
+    cloudflare = { ok: true, zones: zones.size, note: "" };
+
+    for (const d of domains) {
+      const zone = zones.get(d.domain.toLowerCase());
+      if (!zone) {
+        d.cloudflare = "none";
+        continue;
+      }
+      d.cloudflareZoneId = zone.id;
+      d.cloudflare = zone.status === "active" ? "active" : "pending";
+    }
+  } catch (error) {
+    cloudflare = {
+      ok: false,
+      zones: 0,
+      note: error instanceof Error ? error.message : "Cloudflare could not be read.",
+    };
+    for (const d of domains) d.cloudflare = "unknown";
+  }
+
+  return { domains, sources: results.map((r) => r.source), cloudflare };
 }

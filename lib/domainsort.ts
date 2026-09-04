@@ -7,7 +7,8 @@
  */
 
 export type SortKey =
-  | "domain" | "provider" | "status" | "expires" | "renewal" | "price" | "ns";
+  | "domain" | "provider" | "status" | "expires" | "renewal" | "price" | "ns"
+  | "cloudflare";
 export type Direction = "asc" | "desc";
 
 export interface Sortable {
@@ -20,6 +21,7 @@ export interface Sortable {
   /** Micro-units, or null when the registrar would not price this extension. */
   renewalPrice: number | null;
   providerLabel: string;
+  cloudflare: string;
 }
 
 /**
@@ -108,6 +110,15 @@ export function orderDomains<T extends Sortable>(
           (pointsAt(a.nameServers).label.localeCompare(pointsAt(b.nameServers).label) ||
             a.domain.localeCompare(b.domain)) * flip
         );
+      case "cloudflare": {
+        // Ordered by how much attention each state wants rather than
+        // alphabetically: not added, then pending, then unknown, then active.
+        const rank: Record<string, number> = { none: 0, pending: 1, unknown: 2, active: 3 };
+        return (
+          ((rank[a.cloudflare] ?? 9) - (rank[b.cloudflare] ?? 9) ||
+            a.domain.localeCompare(b.domain)) * flip
+        );
+      }
       case "provider":
         return (
           (a.providerLabel.localeCompare(b.providerLabel) ||

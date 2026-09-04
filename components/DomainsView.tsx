@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import AddToCloudflare from "@/components/AddToCloudflare";
 import DomainDns from "@/components/DomainDns";
 import {
   orderDomains, pointsAt, statusTone, type Direction, type SortKey,
@@ -20,6 +21,23 @@ type Domain = {
   /** Micro-units, as both registrars quote. 22990000 is 22.99. */
   renewalPrice: number | null;
   currency: string;
+  cloudflare: "active" | "pending" | "none" | "unknown";
+  cloudflareZoneId: string | null;
+};
+
+/**
+ * The Cloudflare column, as a dot.
+ *
+ * Green is a zone Cloudflare has verified. Amber is a zone that exists and is
+ * waiting for its name servers, which is a real state and not a failure. Red is
+ * no zone this token can see, and grey is that we could not ask — those two
+ * look alike and mean opposite things, so they are never drawn the same.
+ */
+const CLOUDFLARE_DOT: Record<Domain["cloudflare"], { tone: string; text: string }> = {
+  active: { tone: "ok", text: "active on Cloudflare" },
+  pending: { tone: "warn", text: "added, waiting for the name servers to change" },
+  none: { tone: "bad", text: "not on Cloudflare" },
+  unknown: { tone: "idle", text: "Cloudflare could not be asked" },
 };
 
 /** How one registrar's read went, so the page can say what it is missing. */
@@ -64,6 +82,9 @@ const FIRST_DIRECTION: Record<SortKey, Direction> = {
   renewal: "asc",
   price: "desc",
   ns: "asc",
+  // Ascending puts what is not on Cloudflare first, which is the reason
+  // somebody clicks this column.
+  cloudflare: "asc",
 };
 
 function Chevrons({ state }: { state: "none" | "asc" | "desc" }) {
@@ -114,6 +135,9 @@ export default function DomainsView() {
   const [sources, setSources] = useState<Source[]>([]);
   /** The domain whose DNS panel is open, or null. */
   const [managing, setManaging] = useState<Domain | null>(null);
+  /** The domain being added to Cloudflare, or null. */
+  const [adding, setAdding] = useState<Domain | null>(null);
+  const [cfNote, setCfNote] = useState<{ ok: boolean; zones: number; note: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [configError, setConfigError] = useState(false);
@@ -149,6 +173,7 @@ export default function DomainsView() {
       }
       setDomains(payload.domains ?? []);
       setSources(payload.sources ?? []);
+      setCfNote(payload.cloudflare ?? null);
       setConfigError(false);
       setError(null);
     } catch (e) {
@@ -160,6 +185,17 @@ export default function DomainsView() {
 
   useEffect(() => {
     void load();
+    /**
+     * Ask Cloudflare about anything still pending.
+     *
+     * This app has no background worker, so the sweep rides on the page being
+     * opened. It enforces its own five-minute interval and its own one-hour
+     * window internally, so calling it on every load is cheap and calling it
+     * twice in a minute does one round of checks. A zone that activates while
+     * nobody is looking is still picked up: the column asks Cloudflare directly
+     * on the next load either way.
+     */
+    void fetch("/api/cloudflare?sweep=1", { cache: "no-store" }).catch(() => {});
   }, [load]);
 
   const shown = useMemo(() => {
@@ -379,6 +415,7 @@ export default function DomainsView() {
                         ["renewal", "Renewal", false],
                         ["price", "Renews for", true],
                         ["ns", "NS Points At", false],
+                        ["cloudflare", "Cloudflare Status", false],
                       ] as Array<[SortKey, string, boolean]>
                     ).map(([key, label, numeric]) => (
                       <th key={key} className={numeric ? "num sortable" : "sortable"}>
@@ -389,6 +426,7 @@ export default function DomainsView() {
                       </th>
                     ))}
                     <th>Name servers</th>
+                    <th />
                     <th />
                   </tr>
                 </thead>
@@ -456,6 +494,37 @@ export default function DomainsView() {
                           )}
                         </td>
                         <td className="nowrap">
+                          <span
+                            className={`cf-dot cf-${CLOUDFLARE_DOT[d.cloudflare].tone}`}
+                            title={CLOUDFLARE_DOT[d.cloudflare].text}
+                          />
+                          <span className="cf-label">
+                            {d.cloudflare === "active"
+                              ? "active"
+                              : d.cloudflare === "pending"
+                                ? "pending"
+                                : d.cloudflare === "none"
+                                  ? "not added"
+                                  : "unknown"}
+                          </span>
+                        </td>
+                        <td className="nowrap">
+                          {/* Greyed rather than hidden once a domain is on
+                              Cloudflare: an action that vanishes leaves you
+                              wondering whether you imagined it. */}
+                          <button
+                            type="button"
+                            className="btn btn-cloudflare btn-sm"
+                            disabled={d.cloudflare !== "none"}
+                            title={
+                              d.cloudflare === "none"
+                                ? `Create a Cloudflare zone for ${d.domain}`
+                                : CLOUDFLARE_DOT[d.cloudflare].text
+                            }
+                            onClick={() => setAdding(d)}
+                          >
+                            Add to Cloudflare
+                          </button>
                           <button
                             type="button"
                             className="btn btn-ghost btn-sm"
@@ -510,6 +579,18 @@ export default function DomainsView() {
           ) : null}
         </div>
       </div>
+      {adding ? (
+        <AddToCloudflare
+          domain={adding.domain}
+          provider={adding.provider}
+          onClose={() => setAdding(null)}
+          onDone={() => {
+            setAdding(null);
+            void load();
+          }}
+        />
+      ) : null}
+
       {managing ? (
         <DomainDns
           domain={managing.domain}

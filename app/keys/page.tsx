@@ -1,6 +1,7 @@
 import TopBar from "@/components/TopBar";
 import KeysView from "@/components/KeysView";
 import DomainProviders from "@/components/DomainProviders";
+import DnsGroups from "@/components/DnsGroups";
 
 export const metadata = { title: "Keys — Content Automation" };
 export const dynamic = "force-dynamic";
@@ -15,6 +16,7 @@ export default function KeysPage() {
               registrar credentials live in the console and the ones below live
               on the engine. Two cards say that; one long list would not. */}
           <DomainProviders />
+          <DnsGroups />
           <KeysView />
         </div>
       </main>

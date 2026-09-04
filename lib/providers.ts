@@ -27,7 +27,9 @@ const KEY = "content-automation:providers";
 const DIR = path.join(process.cwd(), ".data");
 const FILE = path.join(DIR, "providers.json");
 
-export type ProviderId = "godaddy" | "gandi" | "namecheap" | "spaceship";
+export type ProviderId =
+  | "godaddy" | "gandi" | "namecheap" | "spaceship"
+  | "cloudflare";
 
 export interface ProviderField {
   name: string;
@@ -93,6 +95,34 @@ export const PROVIDERS: ProviderSpec[] = [
         label: "API key",
         secret: true,
         placeholder: "the key or personal access token",
+      },
+    ],
+  },
+  {
+    id: "cloudflare",
+    label: "Cloudflare",
+    wired: true,
+    blurb:
+      "Not a registrar. It runs the DNS for a domain once its name servers " +
+      "point at it, which is where the records for most of this estate actually " +
+      "live. The token needs Zone:Read, Zone:Edit and DNS:Edit; the account id " +
+      "is on the right of any account's overview page and is needed to create a " +
+      "zone.",
+    fields: [
+      {
+        name: "apiToken",
+        label: "API token",
+        secret: true,
+        placeholder: "from My Profile, API Tokens",
+      },
+      {
+        name: "accountId",
+        label: "Account ID",
+        secret: false,
+        placeholder: "32 hex characters",
+        pattern: /^[0-9a-f]{32}$/i,
+        patternNote: "A Cloudflare account id is 32 hexadecimal characters.",
+        hint: "Which account new zones are created in.",
       },
     ],
   },

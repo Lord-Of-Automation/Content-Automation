@@ -187,6 +187,10 @@ function shape(raw: Record<string, unknown>): Domain {
     // Filled in by finish(), once per extension rather than once per domain.
     renewalPrice: null,
     currency: "USD",
+    // Filled in by listAllDomains from one Cloudflare listing, rather than a
+    // lookup per domain.
+    cloudflare: "unknown" as const,
+    cloudflareZoneId: null,
   };
 }
 

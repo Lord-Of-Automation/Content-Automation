@@ -207,6 +207,8 @@ export async function listGandiDomains(): Promise<{ domains: Domain[]; source: D
       nameServers: [],
       renewalPrice: null,
       currency: "USD",
+      cloudflare: "unknown" as const,
+      cloudflareZoneId: null,
     };
   });
 
