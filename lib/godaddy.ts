@@ -317,9 +317,12 @@ async function finish(
       label: "GoDaddy",
       ok: true,
       count: collected.length,
+      // Silent on the happy path. This used to name the authorization scheme,
+      // which was worth showing while it was still unknown which one GoDaddy
+      // accepted and is noise now that it is settled.
       note: truncated
         ? "more domains than one read returns; this is the first several thousand"
-        : `read with the ${scheme.name} authorization scheme`,
+        : "read",
       unpriced,
     },
   };

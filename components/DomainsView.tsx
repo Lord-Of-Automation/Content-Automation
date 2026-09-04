@@ -239,11 +239,14 @@ export default function DomainsView() {
             </div>
           ) : null}
 
-          {/* One line per registrar, and only when there is something to say.
-              A registrar that failed must not empty the page or hide the other
-              one's domains — it says so here and the rest of the list stands. */}
+          {/* Only when something is wrong or worth acting on. A registrar that
+              failed must not empty the page or hide the other one's domains, so
+              it says so here and the rest of the list stands. A registrar that
+              read fine says nothing: the count is already in the strip above,
+              and a banner confirming that things worked is a banner people stop
+              reading. */}
           {sources
-            .filter((s) => !s.ok || s.note !== "read")
+            .filter((s) => !s.ok || (s.note && s.note !== "read" && s.note !== "no credential set"))
             .map((s) => (
               <div className={s.ok ? "notice" : "notice bad"} key={s.provider}>
                 <strong>{s.label}:</strong> {s.note}
