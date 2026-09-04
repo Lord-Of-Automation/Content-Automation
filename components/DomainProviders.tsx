@@ -34,8 +34,30 @@ type Status = {
   accounts?: Array<{ accountId: string; tail: string }>;
 };
 
-/** A Cloudflare row being edited. A blank token means "keep what is stored". */
-type CfRow = { accountId: string; token: string; existing: boolean; tail: string };
+/**
+ * A Cloudflare row being edited. A blank token means "keep what is stored".
+ *
+ * The uid exists only to be a React key. Keying on the account id instead meant
+ * the key changed on every keystroke in that field, so React threw the row away
+ * and built a new one between characters — the input lost focus after the first
+ * letter and the field could not be filled in at all.
+ */
+type CfRow = {
+  uid: string;
+  accountId: string;
+  token: string;
+  existing: boolean;
+  tail: string;
+};
+
+let nextRowId = 0;
+const newRow = (): CfRow => ({
+  uid: `row-${(nextRowId += 1)}`,
+  accountId: "",
+  token: "",
+  existing: false,
+  tail: "",
+});
 
 /** What each stored Cloudflare credential is actually doing, checked live. */
 type CfSummary = {
@@ -101,6 +123,7 @@ export default function DomainProviders() {
     setCfRows((current) =>
       current ??
       (cf?.accounts ?? []).map((a) => ({
+        uid: `row-${(nextRowId += 1)}`,
         accountId: a.accountId,
         token: "",
         existing: true,
@@ -284,7 +307,7 @@ export default function DomainProviders() {
               {spec.id === "cloudflare" ? (
                 <>
                   {(cfRows ?? []).map((row, at) => (
-                    <div className="cf-row" key={`${row.accountId}-${at}`}>
+                    <div className="cf-row" key={row.uid}>
                       <div className="provider-field">
                         <label htmlFor={`cf-token-${at}`}>
                           API token
@@ -351,10 +374,7 @@ export default function DomainProviders() {
                       type="button"
                       className="btn btn-ghost"
                       onClick={() =>
-                        setCfRows((rows) => [
-                          ...(rows ?? []),
-                          { accountId: "", token: "", existing: false, tail: "" },
-                        ])
+                        setCfRows((rows) => [...(rows ?? []), newRow()])
                       }
                     >
                       Add another account
