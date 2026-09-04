@@ -3678,3 +3678,21 @@ body:has(.bulkbar) main {
   background: color-mix(in srgb, var(--bad-soft) 72%, var(--bad));
   border-color: var(--bad);
 }
+
+/* The Google sign-in, above the fields it makes optional. */
+.google-connect {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel-2);
+}
+
+.google-who {
+  font-size: 12px;
+  color: var(--ink-3);
+}

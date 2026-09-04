@@ -15,6 +15,7 @@
 
 import { createSign } from "node:crypto";
 
+import { accessTokenFromRefresh } from "./googleoauth";
 import { credentialFor } from "./providers";
 
 const API = "https://searchconsole.googleapis.com/webmasters/v3";
@@ -102,6 +103,13 @@ const b64url = (input: Buffer | string): string => Buffer.from(input).toString("
 let token: { value: string; expiresAt: number } | null = null;
 
 async function accessToken(): Promise<string> {
+  // A Google sign-in wins whenever there is one. It sees every property that
+  // account owns, where a service account sees only the ones somebody
+  // remembered to add it to — so preferring it is not a preference, it is the
+  // difference between the whole estate and part of it.
+  const signedIn = await accessTokenFromRefresh();
+  if (signedIn) return signedIn;
+
   if (token && Date.now() < token.expiresAt) return token.value;
 
   const { client_email, private_key } = await credentials();
@@ -162,9 +170,20 @@ async function accessToken(): Promise<string> {
   return token.value;
 }
 
-/** The email that has to be added to every property. Shown on the page. */
-export async function serviceAccountEmail(): Promise<string> {
-  return (await credentials()).client_email;
+/**
+ * Whose access this is reading with, for the page to say.
+ *
+ * The signed-in account where there is one, because then the service account's
+ * email is not the thing anybody needs — and telling somebody to add an address
+ * to three hundred properties when the sign-in already covers them all would be
+ * a bad hour spent on nothing.
+ */
+export async function readingAs(): Promise<{ email: string; kind: "signin" | "service" }> {
+  const found = await credentialFor("searchconsole");
+  if (await accessTokenFromRefresh().catch(() => null)) {
+    return { email: found?.googleEmail?.trim() || "a signed-in Google account", kind: "signin" };
+  }
+  return { email: (await credentials()).client_email, kind: "service" };
 }
 
 /** "sc-domain:example.com" and "https://example.com/" both read as example.com. */
@@ -267,12 +286,15 @@ export interface Performance {
   sites: SitePerformance[];
   startDate: string;
   endDate: string;
-  serviceAccount: string;
+  /** Whose access the numbers were read with. */
+  readingAs: string;
+  /** "signin" or "service" — they need different advice when nothing shows. */
+  accessKind: "signin" | "service";
 }
 
 export async function readPerformance(days = 28): Promise<Performance> {
   const { startDate, endDate } = windowFor(days);
-  const email = await serviceAccountEmail();
+  const who = await readingAs();
   const properties = await listSites();
 
   const sites: SitePerformance[] = [];
@@ -317,5 +339,5 @@ export async function readPerformance(days = 28): Promise<Performance> {
   // Most clicks first, which is the order somebody opens this page to see.
   sites.sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions);
 
-  return { sites, startDate, endDate, serviceAccount: email };
+  return { sites, startDate, endDate, readingAs: who.email, accessKind: who.kind };
 }

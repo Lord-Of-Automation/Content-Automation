@@ -34,7 +34,9 @@ function payload(statuses: Awaited<ReturnType<typeof allStatuses>>) {
       blurb: p.blurb,
       // The pattern stays on the server. It is a validation rule, not a
       // description, and the message it produces is what the browser needs.
-      fields: p.fields.map((f) => ({
+      // Hidden fields are stored but never rendered, so they do not travel to
+      // the browser as form inputs it would have to know to leave alone.
+      fields: p.fields.filter((f) => !f.hidden).map((f) => ({
         name: f.name,
         label: f.label,
         secret: f.secret,

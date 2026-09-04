@@ -85,6 +85,8 @@ export default function DomainProviders() {
   const [cfChecked, setCfChecked] = useState<CfSummary[] | null>(null);
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  /** What the Google callback redirected back with, if anything. */
+  const [googleSaid, setGoogleSaid] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -145,6 +147,15 @@ export default function DomainProviders() {
   useEffect(() => {
     void load();
     void check();
+
+    // The sign-in leaves the app and comes back, so the outcome arrives in the
+    // address bar rather than in a response. Read once, then cleaned out of the
+    // URL so a reload does not report last time's result as this time's.
+    const said = new URLSearchParams(window.location.search).get("google");
+    if (said) {
+      setGoogleSaid(said);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
   }, [load, check]);
 
   function setField(provider: string, field: string, value: string) {
@@ -260,6 +271,55 @@ export default function DomainProviders() {
               </div>
 
               <p className="stage-hint provider-blurb">{spec.blurb}</p>
+
+              {/* The sign-in, above the fields, because it is the answer for
+                  almost everybody and the service account below it is the
+                  fallback for the case where nobody can sign in. */}
+              {spec.id === "searchconsole" ? (
+                <div className="google-connect">
+                  {status?.shown?.refreshToken ? (
+                    <>
+                      <span className="pill pill-ok">Signed in</span>
+                      <span className="google-who">
+                        {status.shown.googleEmail || "a Google account"}
+                      </span>
+                      <a className="btn btn-ghost btn-sm" href="/api/google/connect">
+                        Sign in again
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      <a
+                        className="btn btn-primary btn-sm"
+                        href="/api/google/connect"
+                        // A plain link, not a fetch: this leaves the app for
+                        // Google's consent screen and comes back, which is a
+                        // navigation rather than a request.
+                      >
+                        Connect Google
+                      </a>
+                      <span className="google-who">
+                        Sees every property that account owns. Needs the client
+                        ID and secret below to be saved first.
+                      </span>
+                    </>
+                  )}
+                </div>
+              ) : null}
+
+              {spec.id === "searchconsole" && googleSaid ? (
+                <div className={googleSaid === "connected" ? "alert alert-ok" : "alert alert-warn"}>
+                  {googleSaid === "connected"
+                    ? "Connected. The Performance page now reads as that account."
+                    : googleSaid === "cancelled"
+                      ? "The Google sign-in was cancelled, so nothing changed."
+                      : googleSaid === "no-client"
+                        ? "Save the OAuth client ID and secret first, then connect."
+                        : googleSaid === "bad-state"
+                          ? "That sign-in did not match one started here. Try again from this page."
+                          : "Google would not complete the sign-in. Check that the redirect URI on the OAuth client matches this site exactly."}
+                </div>
+              ) : null}
 
               {status?.set && !status.readable ? (
                 <div className="alert alert-warn">

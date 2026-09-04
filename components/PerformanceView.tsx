@@ -18,7 +18,8 @@ type Payload = {
   sites: Site[];
   startDate: string;
   endDate: string;
-  serviceAccount: string;
+  readingAs: string;
+  accessKind: "signin" | "service";
 };
 
 type SortKey = "site" | "clicks" | "impressions" | "ctr" | "position";
@@ -182,10 +183,26 @@ export default function PerformanceView() {
               account authenticated fine and has been added to nothing. */}
           {data && !data.sites.length && !error ? (
             <div className="notice warn">
-              <strong>This service account can see no properties.</strong> Add{" "}
-              <code>{data.serviceAccount}</code> as a user on each property in
-              Search Console, under Settings, Users and permissions. Read-only
-              access is enough.
+              {/* Two different situations that look identical here, and only
+                  one of them is fixed by adding a user to anything. */}
+              {data.accessKind === "signin" ? (
+                <>
+                  <strong>
+                    That Google account owns no Search Console properties.
+                  </strong>{" "}
+                  Signed in as <code>{data.readingAs}</code>. If your properties
+                  belong to a different Google account, connect that one instead
+                  on the Keys page.
+                </>
+              ) : (
+                <>
+                  <strong>This service account can see no properties.</strong>{" "}
+                  Add <code>{data.readingAs}</code> as a user on each property in
+                  Search Console, under Settings, Users and permissions. Or
+                  connect a Google account on the Keys page, which sees every
+                  property it owns without adding anything.
+                </>
+              )}
             </div>
           ) : null}
 
@@ -299,8 +316,8 @@ export default function PerformanceView() {
                 yesterday &mdash; today is always partial, and half a day beside
                 twenty-seven whole ones makes every trend look like a collapse.
                 A site with no impressions is not an error: it is a property
-                Google has nothing to report for. Read with{" "}
-                <code>{data.serviceAccount}</code>.
+                Google has nothing to report for. Read as{" "}
+                <code>{data.readingAs}</code>.
               </p>
             </>
           ) : null}

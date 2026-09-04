@@ -39,6 +39,14 @@ export interface ProviderField {
   secret: boolean;
   /** A textarea rather than one line, for a value that holds several. */
   multiline?: boolean;
+  /**
+   * Stored but never shown as an input.
+   *
+   * For values the app writes rather than a person types — the Google refresh
+   * token arrives from a redirect, and saveProvider only keeps fields the spec
+   * declares, so without this it would be silently dropped on the way in.
+   */
+  hidden?: boolean;
   placeholder: string;
   hint?: string;
   /** Rejected before storing when it does not match. */
@@ -131,19 +139,49 @@ export const PROVIDERS: ProviderSpec[] = [
     wired: true,
     blurb:
       "Not a registrar either. It reports what each site earns in Google, which " +
-      "is the Performance page. There is no API key for this one: paste the " +
-      "whole service account JSON file Google downloaded, then add that " +
-      "account's email address as a user on every property under Settings, " +
-      "Users and permissions. A property it has not been added to is simply " +
-      "invisible, which reads exactly like an empty account.",
+      "is the Performance page. There is no API key for it: Google only gives " +
+      "this data to someone with access. Sign in below and it sees every " +
+      "property that account owns, including ones added later. The service " +
+      "account underneath is the alternative, and it has to be added to each " +
+      "property by hand — a property it is not on is invisible rather than " +
+      "refused, which reads exactly like an empty account.",
     fields: [
       {
+        name: "clientId",
+        label: "OAuth client ID",
+        secret: false,
+        placeholder: "…apps.googleusercontent.com",
+        hint: "From Google Cloud, Credentials, OAuth client, type Web application.",
+      },
+      {
+        name: "clientSecret",
+        label: "OAuth client secret",
+        secret: true,
+        placeholder: "GOCSPX-…",
+      },
+      {
+        name: "refreshToken",
+        label: "Google sign-in",
+        secret: true,
+        hidden: true,
+        placeholder: "",
+      },
+      {
+        name: "googleEmail",
+        label: "Signed in as",
+        secret: false,
+        hidden: true,
+        placeholder: "",
+      },
+      {
         name: "serviceAccount",
-        label: "Service account JSON",
+        label: "Service account JSON (optional)",
         secret: true,
         multiline: true,
         placeholder: '{"type":"service_account","client_email":"…","private_key":"…"}',
-        hint: "The whole file, on one line or base64. Read-only access is all it uses.",
+        hint:
+          "Only needed without a Google sign-in. A service account sees a " +
+          "property only after being added to it as a user, one at a time.",
       },
     ],
   },
