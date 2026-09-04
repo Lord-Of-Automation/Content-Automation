@@ -6,6 +6,18 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 
 type Rrset = { name: string; type: string; ttl: number; values: string[] };
 
+/** A Cloudflare record, which is one value per row and knows about proxying. */
+type CfRecord = {
+  id: string;
+  type: string;
+  name: string;
+  content: string;
+  ttl: number;
+  proxied: boolean;
+};
+
+type CfZone = { id: string; name: string; status: string; nameServers: string[] };
+
 type Zone = {
   domain: string;
   provider: string;
@@ -45,6 +57,18 @@ export default function DomainDns({
   onClose: () => void;
 }) {
   const [zone, setZone] = useState<Zone | null>(null);
+  /**
+   * Cloudflare's zone for this domain, when it has one.
+   *
+   * Which DNS is the live one is not a preference, it is a fact: a domain whose
+   * name servers point at Cloudflare answers from Cloudflare, and the zone the
+   * registrar still keeps is read by nobody. This panel used to read and write
+   * the registrar's zone regardless — so after moving a domain to Cloudflare it
+   * showed the old records as though they were current, and every record added
+   * here went somewhere nothing would ever ask.
+   */
+  const [cfZone, setCfZone] = useState<CfZone | null>(null);
+  const [cfRecords, setCfRecords] = useState<CfRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -61,18 +85,39 @@ export default function DomainDns({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `/api/domains/dns?provider=${encodeURIComponent(provider)}&domain=${encodeURIComponent(domain)}`,
-        { cache: "no-store" },
-      );
-      if (response.status === 401) {
+      // Both, because they answer different questions. The registrar owns the
+      // name servers whatever happens; Cloudflare owns the records once those
+      // name servers point at it.
+      const [registrar, cloudflare] = await Promise.all([
+        fetch(
+          `/api/domains/dns?provider=${encodeURIComponent(provider)}&domain=${encodeURIComponent(domain)}`,
+          { cache: "no-store" },
+        ),
+        fetch(`/api/cloudflare?domain=${encodeURIComponent(domain)}`, { cache: "no-store" }),
+      ]);
+
+      if (registrar.status === 401) {
         window.location.href = "/login";
         return;
       }
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Could not read this domain.");
+
+      const payload = await registrar.json();
+      if (!registrar.ok) throw new Error(payload.error ?? "Could not read this domain.");
       setZone(payload);
       setHosts(payload.nameServers?.length ? payload.nameServers : ["", ""]);
+
+      if (cloudflare.ok) {
+        const cf = (await cloudflare.json()) as { zone?: CfZone | null; records?: CfRecord[] };
+        setCfZone(cf.zone ?? null);
+        setCfRecords(cf.records ?? []);
+      } else {
+        // No Cloudflare credential, or it could not be asked. The registrar's
+        // zone is then all there is, which is the right answer for a domain
+        // that is not on Cloudflare and an honest one for a domain that is.
+        setCfZone(null);
+        setCfRecords([]);
+      }
+
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not read this domain.");
@@ -97,12 +142,12 @@ export default function DomainDns({
     return () => dialog.removeEventListener("cancel", onCancel);
   }, [onClose]);
 
-  async function send(init: RequestInit, done: string) {
+  async function send(init: RequestInit, done: string, url = "/api/domains/dns") {
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
-      const response = await fetch("/api/domains/dns", {
+      const response = await fetch(url, {
         ...init,
         headers: { "content-type": "application/json" },
       });
@@ -122,8 +167,35 @@ export default function DomainDns({
   const changed =
     zone && hosts.filter(Boolean).join("|") !== zone.nameServers.join("|");
 
-  const editable = (zone?.records ?? []).filter((r) => EDITABLE.includes(r.type));
-  const fixed = (zone?.records ?? []).filter((r) => !EDITABLE.includes(r.type));
+  /**
+   * Where this domain's DNS actually lives.
+   *
+   * A Cloudflare zone wins whenever there is one. Cloudflare only answers for a
+   * domain whose name servers point at it, and once they do the registrar's
+   * zone is a museum piece — which is exactly what made the old records look
+   * current here and made a new record vanish into a zone nobody queries.
+   */
+  const onCloudflare = !!cfZone;
+
+  /** Cloudflare stores one row per value; the rest of this panel speaks sets. */
+  const asRrsets = (records: CfRecord[]): Rrset[] => {
+    const sets = new Map<string, Rrset>();
+    for (const r of records) {
+      const key = `${r.name} ${r.type}`;
+      const found = sets.get(key);
+      if (found) found.values.push(r.content);
+      else sets.set(key, { name: r.name, type: r.type, ttl: r.ttl, values: [r.content] });
+    }
+    return [...sets.values()];
+  };
+
+  const shownRecords = onCloudflare ? asRrsets(cfRecords) : (zone?.records ?? []);
+  const editable = shownRecords.filter((r) => EDITABLE.includes(r.type));
+  const fixed = shownRecords.filter((r) => !EDITABLE.includes(r.type));
+
+  /** The Cloudflare row behind a set, so an edit knows which record to replace. */
+  const cfIdFor = (set: Rrset): string | undefined =>
+    cfRecords.find((r) => r.name === set.name && r.type === set.type)?.id;
 
   return (
     <dialog className="sheet" ref={shell}>
@@ -152,7 +224,11 @@ export default function DomainDns({
                   somebody edit a zone nobody reads. Gandi keeps a full LiveDNS
                   zone for a domain pointed at Cloudflare and will accept every
                   edit to it. */}
-              {!zone.authoritative && zone.records.length ? (
+              {/* Only when the records on screen really are the dead ones. A
+                  domain on Cloudflare shows Cloudflare's records, which are
+                  live, and warning about the registrar's stale zone there would
+                  be a warning about something nobody is looking at. */}
+              {!onCloudflare && !zone.authoritative && zone.records.length ? (
                 <div className="notice bad">
                   <strong>These records are not live.</strong> This domain&rsquo;s
                   name servers are {zone.nameServers.join(", ") || "elsewhere"},
@@ -160,6 +236,19 @@ export default function DomainDns({
                   {provider === "godaddy" ? "GoDaddy" : "Gandi"}. Editing below
                   changes a zone nobody queries. Change the name servers first,
                   or edit the records where they actually live.
+                </div>
+              ) : null}
+
+              {/* And when Cloudflare has the zone but is not yet answering,
+                  which is every domain between being added and the name servers
+                  moving. The records are real; nothing reads them yet. */}
+              {onCloudflare && cfZone!.status !== "active" ? (
+                <div className="notice warn">
+                  <strong>Cloudflare has this zone but is not answering for it
+                  yet.</strong> Its status is {cfZone!.status}, which means the
+                  name servers below still have to become{" "}
+                  {cfZone!.nameServers.join(" and ")}. Records edited here are
+                  kept and take effect the moment that happens.
                 </div>
               ) : null}
 
@@ -218,8 +307,21 @@ export default function DomainDns({
               </section>
 
               <section className="sheet-section">
-                <h3>DNS records</h3>
-                {zone.note ? (
+                <h3>
+                  DNS records
+                  <span className="dns-where">
+                    {onCloudflare
+                      ? "on Cloudflare"
+                      : `at ${provider === "godaddy" ? "GoDaddy" : "Gandi"}`}
+                  </span>
+                </h3>
+                {onCloudflare ? (
+                  <p className="stage-hint">
+                    Read from and written to Cloudflare, because that is where
+                    this domain&rsquo;s DNS lives. The registrar still keeps an
+                    old copy of the zone and nothing reads it.
+                  </p>
+                ) : zone.note ? (
                   <p className="stage-hint">{zone.note}</p>
                 ) : (
                   <p className="stage-hint">
@@ -310,13 +412,35 @@ export default function DomainDns({
           busy={busy}
           onCancel={() => setEditing(null)}
           onSave={async (next) => {
-            const ok = await send(
-              {
-                method: "PUT",
-                body: JSON.stringify({ provider, domain, rrset: next }),
-              },
-              `Saved ${next.type} ${next.name}.`,
-            );
+            // Written where the domain actually answers from. Sending this to
+            // the registrar while the name servers point at Cloudflare is how a
+            // new record ends up invisible.
+            const ok = onCloudflare
+              ? await send(
+                  {
+                    method: "PUT",
+                    body: JSON.stringify({
+                      domain,
+                      zoneId: cfZone!.id,
+                      recordId: cfIdFor(next),
+                      record: {
+                        type: next.type,
+                        name: next.name,
+                        content: next.values[0] ?? "",
+                        ttl: next.ttl,
+                      },
+                    }),
+                  },
+                  `Saved ${next.type} ${next.name} on Cloudflare.`,
+                  "/api/cloudflare",
+                )
+              : await send(
+                  {
+                    method: "PUT",
+                    body: JSON.stringify({ provider, domain, rrset: next }),
+                  },
+                  `Saved ${next.type} ${next.name}.`,
+                );
             if (ok) setEditing(null);
           }}
         />
@@ -377,18 +501,32 @@ export default function DomainDns({
           </>
         }
         onConfirm={async () => {
-          const ok = await send(
-            {
-              method: "DELETE",
-              body: JSON.stringify({
-                provider,
-                domain,
-                name: deleting?.name,
-                type: deleting?.type,
-              }),
-            },
-            `Deleted ${deleting?.type} ${deleting?.name}.`,
-          );
+          const ok = onCloudflare
+            ? await send(
+                {
+                  method: "PUT",
+                  body: JSON.stringify({
+                    domain,
+                    zoneId: cfZone!.id,
+                    recordId: deleting ? cfIdFor(deleting) : undefined,
+                    remove: true,
+                  }),
+                },
+                `Deleted ${deleting?.type} ${deleting?.name} on Cloudflare.`,
+                "/api/cloudflare",
+              )
+            : await send(
+                {
+                  method: "DELETE",
+                  body: JSON.stringify({
+                    provider,
+                    domain,
+                    name: deleting?.name,
+                    type: deleting?.type,
+                  }),
+                },
+                `Deleted ${deleting?.type} ${deleting?.name}.`,
+              );
           if (ok) setDeleting(null);
         }}
       />

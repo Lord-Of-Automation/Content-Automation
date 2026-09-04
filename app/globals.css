@@ -3306,3 +3306,18 @@ button,
 .cf-summary th {
   background: var(--panel-2);
 }
+
+/* Which zone the records below belong to. Beside the heading rather than under
+   it, because "DNS records" alone is the ambiguity that let somebody edit the
+   registrar's dead copy thinking it was the live one. */
+.dns-where {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel-2);
+  font-size: 11px;
+  font-weight: 560;
+  color: var(--ink-2);
+  vertical-align: middle;
+}
