@@ -72,6 +72,24 @@ type Source = {
   unpriced: string[];
 };
 
+/**
+ * One CSV field, quoted and made safe to open.
+ *
+ * Quoted always rather than only when it has to be, because a name server list
+ * and a group name both contain commas and a rule with exceptions is a rule
+ * somebody's data eventually falls outside of.
+ *
+ * The leading apostrophe is not decoration. A spreadsheet treats a value
+ * beginning =, +, - or @ as a formula, so a group somebody named "=cmd" would
+ * be evaluated rather than displayed when the file is opened. That is a real
+ * way to attack whoever opens the export, and it costs one character to close.
+ */
+function csvField(value: unknown): string {
+  const text = value === null || value === undefined ? "" : String(value);
+  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
 /** Both registrars price in millionths. Rendered in the viewer's own locale. */
 function money(micro: number, currency: string): string {
   try {
@@ -295,6 +313,60 @@ export default function DomainsView() {
   // What the filter is showing, so narrowing to one brand answers "and what
   // does that cost" without a calculator.
   const shownYearly = useMemo(() => totalOver(shown), [shown, totalOver]);
+
+  /**
+   * The selected rows as a spreadsheet.
+   *
+   * Built here rather than on the server because this is the only place that
+   * holds every column at once — the registrar's fields, the price, Cloudflare's
+   * answer and the groups are four different sources and the table has already
+   * joined them.
+   *
+   * A byte order mark leads the file. Without it Excel reads UTF-8 as the local
+   * codepage, and every domain with an accent in it arrives mangled.
+   */
+  function exportCsv() {
+    const rows = domains.filter((d) => picked.has(d.domain));
+    if (!rows.length) return;
+
+    const header = [
+      "domain", "registrar", "status", "expires", "days_left", "auto_renew",
+      "renewal_price", "currency", "name_servers", "points_at", "cloudflare",
+      "groups",
+    ];
+
+    const body = rows.map((d) =>
+      [
+        d.domain,
+        d.providerLabel,
+        d.status,
+        d.expires ? d.expires.slice(0, 10) : "",
+        d.daysLeft ?? "",
+        d.renewAuto ? "yes" : "no",
+        // The number, not the formatted string: a spreadsheet should be able to
+        // total this column, and "$22.99" is text.
+        d.renewalPrice === null ? "" : (d.renewalPrice / 1_000_000).toFixed(2),
+        d.currency,
+        d.nameServers.join(" "),
+        pointsAt(d.nameServers).label,
+        CLOUDFLARE_BADGE[d.cloudflare].label,
+        groups
+          .filter((g) => g.domains.includes(d.domain.toLowerCase()))
+          .map((g) => g.name)
+          .join("; "),
+      ].map(csvField).join(","),
+    );
+
+    const csv = `\uFEFF${header.map(csvField).join(",")}\r\n${body.join("\r\n")}\r\n`;
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `domains-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    // Revoked on the next turn of the event loop, once the click has been
+    // handled. Revoking immediately cancels the download in some browsers.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
 
   return (
     <div className="stack">
@@ -738,6 +810,7 @@ export default function DomainsView() {
           targets={domains
             .filter((d) => picked.has(d.domain))
             .map((d) => ({ domain: d.domain, provider: d.provider }))}
+          onExport={exportCsv}
           onClear={() => setPicked(new Set())}
           onDone={() => {
             void load();

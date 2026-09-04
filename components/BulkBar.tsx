@@ -73,10 +73,13 @@ export default function BulkBar({
   targets,
   onClear,
   onDone,
+  onExport,
 }: {
   targets: BulkTarget[];
   onClear: () => void;
   onDone: () => void;
+  /** Built by the table, which is the only thing holding every column. */
+  onExport: () => void;
 }) {
   /**
    * Grouping is not one of the actions above.
@@ -182,6 +185,12 @@ export default function BulkBar({
                   <path d="M3 7h7v5H3zM14 7h7v5h-7zM3 16h7v4H3zM14 16h7v4h-7z" />
                 </svg>
                 Group
+              </button>
+              <button type="button" className="bulkbar-action" onClick={onExport}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                  <path d="M12 3v12M8 11l4 4 4-4M4 21h16" />
+                </svg>
+                Export CSV
               </button>
               <span className="bulkbar-sep" aria-hidden />
               {(Object.keys(ACTIONS) as BulkAction[]).map((key) => (
