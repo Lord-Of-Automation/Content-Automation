@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import AddToCloudflare from "@/components/AddToCloudflare";
+import BulkBar from "@/components/BulkBar";
 import DomainDns from "@/components/DomainDns";
 import {
   orderDomains, pointsAt, statusTone, type Direction, type SortKey,
@@ -158,6 +159,14 @@ export default function DomainsView() {
   const [managing, setManaging] = useState<Domain | null>(null);
   /** The domain being added to Cloudflare, or null. */
   const [adding, setAdding] = useState<Domain | null>(null);
+  /**
+   * The domains ticked, by name.
+   *
+   * Names rather than rows, so a selection survives a re-sort, a filter change
+   * and a reload. Ticking a domain and then narrowing the filter should not
+   * quietly drop it from what a bulk action is about to touch.
+   */
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const [cfNote, setCfNote] = useState<{ ok: boolean; zones: number; note: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -436,6 +445,34 @@ export default function DomainsView() {
                         summarised by NS Points At, and sorting on the literal
                         hostname would group by whichever letter Cloudflare
                         happened to assign. */}
+                    {/* Select-all covers what the filter left, not the whole
+                        estate. Ticking a box while looking at five domains and
+                        acting on three hundred is not something anybody means
+                        to do. */}
+                    <th className="pick">
+                      <input
+                        type="checkbox"
+                        aria-label="Select every domain shown"
+                        checked={shown.length > 0 && shown.every((d) => picked.has(d.domain))}
+                        ref={(el) => {
+                          if (el) {
+                            el.indeterminate =
+                              shown.some((d) => picked.has(d.domain)) &&
+                              !shown.every((d) => picked.has(d.domain));
+                          }
+                        }}
+                        onChange={(e) =>
+                          setPicked((current) => {
+                            const next = new Set(current);
+                            for (const d of shown) {
+                              if (e.target.checked) next.add(d.domain);
+                              else next.delete(d.domain);
+                            }
+                            return next;
+                          })
+                        }
+                      />
+                    </th>
                     {(
                       [
                         ["domain", "Domain", false],
@@ -463,7 +500,22 @@ export default function DomainsView() {
                   {shown.slice(0, visible).map((d) => {
                     const where = pointsAt(d.nameServers);
                     return (
-                      <tr key={d.domain}>
+                      <tr key={d.domain} className={picked.has(d.domain) ? "is-picked" : ""}>
+                        <td className="pick">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${d.domain}`}
+                            checked={picked.has(d.domain)}
+                            onChange={(e) =>
+                              setPicked((current) => {
+                                const next = new Set(current);
+                                if (e.target.checked) next.add(d.domain);
+                                else next.delete(d.domain);
+                                return next;
+                              })
+                            }
+                          />
+                        </td>
                         <td>
                           <a
                             className="domain-name"
@@ -615,6 +667,18 @@ export default function DomainsView() {
           ) : null}
         </div>
       </div>
+      {/* Only for domains still on screen. A bulk action that included rows
+          the filter has hidden would act on things nobody can see. */}
+      {picked.size ? (
+        <BulkBar
+          targets={domains
+            .filter((d) => picked.has(d.domain))
+            .map((d) => ({ domain: d.domain, provider: d.provider }))}
+          onClear={() => setPicked(new Set())}
+          onDone={() => void load()}
+        />
+      ) : null}
+
       {adding ? (
         <AddToCloudflare
           domain={adding.domain}

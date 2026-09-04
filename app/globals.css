@@ -3342,3 +3342,194 @@ button,
 .logs td.row-actions .btn + .btn {
   margin-left: 8px;
 }
+
+/* ---------- bulk selection ---------- */
+
+.logs th.pick,
+.logs td.pick {
+  width: 34px;
+  padding-right: 0;
+  text-align: center;
+}
+
+.logs th.pick input,
+.logs td.pick input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.logs tr.is-picked {
+  background: var(--accent-soft);
+}
+
+/* Fixed to the bottom, over the table rather than pushing it. The selection is
+   made by scrolling, so the actions have to stay where the hand is. */
+.bulkbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 55;
+  display: flex;
+  justify-content: center;
+  padding: 0 16px 18px;
+  pointer-events: none;
+  animation: bulkbar-in 140ms ease-out;
+}
+
+@keyframes bulkbar-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Dark whatever the theme, like the bar this is modelled on: it sits over the
+   page rather than in it, and needs to read as a layer above. */
+.bulkbar-inner {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 100%;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #171b22;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+.bulkbar-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 8px 12px;
+  margin-right: 6px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: #cdd4de;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bulkbar-count strong {
+  color: #fff;
+  font-weight: 640;
+}
+
+.bulkbar-count:hover .bulkbar-x {
+  color: #fff;
+}
+
+.bulkbar-x {
+  font-size: 17px;
+  line-height: 1;
+  color: #7b8798;
+}
+
+.bulkbar-action {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 82px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  font: inherit;
+  font-size: 11.5px;
+  color: #cdd4de;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bulkbar-action svg {
+  width: 17px;
+  height: 17px;
+}
+
+.bulkbar-action:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+/* The two that cannot be undone by pressing the button again. */
+.bulkbar-action.is-danger:hover {
+  background: rgba(192, 57, 47, 0.22);
+  color: #ff9a90;
+}
+
+.bulkbar-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  color: #cdd4de;
+  white-space: nowrap;
+}
+
+.bulkbar-track {
+  display: block;
+  width: 220px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.bulkbar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 200ms ease;
+}
+
+/* The result stays until dismissed. The failures are why anybody reads it, and
+   a toast would carry them away before they were read. */
+.bulk-result {
+  position: fixed;
+  right: 18px;
+  bottom: 92px;
+  z-index: 56;
+  width: min(460px, calc(100vw - 36px));
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 11px;
+  box-shadow: var(--shadow);
+}
+
+.bulk-result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.bulk-result-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+.bulk-result-list code {
+  font-size: 11.5px;
+  color: var(--ink);
+}
+
+/* Room under the table for the bar, so the last rows are not sitting beneath
+   it while somebody is trying to tick them. */
+body:has(.bulkbar) main {
+  padding-bottom: 128px;
+}
