@@ -216,12 +216,23 @@ export async function accessTokenFromRefresh(): Promise<string | null> {
     // invalid_grant is the one worth naming: it is what an expired or revoked
     // refresh token says, and on a Testing consent screen it means the seven
     // days are up rather than that anything is misconfigured.
-    throw new GoogleOAuthError(
-      body.error === "invalid_grant"
-        ? "Google no longer accepts the stored sign-in. If the consent screen is " +
+    // The three that mean different things and all read as "refused".
+    if (body.error === "invalid_grant") {
+      throw new GoogleOAuthError(
+        "Google no longer accepts the stored sign-in. If the consent screen is " +
           "still in Testing, refresh tokens expire after seven days — press " +
-          "Connect again. Otherwise the access was revoked."
-        : `Google refused the stored sign-in: ${body.error_description ?? body.error ?? response.status}`,
+          "Connect again. Otherwise the access was revoked.",
+      );
+    }
+    if (body.error === "unauthorized_client" || body.error === "invalid_client") {
+      throw new GoogleOAuthError(
+        "The stored sign-in belongs to a different OAuth client than the one " +
+          "configured now. A refresh token only works with the client that " +
+          "issued it, so press Connect again to sign in through this one.",
+      );
+    }
+    throw new GoogleOAuthError(
+      `Google refused the stored sign-in: ${body.error_description ?? body.error ?? response.status}`,
     );
   }
 

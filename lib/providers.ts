@@ -569,6 +569,31 @@ export async function saveProvider(
   const existing = store[spec.id];
   const next: Record<string, string> = { ...(existing?.values ?? {}) };
 
+  /**
+   * Changing the Google OAuth client throws away the sign-in with it.
+   *
+   * A refresh token belongs to the client that issued it. Point this at a
+   * different client id and the stored token stops working — Google answers
+   * "unauthorized", which reads as a broken sign-in rather than as the
+   * consequence of the change just made. Clearing it means the page says
+   * "not signed in", which is true and has an obvious next step.
+   */
+  if (spec.id === "searchconsole") {
+    const newClient = String(values.clientId ?? "").trim();
+    const newSecret = String(values.clientSecret ?? "").trim();
+    const oldClient = existing?.values.clientId ?? "";
+    const changed =
+      (newClient && newClient !== oldClient) ||
+      // The secret cannot be compared, being encrypted, so any new one counts
+      // as a change. Re-entering the same secret costs one reconnection.
+      !!newSecret;
+
+    if (changed && next.refreshToken) {
+      delete next.refreshToken;
+      delete next.googleEmail;
+    }
+  }
+
   for (const field of spec.fields) {
     const given = String(values[field.name] ?? "").trim();
     if (!given) continue;
