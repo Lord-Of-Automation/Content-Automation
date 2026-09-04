@@ -291,6 +291,15 @@ export default function DomainsView() {
               read fine says nothing: the count is already in the strip above,
               and a banner confirming that things worked is a banner people stop
               reading. */}
+          {cfNote && !cfNote.ok ? (
+            <div className="notice warn">
+              <strong>Cloudflare could not be read.</strong> {cfNote.note} Every
+              row shows Unknown until it can be, which is not the same as saying
+              those domains are not on Cloudflare. Adding one still works; it
+              will simply be Cloudflare that answers.
+            </div>
+          ) : null}
+
           {sources
             .filter((s) => !s.ok || (s.note && s.note !== "read" && s.note !== "no credential set"))
             .map((s) => (
@@ -508,17 +517,23 @@ export default function DomainsView() {
                           </span>
                         </td>
                         <td className="nowrap">
-                          {/* Greyed rather than hidden once a domain is on
-                              Cloudflare: an action that vanishes leaves you
-                              wondering whether you imagined it. */}
+                          {/* Greyed only when the domain really is on
+                              Cloudflare. It used to be greyed for Unknown too,
+                              which meant that a token this console could not
+                              read made every button on the page unclickable —
+                              including for the domains that most needed adding.
+                              Not knowing is a reason to let somebody try, not a
+                              reason to stop them: the attempt either works or
+                              comes back with Cloudflare's own answer, and both
+                              beat a button that will not press. */}
                           <button
                             type="button"
                             className="btn btn-cloudflare btn-sm"
-                            disabled={d.cloudflare !== "none"}
+                            disabled={d.cloudflare === "active" || d.cloudflare === "pending"}
                             title={
-                              d.cloudflare === "none"
-                                ? `Create a Cloudflare zone for ${d.domain}`
-                                : CLOUDFLARE_BADGE[d.cloudflare].text
+                              d.cloudflare === "active" || d.cloudflare === "pending"
+                                ? CLOUDFLARE_BADGE[d.cloudflare].text
+                                : `Create a Cloudflare zone for ${d.domain}`
                             }
                             onClick={() => setAdding(d)}
                           >
