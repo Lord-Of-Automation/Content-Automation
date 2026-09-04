@@ -527,7 +527,7 @@ export default function DomainsView() {
                             {CLOUDFLARE_BADGE[d.cloudflare].label}
                           </span>
                         </td>
-                        <td className="nowrap">
+                        <td className="row-actions">
                           {/* Greyed only when the domain really is on
                               Cloudflare. It used to be greyed for Unknown too,
                               which meant that a token this console could not

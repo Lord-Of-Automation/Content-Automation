@@ -3321,3 +3321,12 @@ button,
   color: var(--ink-2);
   vertical-align: middle;
 }
+
+/* The two actions on a domain row, held apart. Touching, they read as one
+   control with two halves — and one of them creates a Cloudflare zone while the
+   other opens a panel, which are not two halves of anything. */
+.logs td.row-actions {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
