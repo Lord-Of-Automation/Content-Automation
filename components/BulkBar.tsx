@@ -216,13 +216,6 @@ export default function BulkBar({
                 Group
               </button>
 
-              <button type="button" className="bulkbar-action" onClick={onExport}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-                  <path d="M12 3v12M8 11l4 4 4-4M4 21h16" />
-                </svg>
-                Export CSV
-              </button>
-
               {REST.map((key) => (
                 <button
                   key={key}
@@ -238,6 +231,14 @@ export default function BulkBar({
                   {ACTIONS[key].label}
                 </button>
               ))}
+
+              {/* Last, because it is the only one that changes nothing. */}
+              <button type="button" className="bulkbar-action" onClick={onExport}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                  <path d="M12 3v12M8 11l4 4 4-4M4 21h16" />
+                </svg>
+                Export CSV
+              </button>
             </>
           )}
         </div>
