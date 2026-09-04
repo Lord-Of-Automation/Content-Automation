@@ -374,12 +374,20 @@ export default function PerformanceView() {
                       </td>
                       <td className="detail">
                         {s.error && TROUBLE[s.errorKind] ? (
-                          <span
-                            className={`pill pill-${TROUBLE[s.errorKind]!.tone}`}
-                            title={s.error}
-                          >
-                            {TROUBLE[s.errorKind]!.label}
-                          </span>
+                          <>
+                            <span
+                              className={`pill pill-${TROUBLE[s.errorKind]!.tone}`}
+                              title={s.error}
+                            >
+                              {TROUBLE[s.errorKind]!.label}
+                            </span>
+                            {/* On screen rather than behind a hover, for the
+                                one kind that has no known fix. Whatever Google
+                                said is the only lead there is. */}
+                            {s.errorKind === "failed" ? (
+                              <div className="perf-why">{s.error}</div>
+                            ) : null}
+                          </>
                         ) : (
                           <span className="registrar">
                             {s.kind === "domain" ? "domain property" : "url prefix"}

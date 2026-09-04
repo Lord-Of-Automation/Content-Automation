@@ -260,12 +260,28 @@ async function listSites(user: string): Promise<Array<{ siteUrl: string; permiss
     }));
 }
 
+/**
+ * Retried once, and only for the failures that pass on their own.
+ *
+ * A quota refusal and a server error are both about the moment rather than
+ * about the property, and a page making one request per property across a few
+ * hundred of them will meet them. Reporting those as "could not be read" turned
+ * a wait into something to investigate.
+ *
+ * Once, not repeatedly. A second refusal means the quota is genuinely spent,
+ * and hammering it would be the reason it stayed spent.
+ */
+function passing(status: number | undefined): boolean {
+  return status === 429 || (typeof status === "number" && status >= 500);
+}
+
 /** Clicks and impressions for one property over a window, as one row. */
 async function totalsFor(
   user: string,
   siteUrl: string,
   startDate: string,
   endDate: string,
+  retried = false,
 ): Promise<{ clicks: number; impressions: number; ctr: number; position: number } | null> {
   const response = await fetch(
     `${API}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
@@ -284,6 +300,13 @@ async function totalsFor(
   );
 
   if (!response.ok) {
+    if (!retried && passing(response.status)) {
+      // Long enough for a per-minute quota to move on, short enough that a page
+      // of a few hundred properties still finishes.
+      await new Promise((r) => setTimeout(r, 2_000));
+      return totalsFor(user, siteUrl, startDate, endDate, true);
+    }
+
     const body = await response.text().catch(() => "");
     // The status carries the meaning, so it survives into the message rather
     // than being flattened into one word by the caller.

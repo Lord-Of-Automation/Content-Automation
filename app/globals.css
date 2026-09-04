@@ -3745,3 +3745,14 @@ body:has(.bulkbar) main {
 .perf-dash {
   color: var(--ink-3);
 }
+
+/* Google's own words under a failure that survived a retry. Wrapped, because
+   the useful part of these messages is rarely in the first few words. */
+.perf-why {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ink-3);
+  white-space: normal;
+  max-width: 40ch;
+}
