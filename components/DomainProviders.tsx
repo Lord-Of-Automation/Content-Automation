@@ -368,7 +368,15 @@ export default function DomainProviders() {
                     Paste into the OAuth client under Authorised redirect URIs.
                     Google compares it as a string, so a trailing slash, http
                     instead of https, or a preview address rather than this one
-                    each count as different.
+                    each count as different.{" "}
+                    {/* The other half of the comparison. Once two OAuth clients
+                        exist, the usual mistake is the right URI registered on
+                        the wrong one, and nothing on either screen says which
+                        client a sign-in will use. */}
+                    <a href="/api/google/connect?show=1" target="_blank" rel="noreferrer">
+                      See which client this will use
+                    </a>
+                    , and check that is the one you registered it on.
                   </p>
                 </div>
               ) : null}
