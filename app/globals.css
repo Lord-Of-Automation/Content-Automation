@@ -1167,6 +1167,24 @@ button,
   vertical-align: middle;
 }
 
+/* Centred rather than right-aligned. Money normally goes right so the decimal
+   points line up down the column, which is worth having when the figures are a
+   list to be totalled. These are not: each one belongs to the domain beside it
+   and is read one row at a time. */
+.logs td.mid,
+.logs th.mid {
+  text-align: center;
+}
+
+.logs th.mid.sortable button {
+  justify-content: center;
+}
+
+.logs td.mid {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .logs tr:last-child td {
   border-bottom: 0;
 }

@@ -475,17 +475,17 @@ export default function DomainsView() {
                     </th>
                     {(
                       [
-                        ["domain", "Domain", false],
-                        ["provider", "Registrar", false],
-                        ["status", "Status", false],
-                        ["expires", "Expires", false],
-                        ["renewal", "Renewal", false],
-                        ["price", "Renews for", true],
-                        ["ns", "Name servers", false],
-                        ["cloudflare", "Cloudflare", false],
-                      ] as Array<[SortKey, string, boolean]>
-                    ).map(([key, label, numeric]) => (
-                      <th key={key} className={numeric ? "num sortable" : "sortable"}>
+                        ["domain", "Domain", ""],
+                        ["provider", "Registrar", ""],
+                        ["status", "Status", ""],
+                        ["expires", "Expires", ""],
+                        ["renewal", "Renewal", ""],
+                        ["price", "Renews for", "mid"],
+                        ["ns", "Name servers", ""],
+                        ["cloudflare", "Cloudflare", ""],
+                      ] as Array<[SortKey, string, string]>
+                    ).map(([key, label, align]) => (
+                      <th key={key} className={align ? `${align} sortable` : "sortable"}>
                         <button type="button" onClick={() => sortBy(key)}>
                           {label}
                           <Chevrons state={sortKey === key ? direction : "none"} />
@@ -546,7 +546,7 @@ export default function DomainsView() {
                             <span className="pill pill-warn">manual</span>
                           )}
                         </td>
-                        <td className="num">
+                        <td className="mid">
                           {d.renewalPrice ? (
                             money(d.renewalPrice, d.currency)
                           ) : (
