@@ -22,6 +22,14 @@ export type AuditAction =
   | "schedule-created"
   | "schedule-updated"
   | "schedule-deleted"
+  /**
+   * Where a domain points, or what it answers.
+   *
+   * The only entry here that changes something outside this console. A wrong
+   * name server takes a site and its email off the internet, so who did it and
+   * what it was before are worth more than for anything else on this list.
+   */
+  | "dns-changed"
   /** A step frozen so it stops running. Logged: it changes what a run does. */
   | "step-pinned"
   | "step-unpinned";

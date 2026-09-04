@@ -3073,3 +3073,144 @@ button,
 .tld-extra {
   max-width: 320px;
 }
+
+/* ---------- domain sheet ---------- */
+
+/* A <dialog>, like the confirmation, for the focus trap and the inert backdrop
+   that a hand-rolled overlay has to reimplement and usually gets wrong. Wider
+   than a confirmation because it holds two tables. */
+.sheet {
+  width: min(920px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  overflow: visible;
+}
+
+.sheet::backdrop {
+  background: rgba(10, 14, 20, 0.5);
+}
+
+.sheet-card {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+}
+
+.sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sheet-head h2 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.sheet-head p {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.sheet-body {
+  padding: 4px 0 16px;
+  overflow-y: auto;
+}
+
+.sheet-section {
+  padding: 16px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.sheet-section:first-of-type {
+  border-top: 0;
+}
+
+.sheet-section h3 {
+  margin: 0 0 3px;
+  font-size: 14px;
+}
+
+.sheet-section .stage-hint {
+  margin: 0 0 12px;
+  max-width: 68ch;
+}
+
+.ns-input {
+  margin-bottom: 7px;
+}
+
+.sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* Pushed to the right so the destructive action is not where the eye lands
+   first, and not adjacent to the harmless ones. */
+.sheet-actions .btn-danger {
+  margin-left: auto;
+}
+
+.btn-sm {
+  padding: 4px 9px;
+  font-size: 12px;
+}
+
+/* One value per line inside a cell, since a record set holds several and
+   running them together makes two look like one. */
+.rr-value {
+  font-size: 11.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink-2);
+  word-break: break-all;
+}
+
+/* The record form, over the sheet rather than beside it: editing one record is
+   a mode, and the list behind it is not usable while you are in it. */
+.sheet-editor {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(10, 14, 20, 0.45);
+}
+
+.sheet-editor-card {
+  width: min(620px, 100%);
+  padding: 18px 20px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.sheet-editor-card h3 {
+  margin: 0 0 14px;
+  font-size: 15px;
+}
+
+.sheet-editor-card textarea {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  resize: vertical;
+}

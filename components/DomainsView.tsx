@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import DomainDns from "@/components/DomainDns";
 import {
   orderDomains, pointsAt, statusTone, type Direction, type SortKey,
 } from "@/lib/domainsort";
@@ -111,6 +112,8 @@ function prettyStatus(status: string): string {
 export default function DomainsView() {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
+  /** The domain whose DNS panel is open, or null. */
+  const [managing, setManaging] = useState<Domain | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [configError, setConfigError] = useState(false);
@@ -383,6 +386,7 @@ export default function DomainsView() {
                       </th>
                     ))}
                     <th>Name servers</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
@@ -448,6 +452,15 @@ export default function DomainsView() {
                             <span className="quiet">none recorded</span>
                           )}
                         </td>
+                        <td className="nowrap">
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setManaging(d)}
+                          >
+                            DNS
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -494,6 +507,17 @@ export default function DomainsView() {
           ) : null}
         </div>
       </div>
+      {managing ? (
+        <DomainDns
+          domain={managing.domain}
+          provider={managing.provider}
+          onClose={() => {
+            setManaging(null);
+            // The name servers may have moved, and this list shows them.
+            void load();
+          }}
+        />
+      ) : null}
     </div>
   );
 }
