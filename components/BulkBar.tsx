@@ -66,6 +66,17 @@ const ACTIONS: Record<
   },
 };
 
+/**
+ * The order the bar reads in.
+ *
+ * The two Cloudflare actions come first because they are the pair that gets
+ * used, and they are used in that order: add the zones, then point the domains
+ * at them. Everything after the separator is a different kind of thing — a
+ * label, a file, a registrar setting — and none of it is part of that sequence.
+ */
+const FIRST: BulkAction[] = ["cloudflare-add", "cloudflare-point"];
+const REST: BulkAction[] = ["renew-auto-on", "renew-auto-off"];
+
 /** Batches of twelve, matching the server. Anything larger runs past its limit. */
 const BATCH = 12;
 
@@ -176,6 +187,24 @@ export default function BulkBar({
             </div>
           ) : (
             <>
+              {FIRST.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={
+                    ACTIONS[key].danger ? "bulkbar-action is-danger" : "bulkbar-action"
+                  }
+                  onClick={() => setPending(key)}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                    <path d={ACTIONS[key].icon} />
+                  </svg>
+                  {ACTIONS[key].label}
+                </button>
+              ))}
+
+              <span className="bulkbar-sep" aria-hidden />
+
               <button
                 type="button"
                 className="bulkbar-action"
@@ -186,27 +215,28 @@ export default function BulkBar({
                 </svg>
                 Group
               </button>
+
               <button type="button" className="bulkbar-action" onClick={onExport}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                   <path d="M12 3v12M8 11l4 4 4-4M4 21h16" />
                 </svg>
                 Export CSV
               </button>
-              <span className="bulkbar-sep" aria-hidden />
-              {(Object.keys(ACTIONS) as BulkAction[]).map((key) => (
-              <button
-                key={key}
-                type="button"
-                className={
-                  ACTIONS[key].danger ? "bulkbar-action is-danger" : "bulkbar-action"
-                }
-                onClick={() => setPending(key)}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-                  <path d={ACTIONS[key].icon} />
-                </svg>
-                {ACTIONS[key].label}
-              </button>
+
+              {REST.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={
+                    ACTIONS[key].danger ? "bulkbar-action is-danger" : "bulkbar-action"
+                  }
+                  onClick={() => setPending(key)}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                    <path d={ACTIONS[key].icon} />
+                  </svg>
+                  {ACTIONS[key].label}
+                </button>
               ))}
             </>
           )}
