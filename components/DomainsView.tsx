@@ -458,7 +458,7 @@ export default function DomainsView() {
                             className="btn btn-ghost btn-sm"
                             onClick={() => setManaging(d)}
                           >
-                            DNS
+                            Modify
                           </button>
                         </td>
                       </tr>
