@@ -3635,17 +3635,22 @@ body:has(.bulkbar) main {
   white-space: nowrap;
 }
 
+/* The glyph sits high in its own line box, so centring the box is not enough —
+   the line height has to match the button or the cross rides above the middle. */
 .group-member button {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 16px;
   height: 16px;
+  padding: 0;
   border: 0;
   border-radius: 50%;
   background: none;
   font: inherit;
   font-size: 13px;
-  line-height: 1;
+  line-height: 16px;
+  text-align: center;
   color: var(--ink-3);
   cursor: pointer;
 }
@@ -3653,4 +3658,23 @@ body:has(.bulkbar) main {
 .group-member button:hover:not(:disabled) {
   background: var(--bad-soft);
   color: var(--bad);
+}
+
+/* The two actions on a group row, held apart, with the destructive one marked.
+   Delete is the only thing in this dialog that cannot be undone by pressing the
+   button again, so it is red before anybody reaches it rather than on hover. */
+.group-actions .btn + .btn {
+  margin-left: 8px;
+}
+
+.btn-remove {
+  background: var(--bad-soft);
+  border-color: color-mix(in srgb, var(--bad) 30%, transparent);
+  color: var(--bad);
+  font-weight: 600;
+}
+
+.btn-remove:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--bad-soft) 72%, var(--bad));
+  border-color: var(--bad);
 }

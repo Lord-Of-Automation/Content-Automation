@@ -272,7 +272,7 @@ export default function GroupDialog({
                               </span>
                             ) : null}
                           </td>
-                          <td className="nowrap">
+                          <td className="nowrap group-actions">
                             <button
                               type="button"
                               className="btn btn-ghost btn-sm"
@@ -283,7 +283,7 @@ export default function GroupDialog({
                             </button>
                             <button
                               type="button"
-                              className="btn btn-ghost btn-sm"
+                              className="btn btn-remove btn-sm"
                               disabled={busy}
                               onClick={() => setDeleting(g)}
                             >
