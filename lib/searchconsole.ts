@@ -292,8 +292,40 @@ export interface Performance {
   accessKind: "signin" | "service";
 }
 
-export async function readPerformance(days = 28): Promise<Performance> {
-  const { startDate, endDate } = windowFor(days);
+/**
+ * A window somebody typed, checked against what Search Console will answer.
+ *
+ * Returns the reason rather than a corrected range. Silently moving a date
+ * somebody chose is worse than refusing it: the table would then show a
+ * different period from the one on screen, and nothing would say so.
+ */
+export function checkWindow(start: string, end: string): string | null {
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  if (!iso.test(start) || !iso.test(end)) return "Both dates are needed.";
+
+  const from = Date.parse(`${start}T00:00:00Z`);
+  const to = Date.parse(`${end}T00:00:00Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return "That is not a date.";
+  if (from > to) return "The first date is after the second.";
+
+  // Today is always partial and tomorrow does not exist yet. Search Console
+  // answers for both without complaint, with numbers that look like a collapse.
+  const today = Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
+  if (to >= today) return "Search Console has no complete day for today yet. End on yesterday or earlier.";
+
+  // Sixteen months is what Search Console keeps. Asking further back returns a
+  // shorter period than the one requested, with no indication that it did.
+  const oldest = today - 16 * 30 * 86_400_000;
+  if (from < oldest) return "Search Console keeps about 16 months. That start date is further back.";
+
+  return null;
+}
+
+export async function readPerformance(
+  days = 28,
+  range?: { startDate: string; endDate: string },
+): Promise<Performance> {
+  const { startDate, endDate } = range ?? windowFor(days);
   const who = await readingAs();
   const properties = await listSites();
 

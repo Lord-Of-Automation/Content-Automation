@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import DatePicker from "@/components/DatePicker";
+
 type Site = {
   siteUrl: string;
   site: string;
@@ -60,6 +62,15 @@ function Chevrons({ state }: { state: "none" | "asc" | "desc" }) {
 export default function PerformanceView() {
   const [data, setData] = useState<Payload | null>(null);
   const [days, setDays] = useState(28);
+  /**
+   * A window somebody chose, empty until they do.
+   *
+   * Kept apart from the preset rather than folded into it, so switching
+   * back to 28 days and returning to Custom does not lose the dates.
+   */
+  const [custom, setCustom] = useState(false);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [configError, setConfigError] = useState(false);
@@ -70,10 +81,13 @@ export default function PerformanceView() {
   // Named "span", not "window": a parameter called window shadows the global
   // one, and the redirect below then reads as nonsense rather than as a
   // redirect.
-  const load = useCallback(async (span: number) => {
+  const load = useCallback(async (span: number, range?: { from: string; to: string }) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/performance?days=${span}`, { cache: "no-store" });
+      const query = range?.from && range?.to
+        ? `start=${range.from}&end=${range.to}`
+        : `days=${span}`;
+      const response = await fetch(`/api/performance?${query}`, { cache: "no-store" });
       if (response.status === 401) {
         window.location.href = "/login";
         return;
@@ -94,8 +108,15 @@ export default function PerformanceView() {
   }, []);
 
   useEffect(() => {
+    // A custom window only loads once both ends are chosen. Fetching on the
+    // first of two dates would report a range nobody asked for and then
+    // replace it a moment later.
+    if (custom) {
+      if (from && to) void load(days, { from, to });
+      return;
+    }
     void load(days);
-  }, [load, days]);
+  }, [load, days, custom, from, to]);
 
   function sortBy(key: SortKey) {
     if (key === sortKey) setDirection((d) => (d === "asc" ? "desc" : "asc"));
@@ -151,17 +172,45 @@ export default function PerformanceView() {
           <div>
             <h2>Performance</h2>
           </div>
-          <div className="seg seg-sm">
-            {WINDOWS.map(([value, label]) => (
+          <div className="perf-window">
+            <div className="seg seg-sm">
+              {WINDOWS.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={!custom && days === value ? "seg-btn is-on" : "seg-btn"}
+                  onClick={() => {
+                    setCustom(false);
+                    setDays(value);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
               <button
-                key={value}
                 type="button"
-                className={days === value ? "seg-btn is-on" : "seg-btn"}
-                onClick={() => setDays(value)}
+                className={custom ? "seg-btn is-on" : "seg-btn"}
+                onClick={() => {
+                  setCustom(true);
+                  // Seeded from the window on screen, so Custom opens on the
+                  // period being looked at rather than on nothing.
+                  if (!from && data) setFrom(data.startDate);
+                  if (!to && data) setTo(data.endDate);
+                }}
               >
-                {label}
+                Custom
               </button>
-            ))}
+            </div>
+
+            {custom ? (
+              <div className="perf-dates">
+                <DatePicker id="perf-from" value={from} onChange={setFrom} placeholder="from" />
+                <span className="perf-dash" aria-hidden>
+                  &ndash;
+                </span>
+                <DatePicker id="perf-to" value={to} onChange={setTo} placeholder="to" />
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -204,6 +253,10 @@ export default function PerformanceView() {
                 </>
               )}
             </div>
+          ) : null}
+
+          {custom && !(from && to) ? (
+            <div className="empty">Choose both ends of the period.</div>
           ) : null}
 
           {loading && !data ? <div className="empty">Loading…</div> : null}

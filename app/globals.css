@@ -3709,3 +3709,30 @@ body:has(.bulkbar) main {
   min-width: 0;
   font-size: 12.5px;
 }
+
+/* The window chooser: presets, and the two dates when Custom is on. */
+.perf-window {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.perf-dates {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.perf-dates .datepick {
+  width: 168px;
+}
+
+.perf-dates .datepick-trigger {
+  padding: 5px 9px;
+  font-size: 12.5px;
+}
+
+.perf-dash {
+  color: var(--ink-3);
+}
