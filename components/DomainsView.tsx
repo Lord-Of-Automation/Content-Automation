@@ -21,7 +21,7 @@ type Domain = {
   /** Micro-units, as both registrars quote. 22990000 is 22.99. */
   renewalPrice: number | null;
   currency: string;
-  cloudflare: "active" | "pending" | "none" | "unknown";
+  cloudflare: "active" | "pending" | "elsewhere" | "none" | "unknown";
   cloudflareZoneId: string | null;
 };
 
@@ -46,7 +46,18 @@ const CLOUDFLARE_BADGE: Record<
     label: "Pending",
     text: "Added, but waiting for the name servers to change at the registrar.",
   },
-  none: { tone: "bad", label: "Inactive", text: "No zone this Cloudflare token can see." },
+  elsewhere: {
+    tone: "run",
+    label: "Other account",
+    text:
+      "This domain answers from Cloudflare name servers, so it is on Cloudflare — " +
+      "just under an account the configured token cannot see.",
+  },
+  none: {
+    tone: "bad",
+    label: "Inactive",
+    text: "Not on Cloudflare: no zone here, and its name servers point elsewhere.",
+  },
   unknown: { tone: "idle", label: "Unknown", text: "Cloudflare could not be asked." },
 };
 
@@ -529,11 +540,15 @@ export default function DomainsView() {
                           <button
                             type="button"
                             className="btn btn-cloudflare btn-sm"
-                            disabled={d.cloudflare === "active" || d.cloudflare === "pending"}
+                            disabled={
+                              d.cloudflare === "active" ||
+                              d.cloudflare === "pending" ||
+                              d.cloudflare === "elsewhere"
+                            }
                             title={
-                              d.cloudflare === "active" || d.cloudflare === "pending"
-                                ? CLOUDFLARE_BADGE[d.cloudflare].text
-                                : `Create a Cloudflare zone for ${d.domain}`
+                              d.cloudflare === "none" || d.cloudflare === "unknown"
+                                ? `Create a Cloudflare zone for ${d.domain}`
+                                : CLOUDFLARE_BADGE[d.cloudflare].text
                             }
                             onClick={() => setAdding(d)}
                           >

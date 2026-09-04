@@ -40,10 +40,14 @@ export interface Domain {
    * "active" is a zone this token can see that Cloudflare has verified.
    * "pending" is a zone created but not yet picked up, which nearly always
    * means its name servers have not been changed at the registrar yet.
-   * "none" means no zone this token can see — which is not the same as no zone
-   * at all, since a token only sees the accounts it was issued for.
+   * "elsewhere" is the one that needs saying out loud: the domain's name
+   * servers point at Cloudflare, so it is plainly on Cloudflare, but under an
+   * account this token cannot see. A token only sees the accounts it was
+   * issued for, and calling that "not on Cloudflare" is simply untrue.
+   * "none" is no zone here and no Cloudflare name servers either, which is the
+   * only case that really means not on Cloudflare.
    */
-  cloudflare: "active" | "pending" | "none" | "unknown";
+  cloudflare: "active" | "pending" | "elsewhere" | "none" | "unknown";
   /** The zone id, when there is one, so the DNS panel can go straight to it. */
   cloudflareZoneId: string | null;
 }
@@ -161,12 +165,21 @@ export async function listAllDomains(): Promise<DomainList> {
 
     for (const d of domains) {
       const zone = zones.get(d.domain.toLowerCase());
-      if (!zone) {
-        d.cloudflare = "none";
+      if (zone) {
+        d.cloudflareZoneId = zone.id;
+        d.cloudflare = zone.status === "active" ? "active" : "pending";
         continue;
       }
-      d.cloudflareZoneId = zone.id;
-      d.cloudflare = zone.status === "active" ? "active" : "pending";
+
+      // No zone here does not mean no zone. The name servers are the giveaway
+      // and this list already has them: a domain answering from
+      // *.ns.cloudflare.com is on Cloudflare whatever this token can see, and
+      // reporting that as "not on Cloudflare" is how somebody ends up trying to
+      // add a domain that has been there for a year.
+      const onCloudflare = d.nameServers.some((h) =>
+        /(^|\.)ns\.cloudflare\.com\.?$/i.test(h.trim()),
+      );
+      d.cloudflare = onCloudflare ? "elsewhere" : "none";
     }
   } catch (error) {
     cloudflare = {

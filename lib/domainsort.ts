@@ -113,7 +113,9 @@ export function orderDomains<T extends Sortable>(
       case "cloudflare": {
         // Ordered by how much attention each state wants rather than
         // alphabetically: not added, then pending, then unknown, then active.
-        const rank: Record<string, number> = { none: 0, pending: 1, unknown: 2, active: 3 };
+        const rank: Record<string, number> = {
+          none: 0, pending: 1, unknown: 2, elsewhere: 3, active: 4,
+        };
         return (
           ((rank[a.cloudflare] ?? 9) - (rank[b.cloudflare] ?? 9) ||
             a.domain.localeCompare(b.domain)) * flip
