@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { Select } from "@/components/Select";
 
 type Group = { id: string; name: string; domains: string[] };
@@ -34,6 +35,9 @@ export default function GroupDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  /** The group whose domains are open, so they can be taken out one by one. */
+  const [opened, setOpened] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Group | null>(null);
 
   const shell = useRef<HTMLDialogElement>(null);
 
@@ -64,6 +68,60 @@ export default function GroupDialog({
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Takes one named domain out of a group.
+   *
+   * Separate from the Remove button above, which acts on whatever is ticked in
+   * the table behind this dialog. That one cannot reach a domain you did not
+   * select, and a domain you want out of a group is rarely one you went looking
+   * for first.
+   */
+  async function drop(id: string, domain: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/domaingroups", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id, domains: [domain], remove: true }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "That did not work.");
+      setGroups(payload.groups ?? []);
+      onSaved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That did not work.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Forgets the group. The domains themselves are untouched. */
+  async function removeGroup(id: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/domaingroups", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "That did not work.");
+      setGroups(payload.groups ?? []);
+      // The dropdown above and the open list may both have named it.
+      if (choice === id) setChoice("");
+      if (opened === id) setOpened(null);
+      setDone("Group deleted. The domains themselves are untouched.");
+      onSaved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That did not work.");
+    } finally {
+      setBusy(false);
+      setDeleting(null);
+    }
+  }
 
   async function save(remove: boolean) {
     setBusy(true);
@@ -195,31 +253,100 @@ export default function GroupDialog({
               <h3>Groups</h3>
               <table className="logs logs-middle">
                 <tbody>
-                  {groups.map((g) => (
-                    <tr key={g.id}>
-                      <td>{g.name}</td>
-                      <td className="mid">{g.domains.length}</td>
-                      <td className="detail">
-                        {/* How much of the current selection is already in it,
-                            which is the thing you want to know before pressing
-                            a button that says Add. */}
-                        {(() => {
-                          const inIt = domains.filter((d) => g.domains.includes(d)).length;
-                          return inIt ? (
-                            <span className="quiet">
-                              {inIt} of the {domains.length} selected already here
-                            </span>
-                          ) : null;
-                        })()}
-                      </td>
-                    </tr>
-                  ))}
+                  {groups.map((g) => {
+                    const inIt = domains.filter((d) => g.domains.includes(d)).length;
+                    const open = opened === g.id;
+
+                    return (
+                      <Fragment key={g.id}>
+                        <tr>
+                          <td>{g.name}</td>
+                          <td className="mid">{g.domains.length}</td>
+                          <td className="detail">
+                            {/* How much of the current selection is already in
+                                it, which is what you want to know before
+                                pressing a button that says Add. */}
+                            {inIt ? (
+                              <span className="quiet">
+                                {inIt} of the {domains.length} selected already here
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="nowrap">
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              disabled={!g.domains.length}
+                              onClick={() => setOpened(open ? null : g.id)}
+                            >
+                              {open ? "Hide" : "Show"}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              disabled={busy}
+                              onClick={() => setDeleting(g)}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+
+                        {open ? (
+                          <tr>
+                            <td colSpan={4}>
+                              <div className="group-members">
+                                {g.domains.map((d) => (
+                                  <span className="group-member" key={d}>
+                                    {d}
+                                    <button
+                                      type="button"
+                                      title={"Take " + d + " out of " + g.name}
+                                      disabled={busy}
+                                      onClick={() => void drop(g.id, d)}
+                                    >
+                                      &times;
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </section>
           ) : null}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!deleting}
+        title={"Delete the group " + (deleting ? deleting.name : "") + "?"}
+        confirmLabel="Delete the group"
+        busyLabel="Deleting..."
+        cancelLabel="Keep it"
+        busy={busy}
+        onDismiss={() => setDeleting(null)}
+        body={
+          <>
+            <p>
+              It holds {deleting?.domains.length} domain
+              {deleting?.domains.length === 1 ? "" : "s"}.
+            </p>
+            <p className="confirm-quiet">
+              The domains themselves are untouched. Only the grouping is
+              forgotten, and the only way back is to make it again.
+            </p>
+          </>
+        }
+        onConfirm={() => {
+          if (deleting) void removeGroup(deleting.id);
+        }}
+      />
     </dialog>
   );
 }
