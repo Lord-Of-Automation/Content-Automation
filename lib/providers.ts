@@ -284,7 +284,13 @@ export async function saveCloudflareAccounts(
   let stored: Array<{ token: string; accountId: string }> = [];
   if (existing?.values.apiToken) {
     try {
-      stored = splitCloudflare(decrypt(existing.values.apiToken));
+      const legacy = existing.values.accountId ?? "";
+      stored = splitCloudflare(decrypt(existing.values.apiToken)).map((a, at) => ({
+        token: a.token,
+        // Same legacy shape as above. Without this the first account has no id
+        // to match on, so adding a second one silently dropped the first.
+        accountId: a.accountId || (at === 0 ? legacy : ""),
+      }));
     } catch {
       // Unreadable means every row has to be retyped, which the form says.
       stored = [];
@@ -339,6 +345,8 @@ export async function saveCloudflareAccounts(
   }
 
   store.cloudflare = {
+    // Only the lines from here on. The separate accountId field is not carried
+    // forward, so the two shapes cannot drift apart again.
     values: { apiToken: secret },
     expiresAt: existing?.expiresAt ?? null,
     savedAt: new Date().toISOString(),
@@ -378,8 +386,14 @@ function statusOf(spec: ProviderSpec, store: Store): ProviderStatus {
     let accountRows: ProviderStatus["accounts"];
     if (spec.id === "cloudflare" && row.values.apiToken) {
       try {
-        accountRows = splitCloudflare(decrypt(row.values.apiToken)).map((a) => ({
-          accountId: a.accountId,
+        // The account id used to be a field of its own, so a credential saved
+        // before rows existed has the token on one line and the id nowhere near
+        // it. Reading that back as a row with a blank account id is how the
+        // first account ends up looking empty — and then unmatchable, because
+        // the merge below keys on exactly that id.
+        const legacy = row.values.accountId ?? "";
+        accountRows = splitCloudflare(decrypt(row.values.apiToken)).map((a, at) => ({
+          accountId: a.accountId || (at === 0 ? legacy : ""),
           tail: a.token.slice(-4),
         }));
       } catch {
