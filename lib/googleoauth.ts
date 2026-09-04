@@ -115,7 +115,11 @@ export function consentUrl(client: OAuthClient, redirect: string, state: string)
   // be issued even when this account has approved before — without it a second
   // connection comes back with no refresh token and looks like a silent failure.
   url.searchParams.set("access_type", "offline");
-  url.searchParams.set("prompt", "consent");
+  // Both prompts, space separated. Consent alone signs in whichever Google
+  // account the browser is already in, with no way to pick another — and the
+  // account that owns the properties is routinely not the one somebody happens
+  // to be logged into. select_account brings back the chooser.
+  url.searchParams.set("prompt", "select_account consent");
   url.searchParams.set("include_granted_scopes", "true");
   url.searchParams.set("state", state);
   return url.toString();
