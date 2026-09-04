@@ -437,7 +437,7 @@ export default function DomainsView() {
                 ) : null}
               </div>
 
-              <table className="logs">
+              <table className="logs logs-middle">
                 <thead>
                   <tr>
                     {/* Every column sorts except the name servers themselves,

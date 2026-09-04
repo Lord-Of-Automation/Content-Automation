@@ -1158,6 +1158,15 @@ button,
   vertical-align: top;
 }
 
+/* Centred, for a table whose rows are tall because one column stacks.
+   The activity log keeps top alignment: its detail column runs to several lines
+   and a one-word column floating in the middle of it reads as unrelated. Here
+   every cell holds one short thing and the name servers make the row tall, so
+   top alignment left everything else stranded at the ceiling. */
+.logs-middle td {
+  vertical-align: middle;
+}
+
 .logs tr:last-child td {
   border-bottom: 0;
 }
