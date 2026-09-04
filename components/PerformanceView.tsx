@@ -14,6 +14,21 @@ type Site = {
   ctr: number;
   position: number;
   error: string | null;
+  errorKind: "none" | "unverified" | "rate-limited" | "no-access" | "failed";
+};
+
+/**
+ * What to put in the badge, per reason.
+ *
+ * They were all "could not be read", which is true of each and useful about
+ * none. Only one of them is something to chase.
+ */
+const TROUBLE: Record<Site["errorKind"], { label: string; tone: string } | null> = {
+  none: null,
+  unverified: { label: "not verified", tone: "warn" },
+  "rate-limited": { label: "rate limited", tone: "warn" },
+  "no-access": { label: "no access", tone: "bad" },
+  failed: { label: "could not be read", tone: "bad" },
 };
 
 type Payload = {
@@ -162,6 +177,8 @@ export default function PerformanceView() {
       ctr: impressions ? clicks / impressions : 0,
       silent: rows.filter((s) => !s.impressions && !s.error).length,
       broken: rows.filter((s) => s.error).length,
+      unverified: rows.filter((s) => s.errorKind === "unverified").length,
+      limited: rows.filter((s) => s.errorKind === "rate-limited").length,
     };
   }, [data]);
 
@@ -284,7 +301,15 @@ export default function PerformanceView() {
                 {totals.broken ? (
                   <div className="domain-stat is-bad">
                     <span className="domain-stat-value">{totals.broken}</span>
-                    <span className="domain-stat-label">could not be read</span>
+                    <span className="domain-stat-label">
+                      {/* Named, because the fix differs. Unverified needs
+                          access granting; rate limited needs waiting. */}
+                      {totals.unverified === totals.broken
+                        ? "not verified for this account"
+                        : totals.limited === totals.broken
+                          ? "rate limited, try again shortly"
+                          : "could not be read"}
+                    </span>
                   </div>
                 ) : null}
               </div>
@@ -348,9 +373,12 @@ export default function PerformanceView() {
                         {s.position ? s.position.toFixed(1) : <span className="quiet">—</span>}
                       </td>
                       <td className="detail">
-                        {s.error ? (
-                          <span className="pill pill-bad" title={s.error}>
-                            could not be read
+                        {s.error && TROUBLE[s.errorKind] ? (
+                          <span
+                            className={`pill pill-${TROUBLE[s.errorKind]!.tone}`}
+                            title={s.error}
+                          >
+                            {TROUBLE[s.errorKind]!.label}
                           </span>
                         ) : (
                           <span className="registrar">

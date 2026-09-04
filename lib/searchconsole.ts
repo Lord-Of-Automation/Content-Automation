@@ -45,6 +45,15 @@ export interface SitePerformance {
   position: number;
   /** Set when this site could not be read, rather than having no traffic. */
   error: string | null;
+  /**
+   * Why, in a couple of words, for the badge.
+   *
+   * "could not be read" is what this said for every failure, which covers a
+   * property nobody verified, one Google is rate limiting, and one that broke
+   * for a reason worth chasing. They need different responses and only one of
+   * them is a problem.
+   */
+  errorKind: "none" | "unverified" | "rate-limited" | "no-access" | "failed";
 }
 
 interface ServiceAccount {
@@ -276,7 +285,11 @@ async function totalsFor(
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(`${response.status}${body ? `: ${body.slice(0, 160)}` : ""}`);
+    // The status carries the meaning, so it survives into the message rather
+    // than being flattened into one word by the caller.
+    const err = new Error(`${response.status}${body ? `: ${body.slice(0, 160)}` : ""}`);
+    (err as Error & { status?: number }).status = response.status;
+    throw err;
   }
 
   const body = (await response.json()) as {
@@ -364,17 +377,43 @@ export async function readPerformance(
     const batch = properties.slice(i, i + 6);
     const rows = await Promise.all(
       batch.map(async (p) => {
-        try {
-          const totals = await totalsFor(user, p.siteUrl, startDate, endDate);
-          return { ...p, totals, error: null as string | null };
-        } catch (error) {
-          // One property failing must not empty the table. A site added
-          // yesterday has no data yet and answers with an error that means
-          // exactly that.
+        // Never asked for, because Google refuses it and the refusal is the
+        // slow, rate-limit-consuming way to learn what the listing already
+        // said. An unverified property is one this account can see the name of
+        // and nothing else.
+        if (/unverified/i.test(p.permissionLevel)) {
           return {
             ...p,
             totals: null,
-            error: error instanceof Error ? error.message : "could not be read",
+            error: "This account can see the property but not its data. Verify it, or ask an owner for at least restricted access.",
+            errorKind: "unverified" as const,
+          };
+        }
+
+        try {
+          const totals = await totalsFor(user, p.siteUrl, startDate, endDate);
+          return { ...p, totals, error: null as string | null, errorKind: "none" as const };
+        } catch (error) {
+          // One property failing must not empty the table, and the reasons are
+          // not interchangeable: a quota that will clear on its own is not the
+          // same as access that will not.
+          const status = (error as Error & { status?: number }).status;
+          const message = error instanceof Error ? error.message : "could not be read";
+          const errorKind =
+            status === 429 ? ("rate-limited" as const)
+            : status === 403 ? ("no-access" as const)
+            : ("failed" as const);
+
+          return {
+            ...p,
+            totals: null,
+            errorKind,
+            error:
+              status === 429
+                ? "Google is rate limiting this account. Reload in a minute, or narrow the period."
+                : status === 403
+                  ? "Google refused this property for this account."
+                  : message,
           };
         }
       }),
@@ -391,6 +430,7 @@ export async function readPerformance(
         ctr: r.totals?.ctr ?? 0,
         position: r.totals?.position ?? 0,
         error: r.error,
+        errorKind: r.errorKind,
       });
     }
   }
