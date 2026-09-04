@@ -87,11 +87,15 @@ export default function DomainProviders() {
   const [busy, setBusy] = useState<string | null>(null);
   /** What the Google callback redirected back with, if anything. */
   const [googleSaid, setGoogleSaid] = useState<string | null>(null);
+  const [googleRedirect, setGoogleRedirect] = useState("");
+  const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const apply = useCallback((payload: { providers: Spec[]; statuses: Status[] }) => {
+  const apply = useCallback(
+    (payload: { providers: Spec[]; statuses: Status[]; googleRedirect?: string }) => {
     setSpecs(payload.providers ?? []);
+    if (payload.googleRedirect) setGoogleRedirect(payload.googleRedirect);
     const byId: Record<string, Status> = {};
     for (const s of payload.statuses ?? []) byId[s.id] = s;
     setStatuses(byId);
@@ -104,7 +108,9 @@ export default function DomainProviders() {
       }
       return next;
     });
-  }, []);
+    },
+    [],
+  );
 
   /**
    * Ask Cloudflare what each stored token can actually see.
@@ -304,6 +310,48 @@ export default function DomainProviders() {
                       </span>
                     </>
                   )}
+                </div>
+              ) : null}
+
+              {/* The one string that has to match, shown rather than guessed
+                  at. redirect_uri_mismatch is an exact comparison, and a
+                  trailing slash or a preview host is enough to fail it. */}
+              {spec.id === "searchconsole" && googleRedirect ? (
+                <div className="field">
+                  <label htmlFor="google-redirect">
+                    Authorised redirect URI
+                    <span className="provider-current">register this verbatim</span>
+                  </label>
+                  <div className="redirect-row">
+                    <input
+                      id="google-redirect"
+                      type="text"
+                      className="mono"
+                      readOnly
+                      value={googleRedirect}
+                      onFocus={(e) => e.currentTarget.select()}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(googleRedirect);
+                          setCopied(true);
+                        } catch {
+                          setError("Could not reach the clipboard. Select the box and copy it.");
+                        }
+                      }}
+                    >
+                      {copied ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                  <p className="provider-hint">
+                    Paste into the OAuth client under Authorised redirect URIs.
+                    Google compares it as a string, so a trailing slash, http
+                    instead of https, or a preview address rather than this one
+                    each count as different.
+                  </p>
                 </div>
               ) : null}
 

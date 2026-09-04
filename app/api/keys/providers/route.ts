@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
+import { redirectUri } from "@/lib/googleoauth";
 import {
   addCloudflareAccount, allStatuses, clearProvider, PROVIDERS,
   removeCloudflareAccount, saveProvider, specFor,
@@ -25,8 +26,21 @@ export const maxDuration = 30;
  */
 
 /** The form's shape and its current state, so the page needs one request. */
-function payload(statuses: Awaited<ReturnType<typeof allStatuses>>) {
+function payload(
+  statuses: Awaited<ReturnType<typeof allStatuses>>,
+  googleRedirect = "",
+) {
   return {
+    /**
+     * The exact address Google will be told to come back to.
+     *
+     * Shown on the page because redirect_uri_mismatch is the commonest way this
+     * sign-in fails, and it fails on an exact string comparison — a trailing
+     * slash, http against https, or a preview host instead of the production
+     * one are each enough. Guessing what to register is the problem; showing
+     * the string removes it.
+     */
+    googleRedirect,
     providers: PROVIDERS.map((p) => ({
       id: p.id,
       label: p.label,
@@ -55,16 +69,17 @@ export async function GET(request: Request) {
 
   try {
     const statuses = await allStatuses();
+    const googleRedirect = redirectUri(request);
 
     // Asked for separately, because it costs a request per account and the
     // form should render before anybody has been to Cloudflare and back.
     if (new URL(request.url).searchParams.get("check")) {
       const { accountSummaries } = await import("@/lib/cloudflare");
       const cloudflare = await accountSummaries().catch(() => []);
-      return NextResponse.json({ ...payload(statuses), cloudflare });
+      return NextResponse.json({ ...payload(statuses, googleRedirect), cloudflare });
     }
 
-    return NextResponse.json(payload(statuses));
+    return NextResponse.json(payload(statuses, googleRedirect));
   } catch (error) {
     return errorResponse(error);
   }

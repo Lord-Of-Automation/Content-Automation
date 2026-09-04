@@ -3696,3 +3696,16 @@ body:has(.bulkbar) main {
   font-size: 12px;
   color: var(--ink-3);
 }
+
+/* The redirect URI and its copy button, on one line. */
+.redirect-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.redirect-row input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+}
