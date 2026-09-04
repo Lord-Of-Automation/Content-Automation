@@ -26,18 +26,28 @@ type Domain = {
 };
 
 /**
- * The Cloudflare column, as a dot.
+ * The Cloudflare column, as a badge.
  *
- * Green is a zone Cloudflare has verified. Amber is a zone that exists and is
- * waiting for its name servers, which is a real state and not a failure. Red is
- * no zone this token can see, and grey is that we could not ask — those two
- * look alike and mean opposite things, so they are never drawn the same.
+ * A word rather than a coloured dot, because a dot needs a legend and this
+ * table has no room for one. Four states and not two: Pending is a zone that
+ * exists and is waiting for its name servers, which is a real thing that
+ * happens for minutes to hours after adding, and Unknown is that Cloudflare
+ * could not be asked at all. That last one is grey and never red, because
+ * "we could not ask" and "Cloudflare does not have it" mean opposite things
+ * and confusing them has people adding zones that already exist.
  */
-const CLOUDFLARE_DOT: Record<Domain["cloudflare"], { tone: string; text: string }> = {
-  active: { tone: "ok", text: "active on Cloudflare" },
-  pending: { tone: "warn", text: "added, waiting for the name servers to change" },
-  none: { tone: "bad", text: "not on Cloudflare" },
-  unknown: { tone: "idle", text: "Cloudflare could not be asked" },
+const CLOUDFLARE_BADGE: Record<
+  Domain["cloudflare"],
+  { tone: string; label: string; text: string }
+> = {
+  active: { tone: "ok", label: "Active", text: "Active: Cloudflare has verified this zone." },
+  pending: {
+    tone: "warn",
+    label: "Pending",
+    text: "Added, but waiting for the name servers to change at the registrar.",
+  },
+  none: { tone: "bad", label: "Inactive", text: "No zone this Cloudflare token can see." },
+  unknown: { tone: "idle", label: "Unknown", text: "Cloudflare could not be asked." },
 };
 
 /** How one registrar's read went, so the page can say what it is missing. */
@@ -414,8 +424,8 @@ export default function DomainsView() {
                         ["expires", "Expires", false],
                         ["renewal", "Renewal", false],
                         ["price", "Renews for", true],
-                        ["ns", "NS Points At", false],
-                        ["cloudflare", "Cloudflare Status", false],
+                        ["ns", "Name servers", false],
+                        ["cloudflare", "Cloudflare", false],
                       ] as Array<[SortKey, string, boolean]>
                     ).map(([key, label, numeric]) => (
                       <th key={key} className={numeric ? "num sortable" : "sortable"}>
@@ -425,7 +435,6 @@ export default function DomainsView() {
                         </button>
                       </th>
                     ))}
-                    <th>Name servers</th>
                     <th />
                     <th />
                   </tr>
@@ -472,17 +481,14 @@ export default function DomainsView() {
                             <span className="quiet">not priced</span>
                           )}
                         </td>
-                        <td className="detail">
-                          <span className={`pill pill-${where.tone}`}>{where.label}</span>
-                        </td>
-                        {/* The names themselves, beside the summary rather than
-                            instead of it. The pill answers "is this domain
-                            live"; these answer "which record do I go and
-                            change", which is the next thing you need and the
-                            reason you would otherwise open GoDaddy. Every
-                            domain on this account has exactly two, so the cell
-                            is a predictable height. */}
+                        {/* One column, because it is one fact. The pill is
+                            the answer at a glance — Cloudflare, or parked and
+                            doing nothing — and the hosts beneath it are which
+                            record to go and change. Split across two columns
+                            they made the table wider to say the same thing
+                            twice. */}
                         <td className="ns">
+                          <span className={`pill pill-${where.tone}`}>{where.label}</span>
                           {d.nameServers.length ? (
                             d.nameServers.map((ns) => (
                               <span className="ns-chip" key={ns}>
@@ -495,17 +501,10 @@ export default function DomainsView() {
                         </td>
                         <td className="nowrap">
                           <span
-                            className={`cf-dot cf-${CLOUDFLARE_DOT[d.cloudflare].tone}`}
-                            title={CLOUDFLARE_DOT[d.cloudflare].text}
-                          />
-                          <span className="cf-label">
-                            {d.cloudflare === "active"
-                              ? "active"
-                              : d.cloudflare === "pending"
-                                ? "pending"
-                                : d.cloudflare === "none"
-                                  ? "not added"
-                                  : "unknown"}
+                            className={`pill pill-${CLOUDFLARE_BADGE[d.cloudflare].tone}`}
+                            title={CLOUDFLARE_BADGE[d.cloudflare].text}
+                          >
+                            {CLOUDFLARE_BADGE[d.cloudflare].label}
                           </span>
                         </td>
                         <td className="nowrap">
@@ -519,7 +518,7 @@ export default function DomainsView() {
                             title={
                               d.cloudflare === "none"
                                 ? `Create a Cloudflare zone for ${d.domain}`
-                                : CLOUDFLARE_DOT[d.cloudflare].text
+                                : CLOUDFLARE_BADGE[d.cloudflare].text
                             }
                             onClick={() => setAdding(d)}
                           >
