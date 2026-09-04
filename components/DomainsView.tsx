@@ -375,10 +375,6 @@ export default function DomainsView() {
         <div className="card-head">
           <div>
             <h2>Domains</h2>
-            <p>
-              Everything this GoDaddy account holds, soonest to expire first.
-              Read only &mdash; nothing here renews, moves or changes a domain.
-            </p>
           </div>
           <button type="button" className="btn btn-ghost" onClick={() => void load()} disabled={loading}>
             {loading ? "Loading…" : "Refresh"}
