@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse, requireSession } from "@/lib/api-guard";
+import { auth } from "@/auth";
 import { GoogleOAuthError } from "@/lib/googleoauth";
 import { checkWindow, readPerformance, SearchConsoleConfigError } from "@/lib/searchconsole";
 
@@ -12,6 +13,11 @@ export const maxDuration = 90;
 export async function GET(request: Request) {
   const denied = await requireSession();
   if (denied) return denied;
+
+  // Whose sign-in to read with. Search Console is the one credential here
+  // that belongs to a person rather than to the deployment.
+  const session = await auth();
+  const user = session?.user?.name ?? "unknown";
 
   const params = new URL(request.url).searchParams;
   const start = params.get("start") ?? "";
@@ -30,7 +36,11 @@ export async function GET(request: Request) {
 
   try {
     return NextResponse.json(
-      await readPerformance(days, start && end ? { startDate: start, endDate: end } : undefined),
+      await readPerformance(
+        user,
+        days,
+        start && end ? { startDate: start, endDate: end } : undefined,
+      ),
     );
   } catch (error) {
     // A missing or malformed service account is something to fix on the Keys

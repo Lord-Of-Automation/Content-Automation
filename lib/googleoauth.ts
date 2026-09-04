@@ -19,7 +19,7 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import { credentialFor } from "./providers";
+import { credentialFor, clearGoogleSignIn, googleSignIn } from "./providers";
 
 /** Read only. Nothing here should be able to change a property. */
 export const SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
@@ -47,9 +47,13 @@ export async function oauthClient(): Promise<OAuthClient | null> {
   return { clientId, clientSecret };
 }
 
-export async function storedRefreshToken(): Promise<string | null> {
-  const found = await credentialFor("searchconsole");
-  return found?.refreshToken?.trim() || null;
+export async function storedRefreshToken(user: string): Promise<string | null> {
+  return (await googleSignIn(user))?.refreshToken ?? null;
+}
+
+export async function signedInAs(user: string): Promise<string | null> {
+  const found = await googleSignIn(user);
+  return found ? found.email || "a Google account" : null;
 }
 
 /**
@@ -180,8 +184,14 @@ export async function exchangeCode(
   return { refreshToken: body.refresh_token, email };
 }
 
-/** Cached until shortly before it expires, like the service account's. */
-let access: { value: string; expiresAt: number } | null = null;
+/**
+ * Cached per person, until shortly before each expires.
+ *
+ * One cache would hand whoever asked second the token of whoever asked first,
+ * which is the very bug the per-user storage exists to fix — and it would do it
+ * invisibly, for an hour at a time.
+ */
+const access = new Map<string, { value: string; expiresAt: number }>();
 
 /**
  * An access token from the stored refresh token, or null when not connected.
@@ -189,11 +199,12 @@ let access: { value: string; expiresAt: number } | null = null;
  * Null rather than throwing, because not being connected is an ordinary state
  * that the caller answers by falling back to the service account.
  */
-export async function accessTokenFromRefresh(): Promise<string | null> {
-  if (access && Date.now() < access.expiresAt) return access.value;
+export async function accessTokenFromRefresh(user: string): Promise<string | null> {
+  const hit = access.get(user);
+  if (hit && Date.now() < hit.expiresAt) return hit.value;
 
   const client = await oauthClient();
-  const refresh = await storedRefreshToken();
+  const refresh = await storedRefreshToken(user);
   if (!client || !refresh) return null;
 
   const response = await fetch(TOKEN_URL, {
@@ -240,14 +251,17 @@ export async function accessTokenFromRefresh(): Promise<string | null> {
     );
   }
 
-  access = {
+  access.set(user, {
     value: body.access_token,
     expiresAt: Date.now() + Math.max(60, (body.expires_in ?? 3600) - 60) * 1000,
-  };
-  return access.value;
+  });
+  return body.access_token;
 }
 
 /** Dropped when the credential changes, so a new sign-in is not shadowed. */
-export function forgetAccessToken(): void {
-  access = null;
+export function forgetAccessToken(user?: string): void {
+  if (user) access.delete(user);
+  else access.clear();
 }
+
+export { clearGoogleSignIn };

@@ -82,25 +82,32 @@ export async function GET(request: Request) {
       // OAuth client changing, the consent expiring, access being revoked — and
       // a page reporting "Signed in" from its mere presence is reporting the
       // wrong fact.
-      const { accessTokenFromRefresh, storedRefreshToken } = await import("@/lib/googleoauth");
-      let google: { stored: boolean; works: boolean; error: string } = {
+      const { accessTokenFromRefresh, signedInAs, storedRefreshToken } =
+        await import("@/lib/googleoauth");
+      const me = (await auth())?.user?.name ?? "unknown";
+      let google: { stored: boolean; works: boolean; error: string; email: string } = {
         stored: false,
         works: false,
         error: "",
+        email: "",
       };
       try {
-        const stored = !!(await storedRefreshToken());
+        const stored = !!(await storedRefreshToken(me));
         if (stored) {
-          const token = await accessTokenFromRefresh();
-          google = { stored, works: !!token, error: "" };
-        } else {
-          google = { stored: false, works: false, error: "" };
+          const token = await accessTokenFromRefresh(me);
+          google = {
+            stored,
+            works: !!token,
+            error: "",
+            email: (await signedInAs(me)) ?? "",
+          };
         }
       } catch (error) {
         google = {
           stored: true,
           works: false,
           error: error instanceof Error ? error.message : "The stored sign-in was refused.",
+          email: "",
         };
       }
 

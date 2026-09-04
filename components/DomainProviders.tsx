@@ -83,7 +83,9 @@ export default function DomainProviders() {
    */
   const [cfEntry, setCfEntry] = useState<CfEntry>({ token: "", accountId: "" });
   const [cfChecked, setCfChecked] = useState<CfSummary[] | null>(null);
-  const [google, setGoogle] = useState<{ stored: boolean; works: boolean; error: string } | null>(null);
+  const [google, setGoogle] = useState<
+    { stored: boolean; works: boolean; error: string; email?: string } | null
+  >(null);
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   /** What the Google callback redirected back with, if anything. */
@@ -301,11 +303,12 @@ export default function DomainProviders() {
                         Connect again
                       </a>
                     </>
-                  ) : status?.shown?.refreshToken ? (
+                  ) : google?.works ? (
                     <>
                       <span className="pill pill-ok">Signed in</span>
                       <span className="google-who">
-                        {status.shown.googleEmail || "a Google account"}
+                        {google.email || "a Google account"} &middot; yours alone,
+                        not the console&rsquo;s
                       </span>
                       <a className="btn btn-ghost btn-sm" href="/api/google/connect">
                         Sign in again
@@ -313,18 +316,16 @@ export default function DomainProviders() {
                     </>
                   ) : (
                     <>
-                      <a
-                        className="btn btn-primary btn-sm"
-                        href="/api/google/connect"
-                        // A plain link, not a fetch: this leaves the app for
-                        // Google's consent screen and comes back, which is a
-                        // navigation rather than a request.
-                      >
+                      {/* A plain link, not a fetch: this leaves the app for
+                          Google's consent screen and comes back, which is a
+                          navigation rather than a request. */}
+                      <a className="btn btn-primary btn-sm" href="/api/google/connect">
                         Connect Google
                       </a>
                       <span className="google-who">
-                        Sees every property that account owns. Needs the client
-                        ID and secret below to be saved first.
+                        Signs in as you. Everyone using this console connects
+                        their own account and sees only their own properties.
+                        Needs the client ID and secret below saved first.
                       </span>
                     </>
                   )}

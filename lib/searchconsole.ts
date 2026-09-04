@@ -15,7 +15,7 @@
 
 import { createSign } from "node:crypto";
 
-import { accessTokenFromRefresh } from "./googleoauth";
+import { accessTokenFromRefresh, signedInAs, storedRefreshToken } from "./googleoauth";
 import { credentialFor } from "./providers";
 
 const API = "https://searchconsole.googleapis.com/webmasters/v3";
@@ -80,7 +80,7 @@ function account(raw: string): ServiceAccount {
   return parsed;
 }
 
-async function credentials(): Promise<ServiceAccount> {
+async function credentials(user: string): Promise<ServiceAccount> {
   const found = await credentialFor("searchconsole");
   const raw = found?.serviceAccount?.trim();
   if (!raw) {
@@ -89,7 +89,7 @@ async function credentials(): Promise<ServiceAccount> {
     // and simply has not pressed Connect — and it is the actively misleading
     // one for somebody whose sign-in has lapsed.
     const hasClient = !!found?.clientId?.trim() && !!found?.clientSecret?.trim();
-    const hasToken = !!found?.refreshToken?.trim();
+    const hasToken = !!(await storedRefreshToken(user));
 
     if (hasToken) {
       throw new SearchConsoleConfigError(
@@ -121,18 +121,17 @@ const b64url = (input: Buffer | string): string => Buffer.from(input).toString("
  */
 let token: { value: string; expiresAt: number } | null = null;
 
-async function accessToken(): Promise<string> {
+async function accessToken(user: string): Promise<string> {
   // A Google sign-in wins whenever there is one. It sees every property that
   // account owns, where a service account sees only the ones somebody
   // remembered to add it to — so preferring it is not a preference, it is the
   // difference between the whole estate and part of it.
-  const signedIn = await accessTokenFromRefresh();
+  const signedIn = await accessTokenFromRefresh(user);
   if (signedIn) return signedIn;
 
   if (token && Date.now() < token.expiresAt) return token.value;
 
-
-  const { client_email, private_key } = await credentials();
+  const { client_email, private_key } = await credentials(user);
   const now = Math.floor(Date.now() / 1000);
 
   const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
@@ -198,17 +197,18 @@ async function accessToken(): Promise<string> {
  * to three hundred properties when the sign-in already covers them all would be
  * a bad hour spent on nothing.
  */
-export async function readingAs(): Promise<{ email: string; kind: "signin" | "service" }> {
-  const found = await credentialFor("searchconsole");
-
+export async function readingAs(
+  user: string,
+): Promise<{ email: string; kind: "signin" | "service" }> {
   // Not swallowed. A sign-in that fails is the answer, and hiding it behind a
   // fallback made the page complain about a service account nobody was using.
-  if (found?.refreshToken?.trim()) {
-    await accessTokenFromRefresh();
-    return { email: found.googleEmail?.trim() || "a signed-in Google account", kind: "signin" };
+  const mine = await signedInAs(user);
+  if (mine) {
+    await accessTokenFromRefresh(user);
+    return { email: mine, kind: "signin" };
   }
 
-  return { email: (await credentials()).client_email, kind: "service" };
+  return { email: (await credentials(user)).client_email, kind: "service" };
 }
 
 /** "sc-domain:example.com" and "https://example.com/" both read as example.com. */
@@ -227,9 +227,9 @@ function hostOf(siteUrl: string): string {
  * An empty list is the ordinary answer for an account nobody has added yet, so
  * the caller says so rather than showing an empty table.
  */
-async function listSites(): Promise<Array<{ siteUrl: string; permissionLevel: string }>> {
+async function listSites(user: string): Promise<Array<{ siteUrl: string; permissionLevel: string }>> {
   const response = await fetch(`${API}/sites`, {
-    headers: { authorization: `Bearer ${await accessToken()}` },
+    headers: { authorization: `Bearer ${await accessToken(user)}` },
     cache: "no-store",
     signal: AbortSignal.timeout(25_000),
   });
@@ -253,6 +253,7 @@ async function listSites(): Promise<Array<{ siteUrl: string; permissionLevel: st
 
 /** Clicks and impressions for one property over a window, as one row. */
 async function totalsFor(
+  user: string,
   siteUrl: string,
   startDate: string,
   endDate: string,
@@ -262,7 +263,7 @@ async function totalsFor(
     {
       method: "POST",
       headers: {
-        authorization: `Bearer ${await accessToken()}`,
+        authorization: `Bearer ${await accessToken(user)}`,
         "content-type": "application/json",
       },
       // No dimensions, so Search Console returns one row: the totals. Asking by
@@ -347,12 +348,13 @@ export function checkWindow(start: string, end: string): string | null {
 }
 
 export async function readPerformance(
+  user: string,
   days = 28,
   range?: { startDate: string; endDate: string },
 ): Promise<Performance> {
   const { startDate, endDate } = range ?? windowFor(days);
-  const who = await readingAs();
-  const properties = await listSites();
+  const who = await readingAs(user);
+  const properties = await listSites(user);
 
   const sites: SitePerformance[] = [];
 
@@ -363,7 +365,7 @@ export async function readPerformance(
     const rows = await Promise.all(
       batch.map(async (p) => {
         try {
-          const totals = await totalsFor(p.siteUrl, startDate, endDate);
+          const totals = await totalsFor(user, p.siteUrl, startDate, endDate);
           return { ...p, totals, error: null as string | null };
         } catch (error) {
           // One property failing must not empty the table. A site added

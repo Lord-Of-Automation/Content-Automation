@@ -452,6 +452,80 @@ export async function removeCloudflareAccount(
   return { ok: true };
 }
 
+/**
+ * A Google sign-in belongs to the person who made it, not to the deployment.
+ *
+ * Every other credential here is shared on purpose: one GoDaddy account, one
+ * Cloudflare estate, one team looking after them. A Search Console sign-in is
+ * different — it carries somebody's own identity, and storing one for the whole
+ * console meant a colleague signing in saw the properties of whoever connected
+ * last rather than their own.
+ *
+ * Keyed on the console username, which is what the session carries. Stored in
+ * the same encrypted values map as everything else, under a suffixed name, so
+ * it inherits the encryption rather than needing a store of its own.
+ */
+function signInKey(user: string): string {
+  return `refreshToken:${user.toLowerCase()}`;
+}
+
+function signInEmailKey(user: string): string {
+  return `googleEmail:${user.toLowerCase()}`;
+}
+
+export async function saveGoogleSignIn(
+  user: string,
+  refreshToken: string,
+  email: string,
+): Promise<void> {
+  const store = await read();
+  const entry = store.searchconsole ?? {
+    values: {},
+    expiresAt: null,
+    savedAt: "",
+    savedBy: "",
+  };
+
+  entry.values[signInKey(user)] = encrypt(refreshToken);
+  entry.values[signInEmailKey(user)] = email;
+  // The old shared token, from before sign-ins were per person. Removed as each
+  // user connects, so it cannot quietly answer for somebody who has not.
+  delete entry.values.refreshToken;
+  delete entry.values.googleEmail;
+
+  entry.savedAt = new Date().toISOString();
+  entry.savedBy = user;
+  store.searchconsole = entry;
+  await write(store);
+}
+
+export async function googleSignIn(
+  user: string,
+): Promise<{ refreshToken: string; email: string } | null> {
+  const store = await read();
+  const raw = store.searchconsole?.values[signInKey(user)];
+  if (!raw) return null;
+  try {
+    return {
+      refreshToken: decrypt(raw),
+      email: store.searchconsole?.values[signInEmailKey(user)] ?? "",
+    };
+  } catch {
+    // Unreadable is the same as absent: better to ask for the sign-in again
+    // than to call Google with ciphertext.
+    return null;
+  }
+}
+
+export async function clearGoogleSignIn(user: string): Promise<void> {
+  const store = await read();
+  const entry = store.searchconsole;
+  if (!entry) return;
+  delete entry.values[signInKey(user)];
+  delete entry.values[signInEmailKey(user)];
+  await write(store);
+}
+
 /** Only GoDaddy has one, from when the token lived in the deployment. */
 function fromEnvironment(id: ProviderId): Record<string, string> | null {
   if (id !== "godaddy") return null;

@@ -6,7 +6,7 @@ import { requireSession } from "@/lib/api-guard";
 import {
   checkState, exchangeCode, forgetAccessToken, oauthClient, redirectUri,
 } from "@/lib/googleoauth";
-import { saveProvider } from "@/lib/providers";
+import { saveGoogleSignIn } from "@/lib/providers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,17 +45,11 @@ export async function GET(request: Request) {
   try {
     const { refreshToken, email } = await exchangeCode(client, code, redirectUri(request));
 
-    // Saved through the ordinary credential path, so it is encrypted at rest
-    // like everything else and the client id and secret beside it are kept.
-    const saved = await saveProvider(
-      "searchconsole",
-      { refreshToken, googleEmail: email ?? "" },
-      "",
-      actor,
-    );
-    if (!saved.ok) return back("not-saved");
-
-    forgetAccessToken();
+    // Stored against the person who signed in, not against the deployment.
+    // A shared one meant a colleague opening Performance saw the properties of
+    // whoever connected last rather than their own.
+    await saveGoogleSignIn(actor, refreshToken, email ?? "");
+    forgetAccessToken(actor);
     await record(actor, "keys-updated", `Search Console: signed in as ${email ?? "a Google account"}`);
     return back("connected");
   } catch {
