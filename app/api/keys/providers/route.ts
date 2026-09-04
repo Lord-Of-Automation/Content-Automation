@@ -46,12 +46,22 @@ function payload(statuses: Awaited<ReturnType<typeof allStatuses>>) {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const denied = await requireSession();
   if (denied) return denied;
 
   try {
-    return NextResponse.json(payload(await allStatuses()));
+    const statuses = await allStatuses();
+
+    // Asked for separately, because it costs a request per account and the
+    // form should render before anybody has been to Cloudflare and back.
+    if (new URL(request.url).searchParams.get("check")) {
+      const { accountSummaries } = await import("@/lib/cloudflare");
+      const cloudflare = await accountSummaries().catch(() => []);
+      return NextResponse.json({ ...payload(statuses), cloudflare });
+    }
+
+    return NextResponse.json(payload(statuses));
   } catch (error) {
     return errorResponse(error);
   }

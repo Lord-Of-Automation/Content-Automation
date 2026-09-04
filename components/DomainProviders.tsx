@@ -37,6 +37,16 @@ type Status = {
 /** A Cloudflare row being edited. A blank token means "keep what is stored". */
 type CfRow = { accountId: string; token: string; existing: boolean; tail: string };
 
+/** What each stored Cloudflare credential is actually doing, checked live. */
+type CfSummary = {
+  accountId: string;
+  tail: string;
+  ok: boolean;
+  zones: number | null;
+  canCreate: boolean;
+  note: string;
+};
+
 /**
  * How loudly to say a credential is running out.
  *
@@ -72,6 +82,8 @@ export default function DomainProviders() {
    * already stored for it.
    */
   const [cfRows, setCfRows] = useState<CfRow[] | null>(null);
+  const [cfChecked, setCfChecked] = useState<CfSummary[] | null>(null);
+  const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +117,28 @@ export default function DomainProviders() {
     });
   }, []);
 
+  /**
+   * Ask Cloudflare what each stored token can actually see.
+   *
+   * A stored credential and a working one are different things, and the form
+   * alone could only ever show the first. Separate from the load because it
+   * costs a request per account, and the fields should appear before anybody
+   * has been to Cloudflare and back.
+   */
+  const check = useCallback(async () => {
+    setChecking(true);
+    try {
+      const response = await fetch("/api/keys/providers?check=1", { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = (await response.json()) as { cloudflare?: CfSummary[] };
+      setCfChecked(payload.cloudflare ?? []);
+    } catch {
+      // The rows above still say what is stored, which is the important half.
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     try {
       const response = await fetch("/api/keys/providers", { cache: "no-store" });
@@ -123,7 +157,8 @@ export default function DomainProviders() {
 
   useEffect(() => {
     void load();
-  }, [load]);
+    void check();
+  }, [load, check]);
 
   function setField(provider: string, field: string, value: string) {
     setDrafts((d) => ({ ...d, [provider]: { ...(d[provider] ?? {}), [field]: value } }));
@@ -156,7 +191,12 @@ export default function DomainProviders() {
 
       // Reseeded from what came back, so the rows show the stored state rather
       // than whatever was typed to get there.
-      if (provider === "cloudflare") setCfRows(null);
+      if (provider === "cloudflare") {
+        setCfRows(null);
+        // Re-checked after saving, so the table below proves the token that was
+        // just entered actually reaches something.
+        void check();
+      }
       apply(payload);
       setDrafts((d) => ({ ...d, [provider]: {} }));
       const name = specs.find((s) => s.id === provider)?.label ?? provider;
@@ -319,7 +359,66 @@ export default function DomainProviders() {
                     >
                       Add another account
                     </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={checking}
+                      onClick={() => void check()}
+                    >
+                      {checking ? "Checking…" : "Re-check"}
+                    </button>
                   </div>
+
+                  {/* What is stored is one question and what works is another.
+                      This answers the second, which is the one somebody has
+                      when a domain reads as being on an account they thought
+                      was configured. */}
+                  {cfChecked?.length ? (
+                    <table className="logs cf-summary">
+                      <thead>
+                        <tr>
+                          <th>Token</th>
+                          <th>Account</th>
+                          <th className="num">Zones</th>
+                          <th>Reads</th>
+                          <th>Creates</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cfChecked.map((a) => (
+                          <tr key={`${a.accountId}-${a.tail}`}>
+                            <td className="nowrap">
+                              <span className="registrar">ends {a.tail}</span>
+                            </td>
+                            <td className="detail">
+                              <span className="rr-value">{a.accountId || "not given"}</span>
+                            </td>
+                            <td className="num">
+                              {a.zones === null ? <span className="quiet">—</span> : a.zones}
+                            </td>
+                            <td className="nowrap">
+                              <span className={a.ok ? "pill pill-ok" : "pill pill-bad"}>
+                                {a.ok ? "yes" : "no"}
+                              </span>
+                            </td>
+                            <td className="detail">
+                              {a.canCreate ? (
+                                <span className="pill pill-ok">yes</span>
+                              ) : (
+                                <span className="pill pill-warn">needs an account id</span>
+                              )}
+                              {a.note ? <div className="provider-hint">{a.note}</div> : null}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : cfChecked ? (
+                    <p className="provider-hint">
+                      Nothing stored for Cloudflare yet, so there is nothing to
+                      check.
+                    </p>
+                  ) : null}
                 </>
               ) : null}
 

@@ -174,6 +174,69 @@ function shapeZone(raw: Record<string, unknown>): CloudflareZone {
   };
 }
 
+/** What one configured account is actually doing, for the Keys page. */
+export interface AccountSummary {
+  accountId: string;
+  /** Last four characters of the token. Enough to tell two rows apart. */
+  tail: string;
+  ok: boolean;
+  /** Zones this token can see, or null when it could not be asked. */
+  zones: number | null;
+  /** Whether a zone can be created here, which needs the account id. */
+  canCreate: boolean;
+  note: string;
+}
+
+/**
+ * Each configured account, checked.
+ *
+ * A stored credential and a working one are different things, and the Keys page
+ * could only ever show the first. One cheap request each — a single zone, read
+ * for its total — turns "two rows are saved" into "two tokens work and between
+ * them they see this many zones", which is the question somebody actually has
+ * when a domain reads as being on another account.
+ */
+export async function accountSummaries(): Promise<AccountSummary[]> {
+  const out: AccountSummary[] = [];
+
+  for (const account of await accounts()) {
+    const answer = await call<Array<Record<string, unknown>>>(
+      "/zones?per_page=1",
+      account.token,
+    );
+
+    // The count lives beside the result rather than in it, so it is read from a
+    // second call with the same shape rather than by paging the whole list.
+    let zones: number | null = null;
+    if (answer.ok) {
+      const counted = await fetch(`${API}/zones?per_page=1`, {
+        headers: { authorization: `Bearer ${account.token}`, accept: "application/json" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(20_000),
+      })
+        .then((r) => r.json())
+        .catch(() => null);
+      const info = (counted as { result_info?: { total_count?: number } } | null)?.result_info;
+      zones = typeof info?.total_count === "number" ? info.total_count : null;
+    }
+
+    out.push({
+      accountId: account.accountId,
+      tail: account.token.slice(-4),
+      ok: answer.ok,
+      zones,
+      canCreate: !!account.accountId,
+      note: answer.ok
+        ? account.accountId
+          ? ""
+          : "no account id, so zones can be read here but not created"
+        : answer.message,
+    });
+  }
+
+  return out;
+}
+
 /** A zone, and which account it was found in. */
 export interface OwnedZone extends CloudflareZone {
   accountLabel: string;
