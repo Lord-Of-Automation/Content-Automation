@@ -34,30 +34,8 @@ type Status = {
   accounts?: Array<{ accountId: string; tail: string }>;
 };
 
-/**
- * A Cloudflare row being edited. A blank token means "keep what is stored".
- *
- * The uid exists only to be a React key. Keying on the account id instead meant
- * the key changed on every keystroke in that field, so React threw the row away
- * and built a new one between characters — the input lost focus after the first
- * letter and the field could not be filled in at all.
- */
-type CfRow = {
-  uid: string;
-  accountId: string;
-  token: string;
-  existing: boolean;
-  tail: string;
-};
-
-let nextRowId = 0;
-const newRow = (): CfRow => ({
-  uid: `row-${(nextRowId += 1)}`,
-  accountId: "",
-  token: "",
-  existing: false,
-  tail: "",
-});
+/** The one credential being typed. It is added to the list, not saved over it. */
+type CfEntry = { token: string; accountId: string };
 
 /** What each stored Cloudflare credential is actually doing, checked live. */
 type CfSummary = {
@@ -103,7 +81,7 @@ export default function DomainProviders() {
    * account is a row keyed on its id, and a row left untouched keeps the token
    * already stored for it.
    */
-  const [cfRows, setCfRows] = useState<CfRow[] | null>(null);
+  const [cfEntry, setCfEntry] = useState<CfEntry>({ token: "", accountId: "" });
   const [cfChecked, setCfChecked] = useState<CfSummary[] | null>(null);
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -117,20 +95,6 @@ export default function DomainProviders() {
     setStatuses(byId);
     // The stored expiry seeds the picker, so opening the page and pressing Save
     // does not quietly blank a date somebody set last week.
-    // Seeded from what is stored, once, so opening the page and pressing Save
-    // does not blank the accounts somebody added last week.
-    const cf = (payload.statuses ?? []).find((s) => s.id === "cloudflare");
-    setCfRows((current) =>
-      current ??
-      (cf?.accounts ?? []).map((a) => ({
-        uid: `row-${(nextRowId += 1)}`,
-        accountId: a.accountId,
-        token: "",
-        existing: true,
-        tail: a.tail,
-      })),
-    );
-
     setDates((current) => {
       const next = { ...current };
       for (const s of payload.statuses ?? []) {
@@ -187,6 +151,38 @@ export default function DomainProviders() {
     setDrafts((d) => ({ ...d, [provider]: { ...(d[provider] ?? {}), [field]: value } }));
   }
 
+  /**
+   * One credential at a time.
+   *
+   * The list is not something you edit and save; it is something you add to and
+   * take from. None of the tokens can be shown back, so a form that held the
+   * whole list would make you retype every one of them to change any.
+   */
+  async function cloudflare(body: Record<string, unknown>, done: string) {
+    setBusy("cloudflare");
+    setMessage(null);
+    setError(null);
+    try {
+      const response = await fetch("/api/keys/providers", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "cloudflare", ...body }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "That did not work.");
+      apply(payload);
+      setCfEntry({ token: "", accountId: "" });
+      setMessage(done);
+      // Re-checked straight away, so the table proves what was just added
+      // actually reaches something.
+      void check();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That did not work.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function submit(provider: string, method: "PUT" | "DELETE") {
     setBusy(provider);
     setMessage(null);
@@ -198,15 +194,7 @@ export default function DomainProviders() {
         body: JSON.stringify(
           method !== "PUT"
             ? { id: provider }
-            : provider === "cloudflare"
-              ? {
-                  id: provider,
-                  accounts: (cfRows ?? []).map((r) => ({
-                    accountId: r.accountId,
-                    token: r.token,
-                  })),
-                }
-              : { id: provider, values: drafts[provider] ?? {}, expiresAt: dates[provider] ?? "" },
+            : { id: provider, values: drafts[provider] ?? {}, expiresAt: dates[provider] ?? "" },
         ),
       });
       const payload = await response.json();
@@ -214,12 +202,6 @@ export default function DomainProviders() {
 
       // Reseeded from what came back, so the rows show the stored state rather
       // than whatever was typed to get there.
-      if (provider === "cloudflare") {
-        setCfRows(null);
-        // Re-checked after saving, so the table below proves the token that was
-        // just entered actually reaches something.
-        void check();
-      }
       apply(payload);
       setDrafts((d) => ({ ...d, [provider]: {} }));
       const name = specs.find((s) => s.id === provider)?.label ?? provider;
@@ -306,79 +288,55 @@ export default function DomainProviders() {
                   reads better as a plain form. */}
               {spec.id === "cloudflare" ? (
                 <>
-                  {(cfRows ?? []).map((row, at) => (
-                    <div className="cf-row" key={row.uid}>
-                      <div className="provider-field">
-                        <label htmlFor={`cf-token-${at}`}>
-                          API token
-                          {row.existing ? (
-                            <span className="provider-current">ends {row.tail}</span>
-                          ) : null}
-                        </label>
-                        <input
-                          id={`cf-token-${at}`}
-                          type="password"
-                          autoComplete="off"
-                          spellCheck={false}
-                          placeholder={
-                            row.existing ? "leave blank to keep this one" : "cfut_…"
-                          }
-                          value={row.token}
-                          onChange={(e) =>
-                            setCfRows((rows) =>
-                              (rows ?? []).map((r, i) =>
-                                i === at ? { ...r, token: e.target.value } : r,
-                              ),
-                            )
-                          }
-                        />
-                      </div>
-
-                      <div className="provider-field">
-                        <label htmlFor={`cf-acct-${at}`}>Account ID</label>
-                        <input
-                          id={`cf-acct-${at}`}
-                          type="text"
-                          className="mono"
-                          spellCheck={false}
-                          placeholder="32 hex characters"
-                          value={row.accountId}
-                          onChange={(e) =>
-                            setCfRows((rows) =>
-                              (rows ?? []).map((r, i) =>
-                                i === at ? { ...r, accountId: e.target.value.trim() } : r,
-                              ),
-                            )
-                          }
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm cf-row-remove"
-                        onClick={() =>
-                          setCfRows((rows) => (rows ?? []).filter((_, i) => i !== at))
-                        }
-                      >
-                        Remove
-                      </button>
+                  {/* One box, not a list of boxes. Each token entered joins the
+                      table below rather than replacing what is there, which is
+                      the only shape that works when none of them can be shown
+                      back to be edited. */}
+                  <div className="cf-row">
+                    <div className="provider-field">
+                      <label htmlFor="cf-new-token">API token</label>
+                      <input
+                        id="cf-new-token"
+                        type="password"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="cfut_…"
+                        value={cfEntry.token}
+                        onChange={(e) => setCfEntry((c) => ({ ...c, token: e.target.value }))}
+                      />
                     </div>
-                  ))}
 
-                  {!(cfRows ?? []).length ? (
-                    <p className="provider-hint">No Cloudflare accounts yet.</p>
-                  ) : null}
+                    <div className="provider-field">
+                      <label htmlFor="cf-new-account">Account ID</label>
+                      <input
+                        id="cf-new-account"
+                        type="text"
+                        className="mono"
+                        spellCheck={false}
+                        placeholder="32 hex characters"
+                        value={cfEntry.accountId}
+                        onChange={(e) =>
+                          setCfEntry((c) => ({ ...c, accountId: e.target.value.trim() }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && cfEntry.token.trim() && busy !== "cloudflare") {
+                            void cloudflare({ add: cfEntry }, "Added.");
+                          }
+                        }}
+                      />
+                    </div>
 
-                  <div className="provider-actions">
                     <button
                       type="button"
-                      className="btn btn-ghost"
-                      onClick={() =>
-                        setCfRows((rows) => [...(rows ?? []), newRow()])
-                      }
+                      className="btn btn-primary cf-row-remove"
+                      disabled={busy === "cloudflare" || !cfEntry.token.trim()}
+                      onClick={() => void cloudflare({ add: cfEntry }, "Added.")}
                     >
-                      Add another account
+                      {busy === "cloudflare" ? "Adding…" : "Add"}
                     </button>
+                  </div>
+
+                  <div className="provider-actions">
                     <button
                       type="button"
                       className="btn btn-ghost"
@@ -402,6 +360,7 @@ export default function DomainProviders() {
                           <th className="num">Zones</th>
                           <th>Reads</th>
                           <th>Creates</th>
+                          <th />
                         </tr>
                       </thead>
                       <tbody>
@@ -428,6 +387,21 @@ export default function DomainProviders() {
                                 <span className="pill pill-warn">needs an account id</span>
                               )}
                               {a.note ? <div className="provider-hint">{a.note}</div> : null}
+                            </td>
+                            <td className="nowrap">
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                disabled={busy === "cloudflare"}
+                                onClick={() =>
+                                  void cloudflare(
+                                    { remove: a.accountId || a.tail },
+                                    "Removed.",
+                                  )
+                                }
+                              >
+                                Remove
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -504,17 +478,16 @@ export default function DomainProviders() {
               </div>
 
               <div className="provider-actions">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => void submit(spec.id, "PUT")}
-                  disabled={
-                    busy === spec.id ||
-                    (spec.id !== "cloudflare" && !touched && !dateChanged)
-                  }
-                >
-                  {busy === spec.id ? "Saving…" : "Save"}
-                </button>
+                {spec.id === "cloudflare" ? null : (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => void submit(spec.id, "PUT")}
+                    disabled={busy === spec.id || (!touched && !dateChanged)}
+                  >
+                    {busy === spec.id ? "Saving…" : "Save"}
+                  </button>
+                )}
                 {status?.source === "console" ? (
                   <button
                     type="button"

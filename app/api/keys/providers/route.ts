@@ -4,7 +4,8 @@ import { auth } from "@/auth";
 import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
 import {
-  allStatuses, clearProvider, PROVIDERS, saveCloudflareAccounts, saveProvider, specFor,
+  addCloudflareAccount, allStatuses, clearProvider, PROVIDERS,
+  removeCloudflareAccount, saveProvider, specFor,
 } from "@/lib/providers";
 
 export const runtime = "nodejs";
@@ -78,8 +79,9 @@ export async function PUT(request: Request) {
     id?: string;
     values?: Record<string, string>;
     expiresAt?: string;
-    /** Cloudflare only: one row per account, merged on the id. */
-    accounts?: Array<{ accountId?: string; token?: string }>;
+    /** Cloudflare only: one credential to append, or one to drop. */
+    add?: { token?: string; accountId?: string };
+    remove?: string;
   };
   try {
     body = await request.json();
@@ -92,19 +94,29 @@ export async function PUT(request: Request) {
   if (!spec) return NextResponse.json({ error: "There is no such provider." }, { status: 400 });
 
   try {
-    // Cloudflare arrives as rows rather than one blob, because several accounts
-    // is the normal case for it and a list of secrets cannot be edited as text
-    // when none of them can be shown back.
-    if (id === "cloudflare" && Array.isArray(body.accounts)) {
-      const saved = await saveCloudflareAccounts(
-        body.accounts.map((a) => ({
-          accountId: String(a.accountId ?? ""),
-          token: String(a.token ?? ""),
-        })),
+    // Cloudflare is added one at a time and removed one at a time, rather than
+    // saved as a block. None of its tokens can be shown back, so a form that
+    // edited the whole list would make you retype every one of them to change
+    // any of them.
+    if (id === "cloudflare" && body.add) {
+      const added = await addCloudflareAccount(
+        String(body.add.token ?? ""),
+        String(body.add.accountId ?? ""),
         actor,
       );
-      if (!saved.ok) return NextResponse.json({ error: saved.error }, { status: 400 });
-      await record(actor, "keys-updated", `Cloudflare: ${body.accounts.length} account(s)`);
+      if (!added.ok) return NextResponse.json({ error: added.error }, { status: 400 });
+      await record(
+        actor,
+        "keys-updated",
+        `Cloudflare: added the account ending ${String(body.add.token ?? "").slice(-4)}`,
+      );
+      return NextResponse.json(payload(await allStatuses()));
+    }
+
+    if (id === "cloudflare" && body.remove) {
+      const dropped = await removeCloudflareAccount(String(body.remove), actor);
+      if (!dropped.ok) return NextResponse.json({ error: dropped.error }, { status: 400 });
+      await record(actor, "keys-updated", `Cloudflare: removed ${body.remove}`);
       return NextResponse.json(payload(await allStatuses()));
     }
 

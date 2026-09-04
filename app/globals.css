@@ -3269,8 +3269,8 @@ button,
   width: min(620px, calc(100vw - 32px));
 }
 
-/* One Cloudflare account per row: token, id, and a way to drop it. Bordered so
-   two rows of near-identical fields cannot be mistaken for one. */
+/* The one box a Cloudflare credential is typed into. Bordered so it reads as an
+   entry form rather than as the top row of the table below it. */
 .cf-row {
   display: grid;
   grid-template-columns: minmax(200px, 1fr) minmax(200px, 1fr) auto;

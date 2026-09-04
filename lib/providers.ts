@@ -264,95 +264,130 @@ export function splitCloudflare(raw: string): Array<{ token: string; accountId: 
   return out;
 }
 
-/**
- * Saves the Cloudflare accounts as a set of rows.
- *
- * Merged on the account id rather than on position. The tokens are never sent
- * back to the browser, so a row the person did not retype arrives with an empty
- * token — and matching that to what is stored by index would silently attach
- * the wrong token to an account the moment somebody removed a row above it.
- * The account id is stable, unique and not a secret, which is exactly what a
- * key needs to be.
- */
-export async function saveCloudflareAccounts(
-  rows: Array<{ accountId: string; token: string }>,
-  actor: string,
-): Promise<SaveResult> {
+/** The stored lines, with the legacy separate account id folded in. */
+async function storedCloudflare(): Promise<{
+  rows: Array<{ token: string; accountId: string }>;
+  entry: StoredProvider | undefined;
+}> {
   const store = await read();
-  const existing = store.cloudflare;
+  const entry = store.cloudflare;
+  if (!entry?.values.apiToken) return { rows: [], entry };
 
-  let stored: Array<{ token: string; accountId: string }> = [];
-  if (existing?.values.apiToken) {
-    try {
-      const legacy = existing.values.accountId ?? "";
-      stored = splitCloudflare(decrypt(existing.values.apiToken)).map((a, at) => ({
-        token: a.token,
-        // Same legacy shape as above. Without this the first account has no id
-        // to match on, so adding a second one silently dropped the first.
-        accountId: a.accountId || (at === 0 ? legacy : ""),
-      }));
-    } catch {
-      // Unreadable means every row has to be retyped, which the form says.
-      stored = [];
-    }
-  }
-
-  const lines: string[] = [];
-  for (const row of rows) {
-    const accountId = String(row.accountId ?? "").trim();
-    if (accountId && !/^[0-9a-f]{32}$/i.test(accountId)) {
-      return { ok: false, error: `"${accountId}" is not a Cloudflare account id.` };
-    }
-
-    const given = String(row.token ?? "").trim();
-    const kept = stored.find((s) => s.accountId && s.accountId === accountId)?.token ?? "";
-    const token = given || kept;
-
-    if (!token) {
-      return {
-        ok: false,
-        error: accountId
-          ? `No token for account ${accountId}. Paste it, or remove the row.`
-          : "A row needs a token.",
-      };
-    }
-    if (!/^cfut_[A-Za-z0-9_-]{20,}$/.test(token)) {
-      return {
-        ok: false,
-        error:
-          "A Cloudflare token starts with cfut_ and has no spaces. Paste the token " +
-          "itself, not the whole Authorization header.",
-      };
-    }
-
-    lines.push(accountId ? `${token} ${accountId}` : token);
-  }
-
-  if (!lines.length) {
-    // Removing every row is a deletion, and saying so beats writing an empty
-    // credential that reads as "set" and answers nothing.
-    const next = await read();
-    delete next.cloudflare;
-    await write(next);
-    return { ok: true };
-  }
-
-  let secret: string;
   try {
-    secret = encrypt(lines.join("\n"));
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Could not encrypt." };
+    // The account id used to be a field of its own, so a credential saved
+    // before this took lines has its id nowhere near its token.
+    const legacy = entry.values.accountId ?? "";
+    const rows = splitCloudflare(decrypt(entry.values.apiToken)).map((a, at) => ({
+      token: a.token,
+      accountId: a.accountId || (at === 0 ? legacy : ""),
+    }));
+    return { rows, entry };
+  } catch {
+    // Unreadable is the same as absent: better to ask for it again than to
+    // build a credential list out of ciphertext nobody can decrypt.
+    return { rows: [], entry };
+  }
+}
+
+async function writeCloudflare(
+  rows: Array<{ token: string; accountId: string }>,
+  actor: string,
+): Promise<void> {
+  const store = await read();
+
+  if (!rows.length) {
+    // Removing the last one is a deletion. An empty credential would read as
+    // "set" on the Keys page and answer nothing at all.
+    delete store.cloudflare;
+    await write(store);
+    return;
   }
 
   store.cloudflare = {
-    // Only the lines from here on. The separate accountId field is not carried
-    // forward, so the two shapes cannot drift apart again.
-    values: { apiToken: secret },
-    expiresAt: existing?.expiresAt ?? null,
+    // Lines only from here on, so the old two-field shape cannot come back.
+    values: {
+      apiToken: encrypt(
+        rows.map((r) => (r.accountId ? `${r.token} ${r.accountId}` : r.token)).join("\n"),
+      ),
+    },
+    expiresAt: store.cloudflare?.expiresAt ?? null,
     savedAt: new Date().toISOString(),
     savedBy: actor,
   };
   await write(store);
+}
+
+/**
+ * Adds one Cloudflare account to the list.
+ *
+ * Appending rather than replacing, because that is what the form does: one box
+ * of inputs, and each token entered joins the ones already there. Editing a
+ * list of secrets in place never worked here anyway — none of them can be shown
+ * back, so every row would have to be retyped to change any of them.
+ */
+export async function addCloudflareAccount(
+  token: string,
+  accountId: string,
+  actor: string,
+): Promise<SaveResult> {
+  const clean = String(token || "").trim();
+  const id = String(accountId || "").trim().toLowerCase();
+
+  if (!/^cfut_[A-Za-z0-9_-]{20,}$/.test(clean)) {
+    return {
+      ok: false,
+      error:
+        "A Cloudflare token starts with cfut_ and has no spaces. Paste the token " +
+        "itself, not the whole Authorization header.",
+    };
+  }
+  if (id && !/^[0-9a-f]{32}$/.test(id)) {
+    return { ok: false, error: "A Cloudflare account id is 32 hexadecimal characters." };
+  }
+
+  const { rows } = await storedCloudflare();
+
+  // The same token twice is a mistake worth naming rather than a list that
+  // quietly does everything twice.
+  if (rows.some((r) => r.token === clean)) {
+    return { ok: false, error: "That token is already in the list." };
+  }
+  if (id && rows.some((r) => r.accountId === id)) {
+    return {
+      ok: false,
+      error:
+        `An account ending ${rows.find((r) => r.accountId === id)!.token.slice(-4)} is already ` +
+        "listed for that id. Remove it first if you are replacing its token.",
+    };
+  }
+
+  try {
+    await writeCloudflare([...rows, { token: clean, accountId: id }], actor);
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not save." };
+  }
+  return { ok: true };
+}
+
+/** Drops one, found by its account id, or by its token's last four. */
+export async function removeCloudflareAccount(
+  key: string,
+  actor: string,
+): Promise<SaveResult> {
+  const wanted = String(key || "").trim().toLowerCase();
+  if (!wanted) return { ok: false, error: "Nothing named to remove." };
+
+  const { rows } = await storedCloudflare();
+  const kept = rows.filter(
+    (r) => r.accountId.toLowerCase() !== wanted && r.token.slice(-4).toLowerCase() !== wanted,
+  );
+  if (kept.length === rows.length) return { ok: false, error: "No such credential." };
+
+  try {
+    await writeCloudflare(kept, actor);
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not save." };
+  }
   return { ok: true };
 }
 
