@@ -197,6 +197,16 @@ export interface ProviderStatus {
   savedBy: string | null;
   /** False when AUTH_SECRET changed and the stored values can no longer be read. */
   readable: boolean;
+  /**
+   * One entry per Cloudflare account, masked.
+   *
+   * Cloudflare is the one provider where several credentials are ordinary
+   * rather than exceptional: an estate this size spans accounts, and a token
+   * only sees the one it was issued for. The account id is the key — it is
+   * unique, it is not a secret, and it is what lets a row be edited or removed
+   * without the token ever coming back to the browser to be edited alongside it.
+   */
+  accounts?: Array<{ accountId: string; tail: string }>;
 }
 
 async function read(): Promise<Store> {
@@ -236,6 +246,108 @@ function daysUntil(iso: string | null): number | null {
   return Math.round((at - Date.now()) / 86_400_000);
 }
 
+/**
+ * The stored Cloudflare lines, split into accounts.
+ *
+ * Written as "token accountId" per line, because that is the shape a person
+ * pastes. Read back as pairs so the form can show one row each.
+ */
+export function splitCloudflare(raw: string): Array<{ token: string; accountId: string }> {
+  const out: Array<{ token: string; accountId: string }> = [];
+  for (const line of String(raw || "").split(/[\r\n]+/)) {
+    const parts = line.trim().split(/[\s,]+/).filter(Boolean);
+    if (!parts.length) continue;
+    const token = parts.find((p) => p.startsWith("cfut_") || p.length > 30) ?? parts[0];
+    const accountId = parts.find((p) => /^[0-9a-f]{32}$/i.test(p)) ?? "";
+    if (token) out.push({ token, accountId });
+  }
+  return out;
+}
+
+/**
+ * Saves the Cloudflare accounts as a set of rows.
+ *
+ * Merged on the account id rather than on position. The tokens are never sent
+ * back to the browser, so a row the person did not retype arrives with an empty
+ * token — and matching that to what is stored by index would silently attach
+ * the wrong token to an account the moment somebody removed a row above it.
+ * The account id is stable, unique and not a secret, which is exactly what a
+ * key needs to be.
+ */
+export async function saveCloudflareAccounts(
+  rows: Array<{ accountId: string; token: string }>,
+  actor: string,
+): Promise<SaveResult> {
+  const store = await read();
+  const existing = store.cloudflare;
+
+  let stored: Array<{ token: string; accountId: string }> = [];
+  if (existing?.values.apiToken) {
+    try {
+      stored = splitCloudflare(decrypt(existing.values.apiToken));
+    } catch {
+      // Unreadable means every row has to be retyped, which the form says.
+      stored = [];
+    }
+  }
+
+  const lines: string[] = [];
+  for (const row of rows) {
+    const accountId = String(row.accountId ?? "").trim();
+    if (accountId && !/^[0-9a-f]{32}$/i.test(accountId)) {
+      return { ok: false, error: `"${accountId}" is not a Cloudflare account id.` };
+    }
+
+    const given = String(row.token ?? "").trim();
+    const kept = stored.find((s) => s.accountId && s.accountId === accountId)?.token ?? "";
+    const token = given || kept;
+
+    if (!token) {
+      return {
+        ok: false,
+        error: accountId
+          ? `No token for account ${accountId}. Paste it, or remove the row.`
+          : "A row needs a token.",
+      };
+    }
+    if (!/^cfut_[A-Za-z0-9_-]{20,}$/.test(token)) {
+      return {
+        ok: false,
+        error:
+          "A Cloudflare token starts with cfut_ and has no spaces. Paste the token " +
+          "itself, not the whole Authorization header.",
+      };
+    }
+
+    lines.push(accountId ? `${token} ${accountId}` : token);
+  }
+
+  if (!lines.length) {
+    // Removing every row is a deletion, and saying so beats writing an empty
+    // credential that reads as "set" and answers nothing.
+    const next = await read();
+    delete next.cloudflare;
+    await write(next);
+    return { ok: true };
+  }
+
+  let secret: string;
+  try {
+    secret = encrypt(lines.join("\n"));
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not encrypt." };
+  }
+
+  store.cloudflare = {
+    values: { apiToken: secret },
+    expiresAt: existing?.expiresAt ?? null,
+    savedAt: new Date().toISOString(),
+    savedBy: actor,
+  };
+  await write(store);
+  return { ok: true };
+}
+
 /** Only GoDaddy has one, from when the token lived in the deployment. */
 function fromEnvironment(id: ProviderId): Record<string, string> | null {
   if (id !== "godaddy") return null;
@@ -262,10 +374,24 @@ function statusOf(spec: ProviderSpec, store: Store): ProviderStatus {
         readable = false;
       }
     }
+    // Cloudflare's rows, masked, so the form can list them one per line.
+    let accountRows: ProviderStatus["accounts"];
+    if (spec.id === "cloudflare" && row.values.apiToken) {
+      try {
+        accountRows = splitCloudflare(decrypt(row.values.apiToken)).map((a) => ({
+          accountId: a.accountId,
+          tail: a.token.slice(-4),
+        }));
+      } catch {
+        accountRows = [];
+      }
+    }
+
     return {
       id: spec.id,
       set: Object.keys(shown).length > 0 || !readable,
       source: "console",
+      accounts: accountRows,
       shown,
       expiresAt: row.expiresAt,
       daysLeft: daysUntil(row.expiresAt),

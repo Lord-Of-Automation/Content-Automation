@@ -3268,3 +3268,28 @@ button,
 .sheet-narrow {
   width: min(620px, calc(100vw - 32px));
 }
+
+/* One Cloudflare account per row: token, id, and a way to drop it. Bordered so
+   two rows of near-identical fields cannot be mistaken for one. */
+.cf-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(200px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel-2);
+}
+
+.cf-row-remove {
+  margin-bottom: 1px;
+}
+
+@media (max-width: 640px) {
+  .cf-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+}
