@@ -2894,6 +2894,7 @@ button,
 .datepick-step {
   width: 26px;
   height: 26px;
+  padding: 0;
   display: grid;
   place-items: center;
   border: 1px solid var(--line);
@@ -2910,9 +2911,13 @@ button,
   color: var(--ink);
 }
 
+/* minmax(0, 1fr), not 1fr. A grid column defaults to a minimum of its content,
+   so a column never shrinks below the widest thing in it — and the global button
+   rule puts 14px of padding on every button, which made each day wider than its
+   share of the panel and pushed Sunday out through the right-hand edge. */
 .datepick-days {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 2px;
 }
 
@@ -2927,9 +2932,13 @@ button,
   text-transform: uppercase;
 }
 
+/* Padding reset, because these inherit the global button padding and a day is
+   a square with a digit in it rather than a button with a label. */
 .datepick-day,
 .datepick-pad {
   height: 31px;
+  min-width: 0;
+  padding: 0;
   border-radius: 7px;
   border: 0;
   background: none;
