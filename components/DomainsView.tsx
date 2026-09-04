@@ -508,16 +508,23 @@ export default function DomainsView() {
                             they made the table wider to say the same thing
                             twice. */}
                         <td className="ns">
-                          <span className={`pill pill-${where.tone}`}>{where.label}</span>
-                          {d.nameServers.length ? (
-                            d.nameServers.map((ns) => (
-                              <span className="ns-chip" key={ns}>
-                                {ns}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="quiet">none recorded</span>
-                          )}
+                          {/* Stacked inside the cell rather than by making the
+                              cell a flex container. A flex <td> leaves the
+                              table's layout, so it stops sharing the row's
+                              height and every other column stops lining up
+                              with it. */}
+                          <div className="ns-stack">
+                            <span className={`pill pill-${where.tone}`}>{where.label}</span>
+                            {d.nameServers.length ? (
+                              d.nameServers.map((ns) => (
+                                <span className="ns-chip" key={ns}>
+                                  {ns}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="quiet">none recorded</span>
+                            )}
+                          </div>
                         </td>
                         <td className="nowrap">
                           <span

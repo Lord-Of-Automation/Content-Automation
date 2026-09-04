@@ -2647,17 +2647,23 @@ button,
    brad.ns, jule.ns — so the boxes align and the odd one out is visible at a
    glance straight down the column. */
 .logs td.ns {
+  white-space: nowrap;
+}
+
+/* The stack lives inside the cell, never on it. A flex <td> is removed from the
+   table's layout: it stops sharing the row's height, and the columns beside it
+   stop aligning with it. */
+.ns-stack {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 3px;
-  white-space: nowrap;
 }
 
 /* The summary sits above the hosts it summarises, with a little air between
    them, so the pill reads as a heading for the two lines rather than as a third
    item in the list. */
-.logs td.ns .pill {
+.ns-stack .pill {
   margin-bottom: 3px;
 }
 
@@ -3324,9 +3330,15 @@ button,
 
 /* The two actions on a domain row, held apart. Touching, they read as one
    control with two halves — and one of them creates a Cloudflare zone while the
-   other opens a panel, which are not two halves of anything. */
+   other opens a panel, which are not two halves of anything.
+   
+   Spaced with a margin rather than flex. Making the cell a flex container takes
+   it out of the table's layout, so it stops sharing the row's height and its
+   contents stop lining up with every other column — which is what happened. */
 .logs td.row-actions {
-  display: flex;
-  gap: 8px;
   white-space: nowrap;
+}
+
+.logs td.row-actions .btn + .btn {
+  margin-left: 8px;
 }
