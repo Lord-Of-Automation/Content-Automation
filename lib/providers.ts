@@ -36,6 +36,8 @@ export interface ProviderField {
   label: string;
   /** A password field is masked and never echoed back. */
   secret: boolean;
+  /** A textarea rather than one line, for a value that holds several. */
+  multiline?: boolean;
   placeholder: string;
   hint?: string;
   /** Rejected before storing when it does not match. */
@@ -105,24 +107,20 @@ export const PROVIDERS: ProviderSpec[] = [
     blurb:
       "Not a registrar. It runs the DNS for a domain once its name servers " +
       "point at it, which is where the records for most of this estate actually " +
-      "live. The token needs Zone:Read, Zone:Edit and DNS:Edit; the account id " +
-      "is on the right of any account's overview page and is needed to create a " +
-      "zone.",
+      "live. One line per account: a token, a space, then that account's id. A " +
+      "token only ever sees the account it was issued for, so an estate spread " +
+      "over several accounts needs one line for each or most of it stays " +
+      "invisible. Each token needs Zone:Read, Zone:Edit and DNS:Edit.",
     fields: [
       {
         name: "apiToken",
-        label: "API token",
+        label: "Tokens and account ids",
         secret: true,
-        placeholder: "from My Profile, API Tokens",
-      },
-      {
-        name: "accountId",
-        label: "Account ID",
-        secret: false,
-        placeholder: "32 hex characters",
-        pattern: /^[0-9a-f]{32}$/i,
-        patternNote: "A Cloudflare account id is 32 hexadecimal characters.",
-        hint: "Which account new zones are created in.",
+        multiline: true,
+        placeholder: "cfut_… 513064bf88adb2fc058a15bb852234f7",
+        hint:
+          "One account per line. The id is the 32 hex characters in the " +
+          "dashboard address bar, and is what new zones are created in.",
       },
     ],
   },

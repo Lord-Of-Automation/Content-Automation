@@ -32,6 +32,8 @@ export default function AddToCloudflare({
 }) {
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupId, setGroupId] = useState("");
+  const [cfAccounts, setCfAccounts] = useState<Array<{ id: string; label: string }>>([]);
+  const [accountId, setAccountId] = useState("");
   const [zone, setZone] = useState<Zone | null>(null);
   const [written, setWritten] = useState<string[]>([]);
   const [failed, setFailed] = useState<string[]>([]);
@@ -65,9 +67,30 @@ export default function AddToCloudflare({
     }
   }, []);
 
+  /**
+   * Which Cloudflare account to create in.
+   *
+   * Asked only when there is more than one, because with several configured
+   * "which account" is a real question and guessing puts the domain somewhere
+   * nobody intended — where it is then invisible to whoever looks for it.
+   */
+  const loadAccounts = useCallback(async () => {
+    try {
+      const response = await fetch("/api/cloudflare?accounts=1", { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = (await response.json()) as { accounts?: Array<{ id: string; label: string }> };
+      const list = payload.accounts ?? [];
+      setCfAccounts(list);
+      if (list.length === 1) setAccountId(list[0].id);
+    } catch {
+      // The server picks when the browser could not ask.
+    }
+  }, []);
+
   useEffect(() => {
     void loadGroups();
-  }, [loadGroups]);
+    void loadAccounts();
+  }, [loadGroups, loadAccounts]);
 
   async function add() {
     setBusy(true);
@@ -76,7 +99,11 @@ export default function AddToCloudflare({
       const response = await fetch("/api/cloudflare", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ domain, groupId: groupId || undefined }),
+        body: JSON.stringify({
+          domain,
+          groupId: groupId || undefined,
+          accountId: accountId || undefined,
+        }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Cloudflare would not add it.");
@@ -136,6 +163,24 @@ export default function AddToCloudflare({
           {error ? <div className="notice bad">{error}</div> : null}
 
           {!zone ? (
+            <>
+            {cfAccounts.length > 1 ? (
+              <section className="sheet-section">
+                <h3>Which Cloudflare account</h3>
+                <p className="stage-hint">
+                  More than one is configured, and a zone can only live in one of
+                  them. Put it where whoever manages this domain will look for it.
+                </p>
+                <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+                  {cfAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.label}
+                    </option>
+                  ))}
+                </select>
+              </section>
+            ) : null}
+
             <section className="sheet-section">
               <h3>Records to create</h3>
               <p className="stage-hint">
@@ -192,12 +237,13 @@ export default function AddToCloudflare({
                   type="button"
                   className="btn btn-cloudflare"
                   onClick={() => void add()}
-                  disabled={busy}
+                  disabled={busy || (cfAccounts.length > 1 && !accountId)}
                 >
                   {busy ? "Adding…" : "Add to Cloudflare"}
                 </button>
               </div>
             </section>
+            </>
           ) : (
             <>
               <section className="sheet-section">

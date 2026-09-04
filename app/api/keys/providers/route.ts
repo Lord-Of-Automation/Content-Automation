@@ -37,6 +37,7 @@ function payload(statuses: Awaited<ReturnType<typeof allStatuses>>) {
         name: f.name,
         label: f.label,
         secret: f.secret,
+        multiline: f.multiline ?? false,
         placeholder: f.placeholder,
         hint: f.hint,
       })),

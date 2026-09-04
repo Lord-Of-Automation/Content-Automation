@@ -8,6 +8,7 @@ type Field = {
   name: string;
   label: string;
   secret: boolean;
+  multiline?: boolean;
   placeholder: string;
   hint?: string;
 };
@@ -208,19 +209,38 @@ export default function DomainProviders() {
                         <span className="provider-current">{status.shown[field.name]}</span>
                       ) : null}
                     </label>
-                    <input
-                      id={`${spec.id}-${field.name}`}
-                      type={field.secret ? "password" : "text"}
-                      autoComplete="off"
-                      spellCheck={false}
-                      placeholder={
-                        status?.shown?.[field.name]
-                          ? "leave blank to keep the current one"
-                          : field.placeholder
-                      }
-                      value={draft[field.name] ?? ""}
-                      onChange={(e) => setField(spec.id, field.name, e.target.value)}
-                    />
+                    {/* A textarea where the value holds several lines. A
+                        password input would collapse them and hide which line
+                        was wrong. */}
+                    {field.multiline ? (
+                      <textarea
+                        id={`${spec.id}-${field.name}`}
+                        rows={3}
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder={
+                          status?.shown?.[field.name]
+                            ? "leave blank to keep what is stored"
+                            : field.placeholder
+                        }
+                        value={draft[field.name] ?? ""}
+                        onChange={(e) => setField(spec.id, field.name, e.target.value)}
+                      />
+                    ) : (
+                      <input
+                        id={`${spec.id}-${field.name}`}
+                        type={field.secret ? "password" : "text"}
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder={
+                          status?.shown?.[field.name]
+                            ? "leave blank to keep the current one"
+                            : field.placeholder
+                        }
+                        value={draft[field.name] ?? ""}
+                        onChange={(e) => setField(spec.id, field.name, e.target.value)}
+                      />
+                    )}
                     {field.hint ? <p className="provider-hint">{field.hint}</p> : null}
                   </div>
                 ))}

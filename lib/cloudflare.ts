@@ -51,16 +51,61 @@ export class CloudflareConfigError extends Error {
   }
 }
 
-async function credentials(): Promise<{ token: string; accountId: string }> {
+export interface CfAccount {
+  token: string;
+  accountId: string;
+  /** Which line it came from, for messages. Never the token itself. */
+  label: string;
+}
+
+/**
+ * Every Cloudflare account this console has been given.
+ *
+ * One line each, token then account id. Several because an estate this size is
+ * not in one account: 371 zones under one login, 162 under another, and the
+ * domains split between them. A token only ever sees the account it was issued
+ * for, so a single-credential design reported two thirds of the estate as not
+ * on Cloudflare when nearly all of it is.
+ *
+ * A line with no account id still reads fine. The id is only needed to create a
+ * zone, and an account you can read but not create in is a perfectly ordinary
+ * thing to have.
+ */
+export async function accounts(): Promise<CfAccount[]> {
   const found = await credentialFor("cloudflare");
-  const token = found?.apiToken?.trim();
-  const accountId = found?.accountId?.trim() ?? "";
-  if (!token) {
+  const raw = found?.apiToken?.trim();
+  if (!raw) {
     throw new CloudflareConfigError(
       "No Cloudflare token is set. Add it on the Keys page under Domain providers.",
     );
   }
-  return { token, accountId };
+
+  // The account id used to be a field of its own, so a value saved then is one
+  // token with the id beside it. Both shapes read the same way here.
+  const legacyId = found?.accountId?.trim() ?? "";
+
+  const list: CfAccount[] = [];
+  for (const line of raw.split(/[\r\n]+/)) {
+    const parts = line.trim().split(/[\s,]+/).filter(Boolean);
+    if (!parts.length) continue;
+
+    const token = parts.find((p) => p.startsWith("cfut_") || p.length > 30) ?? parts[0];
+    const accountId = parts.find((p) => /^[0-9a-f]{32}$/i.test(p)) ?? "";
+    if (!token) continue;
+
+    list.push({
+      token,
+      accountId: accountId || (list.length === 0 ? legacyId : ""),
+      // The last four characters, so two accounts can be told apart in a
+      // message without the message becoming somewhere a token is written down.
+      label: `account ending ${token.slice(-4)}`,
+    });
+  }
+
+  if (!list.length) {
+    throw new CloudflareConfigError("No Cloudflare token could be read from what is stored.");
+  }
+  return list;
 }
 
 /**
@@ -129,41 +174,74 @@ function shapeZone(raw: Record<string, unknown>): CloudflareZone {
   };
 }
 
-/**
- * Every zone the token can see, keyed by domain.
- *
- * Paged, because an estate outgrows one page quickly and a half-read list would
- * report domains as missing from Cloudflare when they are simply on page three.
- */
-export async function listZones(): Promise<Map<string, CloudflareZone>> {
-  const { token } = await credentials();
-  const zones = new Map<string, CloudflareZone>();
+/** A zone, and which account it was found in. */
+export interface OwnedZone extends CloudflareZone {
+  accountLabel: string;
+}
 
-  for (let page = 1; page <= 20; page += 1) {
-    const answer = await call<Array<Record<string, unknown>>>(
-      `/zones?per_page=50&page=${page}`,
-      token,
-    );
-    if (!answer.ok || !answer.result?.length) break;
-    for (const raw of answer.result) {
-      const zone = shapeZone(raw);
-      if (zone.name) zones.set(zone.name, zone);
+/**
+ * Every zone across every configured account, keyed by domain.
+ *
+ * Paged per account, because an estate outgrows one page quickly and a
+ * half-read list reports domains as missing from Cloudflare when they are
+ * merely on page three.
+ *
+ * An account that fails is skipped rather than fatal. Two accounts hold this
+ * estate between them, and one bad token must not blank the other's zones —
+ * that is exactly the failure that had two thirds of the domains reading as not
+ * on Cloudflare.
+ */
+export async function listZones(): Promise<Map<string, OwnedZone>> {
+  const zones = new Map<string, OwnedZone>();
+
+  for (const account of await accounts()) {
+    for (let page = 1; page <= 30; page += 1) {
+      const answer = await call<Array<Record<string, unknown>>>(
+        `/zones?per_page=50&page=${page}`,
+        account.token,
+      );
+      if (!answer.ok || !answer.result?.length) break;
+      for (const raw of answer.result) {
+        const zone = shapeZone(raw);
+        // First account wins a duplicate. A domain really can be a zone in two
+        // accounts at once — one of them pending forever — and picking one
+        // consistently beats whichever answered last.
+        if (zone.name && !zones.has(zone.name)) {
+          zones.set(zone.name, { ...zone, accountLabel: account.label });
+        }
+      }
+      if (answer.result.length < 50) break;
     }
-    if (answer.result.length < 50) break;
   }
 
   return zones;
 }
 
-/** One zone by name, or null. Used when polling a single domain's activation. */
+/**
+ * One zone by name, and the account it lives in.
+ *
+ * Asked of each account in turn rather than of one, because a write has to go
+ * through the token that owns the zone — a token for the wrong account is
+ * refused, and the refusal reads exactly like a permissions problem.
+ */
+export async function findZone(
+  domain: string,
+): Promise<{ zone: CloudflareZone; account: CfAccount } | null> {
+  for (const account of await accounts()) {
+    const answer = await call<Array<Record<string, unknown>>>(
+      `/zones?name=${encodeURIComponent(domain.toLowerCase())}`,
+      account.token,
+    );
+    if (answer.ok && answer.result?.length) {
+      return { zone: shapeZone(answer.result[0]), account };
+    }
+  }
+  return null;
+}
+
+/** The zone alone, for callers that only want its status. */
 export async function getZone(domain: string): Promise<CloudflareZone | null> {
-  const { token } = await credentials();
-  const answer = await call<Array<Record<string, unknown>>>(
-    `/zones?name=${encodeURIComponent(domain.toLowerCase())}`,
-    token,
-  );
-  if (!answer.ok || !answer.result?.length) return null;
-  return shapeZone(answer.result[0]);
+  return (await findZone(domain))?.zone ?? null;
 }
 
 /**
@@ -173,20 +251,34 @@ export async function getZone(domain: string): Promise<CloudflareZone | null> {
  * are set at the registrar, which is the step people forget and the reason the
  * caller shows them immediately rather than behind another click.
  */
-export async function createZone(domain: string): Promise<CloudflareZone> {
-  const { token, accountId } = await credentials();
-  if (!accountId) {
+export async function createZone(
+  domain: string,
+  accountId?: string,
+): Promise<{ zone: CloudflareZone; account: CfAccount }> {
+  const all = await accounts();
+
+  // Named where the caller named one, because with several accounts "which one"
+  // is a real question and guessing it puts the domain somewhere unintended.
+  // Otherwise the first that can create at all, which is the whole answer when
+  // there is only one.
+  const account = accountId
+    ? all.find((a) => a.accountId === accountId)
+    : all.find((a) => a.accountId);
+
+  if (!account?.accountId) {
     throw new CloudflareConfigError(
-      "No Cloudflare account id is set, and creating a zone needs one. " +
-        "Add it on the Keys page beside the token.",
+      accountId
+        ? "That Cloudflare account is not one of the ones configured here."
+        : "None of the configured Cloudflare lines carries an account id, and " +
+          "creating a zone needs one. Add it after the token on the Keys page.",
     );
   }
 
-  const answer = await call<Record<string, unknown>>("/zones", token, {
+  const answer = await call<Record<string, unknown>>("/zones", account.token, {
     method: "POST",
     body: JSON.stringify({
       name: domain.toLowerCase(),
-      account: { id: accountId },
+      account: { id: account.accountId },
       // A full zone, which is the one that takes over the domain's DNS. The
       // partial kind only works alongside another provider and is not what
       // anybody means by "add this to Cloudflare".
@@ -195,25 +287,24 @@ export async function createZone(domain: string): Promise<CloudflareZone> {
   });
 
   if (!answer.ok || !answer.result) {
-    // 1061 is Cloudflare's "already exists", which is usually true and usually
-    // about an account this token cannot see. Saying so beats "creation
-    // failed", which sends people to check a token that is working perfectly.
+    // 1061 is Cloudflare's "already exists". With several accounts configured
+    // it usually means a fourth one nobody has given this console a token for,
+    // so the message says where to look rather than blaming the token.
     if (answer.code === 1061) {
       throw new Error(
-        `Cloudflare already has a zone for ${domain}, in an account this token cannot see. ` +
-          "Either use the token for that account, or remove the zone there first.",
+        `Cloudflare already has a zone for ${domain}, in an account this console cannot see. ` +
+          "Add that account's token on the Keys page, or remove the zone there first.",
       );
     }
     throw new Error(`Cloudflare refused to add ${domain}: ${answer.message}`);
   }
 
-  return shapeZone(answer.result);
+  return { zone: shapeZone(answer.result), account };
 }
 
 // -------------------------------------------------------------------- records
 
-export async function listRecords(zoneId: string): Promise<CfRecord[]> {
-  const { token } = await credentials();
+export async function listRecords(zoneId: string, token: string): Promise<CfRecord[]> {
   const out: CfRecord[] = [];
 
   for (let page = 1; page <= 10; page += 1) {
@@ -250,8 +341,7 @@ export interface RecordInput {
   priority?: number;
 }
 
-export async function createRecord(zoneId: string, record: RecordInput): Promise<void> {
-  const { token } = await credentials();
+export async function createRecord(zoneId: string, record: RecordInput, token: string): Promise<void> {
   const answer = await call(`/zones/${zoneId}/dns_records`, token, {
     method: "POST",
     body: JSON.stringify({
@@ -272,8 +362,8 @@ export async function updateRecord(
   zoneId: string,
   recordId: string,
   record: RecordInput,
+  token: string,
 ): Promise<void> {
-  const { token } = await credentials();
   const answer = await call(`/zones/${zoneId}/dns_records/${recordId}`, token, {
     method: "PUT",
     body: JSON.stringify({
@@ -288,8 +378,7 @@ export async function updateRecord(
   if (!answer.ok) throw new Error(`Cloudflare refused the change: ${answer.message}`);
 }
 
-export async function deleteRecord(zoneId: string, recordId: string): Promise<void> {
-  const { token } = await credentials();
+export async function deleteRecord(zoneId: string, recordId: string, token: string): Promise<void> {
   const answer = await call(`/zones/${zoneId}/dns_records/${recordId}`, token, {
     method: "DELETE",
   });

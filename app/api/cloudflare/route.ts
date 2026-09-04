@@ -4,8 +4,8 @@ import { auth } from "@/auth";
 import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
 import {
-  CloudflareConfigError, createRecord, createZone, deleteRecord, getZone,
-  listRecords, updateRecord,
+  accounts, CloudflareConfigError, createRecord, createZone, deleteRecord,
+  findZone, listRecords, updateRecord,
 } from "@/lib/cloudflare";
 import { groupById } from "@/lib/dnsgroups";
 import { sweep, watchZone } from "@/lib/cfwatch";
@@ -52,11 +52,26 @@ export async function GET(request: Request) {
       return NextResponse.json(await sweep());
     }
 
-    const domain = domainOf(params.get("domain"));
-    const zone = await getZone(domain);
-    if (!zone) return NextResponse.json({ zone: null, records: [] });
+    // Which accounts exist, so the add dialog can offer a choice rather than
+    // silently picking one when there is more than one.
+    if (params.get("accounts")) {
+      const list = await accounts();
+      return NextResponse.json({
+        // The label and the id only. The token never leaves the server.
+        accounts: list
+          .filter((a) => a.accountId)
+          .map((a) => ({ id: a.accountId, label: a.label })),
+      });
+    }
 
-    return NextResponse.json({ zone, records: await listRecords(zone.id) });
+    const domain = domainOf(params.get("domain"));
+    const found = await findZone(domain);
+    if (!found) return NextResponse.json({ zone: null, records: [] });
+
+    return NextResponse.json({
+      zone: found.zone,
+      records: await listRecords(found.zone.id, found.account.token),
+    });
   } catch (error) {
     if (error instanceof CloudflareConfigError) {
       return NextResponse.json({ error: error.message, kind: "config" }, { status: 500 });
@@ -73,7 +88,7 @@ export async function POST(request: Request) {
   const session = await auth();
   const actor = session?.user?.name ?? "unknown";
 
-  let body: { domain?: string; groupId?: string };
+  let body: { domain?: string; groupId?: string; accountId?: string };
   try {
     body = await request.json();
   } catch {
@@ -82,7 +97,7 @@ export async function POST(request: Request) {
 
   try {
     const domain = domainOf(body.domain);
-    const zone = await createZone(domain);
+    const { zone, account } = await createZone(domain, body.accountId);
 
     // Records written after the zone exists and before anybody is told to move
     // the name servers, so the site answers correctly the moment Cloudflare
@@ -102,7 +117,7 @@ export async function POST(request: Request) {
               ttl: r.ttl,
               proxied: r.proxied,
               priority: r.priority,
-            });
+            }, account.token);
             written.push(`${r.type} ${r.name}`);
           } catch (e) {
             // One refused record must not undo a zone that was created
@@ -169,10 +184,15 @@ export async function PUT(request: Request) {
     const zoneId = String(body.zoneId ?? "");
     if (!/^[0-9a-f]{32}$/i.test(zoneId)) throw new Error("That is not a zone id.");
 
+    // The token that owns the zone, because another account's token is refused
+    // and the refusal reads exactly like a permissions problem.
+    const owner = await findZone(domain);
+    if (!owner) throw new Error("No Cloudflare zone for that domain in any configured account.");
+
     if (body.remove) {
       const recordId = String(body.recordId ?? "");
       if (!/^[0-9a-f]{32}$/i.test(recordId)) throw new Error("That is not a record id.");
-      await deleteRecord(zoneId, recordId);
+      await deleteRecord(zoneId, recordId, owner.account.token);
       await record(actor, "dns-changed", `${domain}: deleted a Cloudflare record`);
       return NextResponse.json({ ok: true });
     }
@@ -187,8 +207,11 @@ export async function PUT(request: Request) {
       content: body.record.content === "@" ? domain : body.record.content,
     };
 
-    if (body.recordId) await updateRecord(zoneId, String(body.recordId), input);
-    else await createRecord(zoneId, input);
+    if (body.recordId) {
+      await updateRecord(zoneId, String(body.recordId), input, owner.account.token);
+    } else {
+      await createRecord(zoneId, input, owner.account.token);
+    }
 
     await record(
       actor,
