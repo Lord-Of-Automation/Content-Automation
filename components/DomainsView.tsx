@@ -248,7 +248,7 @@ export default function DomainsView() {
               </div>
             ))}
           {loading && !domains.length ? (
-            <div className="empty">Asking GoDaddy…</div>
+            <div className="empty">Loading…</div>
           ) : !domains.length && !error ? (
             <div className="empty">This account holds no domains.</div>
           ) : domains.length ? (
