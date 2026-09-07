@@ -343,9 +343,10 @@ export default function WebsitesView() {
                     id="site-pages"
                     value={pageCount}
                     onChange={setPageCount}
-                    options={["3", "5", "8", "12", "20"].map((n) => ({
+                    options={["1", "3", "5", "8", "12", "20"].map((n) => ({
                       value: n,
-                      label: `${n} pages`,
+                      label: n === "1" ? "One page" : `${n} pages`,
+                      hint: n === "1" ? "everything on the front page" : undefined,
                     }))}
                   />
                 </div>

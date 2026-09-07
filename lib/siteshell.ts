@@ -475,8 +475,17 @@ export function renderPage(site: ShellSite, page: ShellPage, options: ShellOptio
     .map((l) => `<a href="${escapeText(l.url)}">${escapeText(l.label)}</a>`)
     .join("\n          ");
 
+  /**
+   * No menu for a site of one page.
+   *
+   * A navigation bar whose only entry is the page you are already on is not a
+   * navigation bar, it is a label in the wrong place. Extra links still show,
+   * because those go somewhere.
+   */
+  const worthNavigating = ordered.length > 1 || h.links.length > 0;
+
   const nav =
-    h.showNav && (pageLinks || extraLinks)
+    h.showNav && worthNavigating && (pageLinks || extraLinks)
       ? `<nav class="site">
           ${[pageLinks, extraLinks].filter(Boolean).join("\n          ")}
         </nav>`
