@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import PageCanvas from "@/components/PageCanvas";
+import PageCanvas, { hasBehaviour } from "@/components/PageCanvas";
 import SitePreview from "@/components/SitePreview";
 import { Select } from "@/components/Select";
 
@@ -744,6 +744,14 @@ export default function WebsiteEditor({ id }: { id: string }) {
                           ? "Read only while the site is still being written: a page that is rewritten under you would lose the edit."
                           : "Click into the page and type. Changes are kept when you click away, and saved when you press Save changes."}
                       </p>
+                      {hasBehaviour(page.bodyHtml) ? (
+                        <p className="provider-hint">
+                          This page carries a script or its own styles. They are
+                          not run here, because this view is part of the console;
+                          the preview beside it runs them, in a frame that can
+                          reach nothing. Your edits keep them either way.
+                        </p>
+                      ) : null}
                     </>
                   ) : (
                     <>

@@ -22,10 +22,28 @@ import { useEffect, useRef } from "react";
  * our own generated content rather than a stranger's, and that is exactly the
  * reasoning that makes people skip it — a model that can be told what to write
  * can be told what to write by somebody else's web page it read on the way.
+ *
+ * Pages are allowed to carry behaviour, and it still does not run here. The
+ * preview next door runs it, in a frame that is its own origin and can reach
+ * nothing; this surface is the console itself, where a script would arrive with
+ * the console's cookies. So the stripping stays, and what is removed is
+ * reported instead, because an editor that silently drops half a page is worse
+ * than one that refuses to run it.
  */
 
 /** Everything that runs, loads, or restyles the console around it. */
 const STRIP = "script, style, link, meta, iframe, object, embed, form, base, noscript";
+
+/**
+ * Whether a page carries anything this surface will not run.
+ *
+ * Used by the editor to say so out loud. Cheap and deliberately rough: a false
+ * positive puts a true sentence on screen about a page that mentions a script
+ * tag, which costs nothing.
+ */
+export function hasBehaviour(html: string): boolean {
+  return /<script[\s>]|<style[\s>]|\son[a-z]+\s*=/i.test(html);
+}
 
 export function cleanHtml(html: string): string {
   if (typeof window === "undefined") return "";
