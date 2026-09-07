@@ -281,44 +281,34 @@ export default function AppDomain({
                   Cloudways goes on reporting the old one, because nothing tells
                   it. Treat a refusal as somebody having changed it.
                 </p>
-                <table className="logs">
-                  <tbody>
-                    <tr>
-                      <td className="nowrap">Login</td>
-                      <td className="detail">
-                        <AppCredential
-                          user={app.adminUser}
-                          password={app.adminPassword}
-                        />
-                      </td>
-                    </tr>
-                    {app.adminPath ? (
-                      <tr>
-                        <td className="nowrap">Admin page</td>
-                        <td className="detail">
-                          <a
-                            className="btn btn-ghost btn-sm"
-                            href={`${
-                              app.domain ? `https://${app.domain}` : app.stagingUrl
-                            }${app.adminPath}`}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                          >
-                            Go To Admin
-                          </a>
-                        </td>
-                      </tr>
-                    ) : null}
-                    <tr>
-                      <td className="nowrap">Always answers</td>
-                      <td className="detail">
-                        <span className="rr-value">
-                          {app.stagingUrl.replace("https://", "")}
-                        </span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                <AppCredential
+                  user={app.adminUser}
+                  password={app.adminPassword}
+                  boxed
+                />
+
+                <div className="sheet-actions">
+                  {app.adminPath ? (
+                    <a
+                      className="btn btn-ghost btn-sm"
+                      href={`${
+                        app.domain ? `https://${app.domain}` : app.stagingUrl
+                      }${app.adminPath}`}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      Go To Admin
+                    </a>
+                  ) : null}
+                </div>
+
+                <p className="stage-hint">
+                  It always answers on{" "}
+                  <span className="rr-value">
+                    {app.stagingUrl.replace("https://", "")}
+                  </span>
+                  , with or without a domain pointed at it.
+                </p>
                 <p className="stage-hint">
                   The server, database and Redis passwords Cloudways returns
                   beside this one are dropped before anything reaches your

@@ -3960,3 +3960,57 @@ body:has(.bulkbar) main {
 .logs th.act-head {
   text-align: right;
 }
+
+/* --------------------------------------------- credentials, the roomy form
+
+   For the Access tab, where there is width to label each value. Shaped like the
+   text inputs on the same page and deliberately not one: these are values to
+   read and copy, and a real input would invite edits that go nowhere. */
+.cred-boxed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.cred-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cred-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.cred-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The same box as input[type="text"] beside it, minus the caret. */
+.cred-box {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  overflow-x: auto;
+  white-space: nowrap;
+  /* One click takes the whole value, for anyone who would rather select than
+     press Copy. */
+  user-select: all;
+}
+
+/* Dots are wider apart than the characters they stand in for, so the box keeps
+   its height and the row does not jump when Show is pressed. */
+.cred-box-secret {
+  letter-spacing: 1px;
+}
