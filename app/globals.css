@@ -3829,9 +3829,31 @@ body:has(.bulkbar) main {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
   justify-content: flex-end;
   margin-left: auto;
+  /* One row, together, with the title left where it is. */
+  flex-wrap: nowrap;
+}
+
+/* One width for all of them.
+   Four controls of four different widths read as four unrelated things; at one
+   width they read as a set. Sized to the longest label rather than to each,
+   and only the full-size ones — the small buttons elsewhere in a heading are
+   not part of this row. */
+.app-head-actions .bar-btn {
+  min-width: 132px;
+}
+
+/* Under this there is no room for four of them beside a name, and a row that
+   cannot wrap would push out of the card instead. */
+@media (max-width: 860px) {
+  .app-head-actions {
+    flex-wrap: wrap;
+  }
+
+  .app-head-actions .bar-btn {
+    min-width: 0;
+  }
 }
 
 /* A dropdown standing in a filter bar. Narrower than a market picker: these
