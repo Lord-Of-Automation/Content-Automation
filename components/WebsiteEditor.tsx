@@ -37,6 +37,9 @@ type Theme = {
   width: number;
 };
 
+/** The header and footer the build designed, when it managed one. */
+type Design = { headerHtml: string; footerHtml: string; css: string } | null;
+
 type Website = {
   id: string;
   name: string;
@@ -48,6 +51,7 @@ type Website = {
   header: Header;
   footer: Footer;
   theme: Theme;
+  design: Design;
   status: "building" | "ready" | "failed";
   runId: string;
   note: string;
@@ -613,6 +617,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
                         name,
                         tagline,
                         language: site.language ?? "en",
+                        design: site.design,
                         header,
                         footer,
                         theme,
@@ -790,6 +795,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
                       name,
                       tagline,
                       language: site.language ?? "en",
+                      design: site.design,
                       header: header ?? site.header,
                       footer: footer ?? site.footer,
                       theme: theme ?? site.theme,

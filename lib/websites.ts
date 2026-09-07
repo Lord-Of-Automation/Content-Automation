@@ -68,6 +68,19 @@ export interface SiteFooter {
   showCopyright: boolean;
 }
 
+/**
+ * A header and footer designed for this site by the build.
+ *
+ * Null when the build skipped it or the site predates it, and the renderer
+ * draws its own instead. Kept editable like everything else: it is markup and
+ * CSS somebody may want to change.
+ */
+export interface SiteDesign {
+  headerHtml: string;
+  footerHtml: string;
+  css: string;
+}
+
 export interface SiteTheme {
   /** Links, and anything the design wants to draw the eye to. */
   accent: string;
@@ -132,6 +145,7 @@ export interface Website {
   header: SiteHeader;
   footer: SiteFooter;
   theme: SiteTheme;
+  design: SiteDesign | null;
   createdAt: string;
   createdBy: string;
   updatedAt: string;
@@ -213,6 +227,8 @@ export interface BuiltPayload {
     name?: string;
     tagline?: string;
     language?: string;
+    /** The header and footer the build designed. */
+    shell?: unknown;
     /** The palette the plan chose for this subject. */
     accent?: string;
     background?: string;
@@ -284,6 +300,8 @@ export function settleFrom(site: Website, built: BuiltPayload | null, actor: str
     tagline: String(built.site.tagline ?? "") || site.tagline,
     language: String(built.site.language ?? "") || site.language,
     theme,
+    // Taken while nobody has changed it, on the same terms as the palette.
+    design: untouched ? cleanDesign(built.site.shell) : site.design,
     pages,
     status: !ended ? "building" : pages.length ? "ready" : "failed",
     note,
@@ -353,12 +371,25 @@ export function cleanTheme(raw: unknown): SiteTheme {
  * and a renderer handed one of those would draw "undefined" where the footer
  * should be.
  */
+export function cleanDesign(raw: unknown): SiteDesign | null {
+  if (!raw || typeof raw !== "object") return null;
+  const d = raw as Record<string, unknown>;
+  const headerHtml = String(d.headerHtml ?? "").slice(0, MAX_BODY);
+  const footerHtml = String(d.footerHtml ?? "").slice(0, MAX_BODY);
+  const css = String(d.css ?? "").slice(0, MAX_BODY);
+  // A design with nothing in it is no design, and storing an empty one would
+  // put an empty header on every page instead of falling back to the built-in.
+  if (!headerHtml && !footerHtml) return null;
+  return { headerHtml, footerHtml, css };
+}
+
 export function withDefaults(site: Website): Website {
   return {
     ...site,
     header: cleanHeader(site.header),
     footer: cleanFooter(site.footer),
     theme: cleanTheme(site.theme),
+    design: cleanDesign(site.design),
   };
 }
 

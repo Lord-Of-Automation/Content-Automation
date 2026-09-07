@@ -37,10 +37,27 @@ export interface ShellLink {
   url: string;
 }
 
+/**
+ * A header and footer designed for this site, rather than the built-in one.
+ *
+ * Placeholders rather than real links. A model writing its own navigation gets
+ * an address wrong eventually, marks the wrong page as current, or writes paths
+ * into an export that is opened from a folder. So it writes the arrangement and
+ * the styling, this fills in the links, and neither is trusted with the other's
+ * job.
+ */
+export interface ShellDesign {
+  headerHtml: string;
+  footerHtml: string;
+  css: string;
+}
+
 export interface ShellSite {
   name: string;
   tagline: string;
   language: string;
+  /** Absent on a site built before this existed, or when the step was skipped. */
+  design?: ShellDesign | null;
   pages: ShellPage[];
   header: {
     logoUrl: string;
@@ -356,11 +373,37 @@ function linkTo(page: ShellPage, options: ShellOptions): string {
  * The whole document, not a fragment: a preview that leaves out the doctype and
  * the head is a preview of something that is not the page.
  */
+/**
+ * Fill a designed header or footer in.
+ *
+ * Every placeholder is replaced whether or not it was used, so a design that
+ * forgot one does not leave "{{NAV}}" on the page for a visitor to read.
+ */
+function fill(
+  markup: string,
+  site: ShellSite,
+  options: ShellOptions,
+  parts: { brand: string; nav: string; pages: string; links: string; copyright: string },
+): string {
+  return markup
+    .replace(/\{\{\s*BRAND\s*\}\}/g, parts.brand)
+    .replace(/\{\{\s*NAV\s*\}\}/g, parts.nav)
+    .replace(/\{\{\s*PAGES\s*\}\}/g, parts.pages)
+    .replace(/\{\{\s*LINKS\s*\}\}/g, parts.links)
+    .replace(/\{\{\s*COPYRIGHT\s*\}\}/g, parts.copyright)
+    .replace(/\{\{\s*NAME\s*\}\}/g, escapeText(site.name))
+    .replace(/\{\{\s*TAGLINE\s*\}\}/g, escapeText(site.tagline))
+    .replace(/\{\{\s*YEAR\s*\}\}/g, String(options.year ?? ""))
+    // Anything else it invented. Better an empty space than a curly brace.
+    .replace(/\{\{[^}]{0,40}\}\}/g, "");
+}
+
 export function renderPage(site: ShellSite, page: ShellPage, options: ShellOptions): string {
   const ordered = [...site.pages].sort((a, b) => a.order - b.order);
   const home = ordered[0];
   const h = site.header;
   const f = site.footer;
+  const design = site.design;
 
   const pageLinks = ordered
     .map((p) => {
@@ -396,8 +439,31 @@ export function renderPage(site: ShellSite, page: ShellPage, options: ShellOptio
         </a>`
     : "";
 
-  const header =
-    brand || nav
+  /**
+   * The pieces a designed shell asks for by name.
+   *
+   * Built here whether or not one is in use, because the built-in header wants
+   * the same links and building them twice is how the two drift apart.
+   */
+  const parts = {
+    brand: brand || `<span class="brand-name">${escapeText(site.name)}</span>`,
+    nav: pageLinks,
+    pages: ordered
+      .map((p) => `<a href="${escapeText(linkTo(p, options))}">${escapeText(p.title)}</a>`)
+      .join(""),
+    links: h.links
+      .map((l) => `<a href="${escapeText(l.url)}">${escapeText(l.label)}</a>`)
+      .join(""),
+    copyright: f.showCopyright
+      ? `&copy; ${options.year ?? ""} ${escapeText(site.name)}`
+      : "",
+  };
+
+  const header = design?.headerHtml
+    ? `  <header class="site">
+${fill(design.headerHtml, site, options, parts)}
+    </header>`
+    : brand || nav
       ? `  <header class="site">
       <div class="wrap">
         ${brand}
@@ -433,8 +499,11 @@ export function renderPage(site: ShellSite, page: ShellPage, options: ShellOptio
     ? `<div class="footer-base"><span>&copy; ${options.year ?? ""} ${escapeText(site.name)}</span></div>`
     : "";
 
-  const footer =
-    about || footerNav || pageNav || base
+  const footer = design?.footerHtml
+    ? `  <footer class="site">
+${fill(design.footerHtml, site, options, parts)}
+    </footer>`
+    : about || footerNav || pageNav || base
       ? `  <footer class="site">
       <div class="wrap">
         <div class="footer-cols">
@@ -457,6 +526,7 @@ export function renderPage(site: ShellSite, page: ShellPage, options: ShellOptio
 <title>${escapeText(title)}</title>
 ${page.metaDescription ? `<meta name="description" content="${escapeText(page.metaDescription)}">` : ""}
 <style>${styles(site)}</style>
+${design?.css ? `<style>${design.css}</style>` : ""}
 </head>
 <body>
 ${header}

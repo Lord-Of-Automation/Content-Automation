@@ -5,8 +5,8 @@ import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
 import { fetchBuiltSite } from "@/lib/engine";
 import {
-  cleanFooter, cleanHeader, cleanPages, cleanTheme, getWebsite, removeWebsite,
-  saveWebsite, settleFrom, type Website,
+  cleanDesign, cleanFooter, cleanHeader, cleanPages, cleanTheme, getWebsite,
+  removeWebsite, saveWebsite, settleFrom, type Website,
 } from "@/lib/websites";
 
 export const runtime = "nodejs";
@@ -77,6 +77,7 @@ export async function PUT(
     tagline?: string;
     pages?: unknown;
     header?: unknown;
+    design?: unknown;
     footer?: unknown;
     theme?: unknown;
   };
@@ -108,6 +109,7 @@ export async function PUT(
       header: body.header === undefined ? site.header : cleanHeader(body.header),
       footer: body.footer === undefined ? site.footer : cleanFooter(body.footer),
       theme: body.theme === undefined ? site.theme : cleanTheme(body.theme),
+      design: body.design === undefined ? site.design : cleanDesign(body.design),
       // An edit settles a site that failed to build: whatever the run did, the
       // pages in front of you now are the site.
       status: site.status === "building" ? site.status : "ready",

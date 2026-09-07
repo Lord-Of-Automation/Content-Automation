@@ -130,6 +130,7 @@ export async function POST(request: Request) {
       header: DEFAULT_HEADER,
       footer: DEFAULT_FOOTER,
       theme: DEFAULT_THEME,
+      design: null,
       createdAt: now,
       createdBy: actor,
       updatedAt: now,
