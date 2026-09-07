@@ -53,6 +53,7 @@ export default function WebsitesView() {
   const [pageCount, setPageCount] = useState("5");
   const [primaryKeyword, setPrimaryKeyword] = useState("");
   const [market, setMarket] = useState("gb");
+  const [referenceUrl, setReferenceUrl] = useState("");
   /**
    * Standing instructions for every page of this site.
    *
@@ -125,6 +126,7 @@ export default function WebsitesView() {
           primaryKeyword,
           market,
           houseRules,
+          referenceUrl,
         }),
       });
       if (response.status === 401) {
@@ -146,6 +148,7 @@ export default function WebsitesView() {
       setTopic("");
       setKeywords("");
       setName("");
+      setReferenceUrl("");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "The website could not be started.");
@@ -273,6 +276,23 @@ export default function WebsitesView() {
               <p className="provider-hint">
                 One per line or separated by commas. They are spread across the
                 pages rather than crammed into one.
+              </p>
+
+              <label className="field-label" htmlFor="site-reference">
+                Design reference (optional)
+              </label>
+              <input
+                id="site-reference"
+                type="text"
+                value={referenceUrl}
+                placeholder="https://a-site-you-like.com"
+                onChange={(e) => setReferenceUrl(e.target.value)}
+              />
+              <p className="provider-hint">
+                A site to take the shape of. It is read for its arrangement and
+                its colours, never its words: the headings and section shapes go
+                to the builder, the prose is thrown away before it gets there. A
+                page that will not load is skipped rather than failing the build.
               </p>
 
               <div className="site-row">

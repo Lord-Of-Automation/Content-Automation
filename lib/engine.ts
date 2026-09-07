@@ -366,6 +366,7 @@ export async function startBuild(input: {
   primary_keyword: string;
   site_market: string;
   house_rules: string;
+  reference_url: string;
 }): Promise<{ executionId: string; note: string | null }> {
   const result = await call<{ id: string; note?: string }>(
     "/runs",

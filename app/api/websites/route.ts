@@ -77,6 +77,7 @@ export async function POST(request: Request) {
     primaryKeyword?: string;
     market?: string;
     houseRules?: string;
+    referenceUrl?: string;
   };
   try {
     body = await request.json();
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
       primary_keyword: String(body.primaryKeyword ?? "").trim().slice(0, 120),
       site_market: String(body.market ?? "gb").trim().toLowerCase().slice(0, 8),
       house_rules: String(body.houseRules ?? "").trim().slice(0, 6000),
+      reference_url: String(body.referenceUrl ?? "").trim().slice(0, 500),
     });
 
     const now = new Date().toISOString();
