@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import AppDomain from "@/components/AppDomain";
+import NewApplication from "@/components/NewApplication";
 import { Select } from "@/components/Select";
 
 type App = {
@@ -81,6 +82,7 @@ export default function AppsView() {
   const [direction, setDirection] = useState<"asc" | "desc">("asc");
   /** The application whose domain is being changed, if any. */
   const [managing, setManaging] = useState<App | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -181,9 +183,23 @@ export default function AppsView() {
           <div>
             <h2>Applications</h2>
           </div>
-          <button type="button" className="ghost" onClick={() => void load()} disabled={loading}>
-            {loading ? "Reading…" : "Refresh"}
-          </button>
+          <div className="app-head-actions">
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => void load()}
+              disabled={loading}
+            >
+              {loading ? "Reading…" : "Refresh"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setCreating(true)}
+            >
+              New application
+            </button>
+          </div>
         </div>
 
         <div className="card-body tight">
@@ -372,6 +388,18 @@ export default function AppsView() {
           ) : null}
         </div>
       </div>
+
+      {creating ? (
+        <NewApplication
+          onClose={() => setCreating(false)}
+          onDone={() => {
+            setCreating(false);
+            // The new one belongs in the table, and it is sorted by name
+            // rather than appended, so the whole list is read again.
+            void load();
+          }}
+        />
+      ) : null}
 
       {managing ? (
         <AppDomain

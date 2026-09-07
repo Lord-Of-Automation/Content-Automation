@@ -342,6 +342,132 @@ export async function listApplications(): Promise<CloudwaysEstate> {
   };
 }
 
+export interface Installable {
+  /** What the API wants in `application`: "wordpress", "phpstack". */
+  application: string;
+  /** "6.2.2". */
+  version: string;
+  /** The family name, for reading: "WordPress". */
+  label: string;
+}
+
+/**
+ * What this account may install, asked rather than assumed.
+ *
+ * A list written into this file would be wrong the week Cloudways moves a
+ * version, and wrong in the worst way: the form would offer something the API
+ * then refuses, which reads as a broken button rather than a stale list. The
+ * catalogue is small and comes back in one call, so there is no reason to
+ * guess.
+ *
+ * Note that one family can carry several builds. WordPress here offers both
+ * "wordpress" and "wordpressdefault" at the same version, and the API says
+ * nothing about what separates them — so the identifier is passed through as
+ * it is and shown beside the name, rather than dressed up in a guess.
+ */
+export async function listInstallable(): Promise<Installable[]> {
+  const body = (await get("/apps")) as {
+    apps?: Record<string, { label?: string; versions?: Array<{ application?: string; app_version?: string }> }>;
+  };
+
+  const out: Installable[] = [];
+  for (const [family, entry] of Object.entries(body?.apps ?? {})) {
+    for (const version of entry?.versions ?? []) {
+      const application = version.application?.trim();
+      if (!application) continue;
+      out.push({
+        application,
+        version: version.app_version?.trim() ?? "",
+        label: entry.label?.trim() || family,
+      });
+    }
+  }
+
+  return out.sort(
+    (a, b) => a.label.localeCompare(b.label) || a.application.localeCompare(b.application),
+  );
+}
+
+export interface CreatedApp {
+  operationId: string;
+  /**
+   * The new application, once it appears.
+   *
+   * Null is an ordinary answer, not a failure: Cloudways builds an application
+   * in the background and can take longer than a web request may wait.
+   */
+  app: CloudwaysApp | null;
+  /** What was asked for, so the result can be named either way. */
+  label: string;
+  serverLabel: string;
+}
+
+/** Letters, digits and the punctuation a site name actually uses. */
+const APP_LABEL = /^[A-Za-z0-9][A-Za-z0-9 ._-]*$/;
+
+/**
+ * Install a new application on one of this account's servers.
+ *
+ * Much safer than changing a domain, and worth saying why: nothing existing is
+ * touched, Cloudways bills per server rather than per application, and one
+ * created by mistake can be deleted. The cost is disk and memory on a server
+ * that may already be carrying a couple of hundred sites.
+ *
+ * The new application is found by diffing the server's application ids across
+ * the create, rather than trusting a field in the reply. That also settles
+ * whether it worked: an id that was not there before is the only proof that
+ * something was built.
+ */
+export async function createApplication(
+  serverId: string,
+  application: string,
+  version: string,
+  label: string,
+): Promise<CreatedApp> {
+  const name = label.trim();
+  if (!name) throw new Error("The application needs a name.");
+  if (name.length > 50) throw new Error("That name is too long. Fifty characters is the limit.");
+  if (!APP_LABEL.test(name)) {
+    throw new Error(
+      "A name can hold letters, digits, spaces, dots, dashes and underscores, " +
+        "and has to start with a letter or digit.",
+    );
+  }
+
+  const catalogue = await listInstallable();
+  if (!catalogue.some((c) => c.application === application && c.version === version)) {
+    throw new Error("Cloudways does not offer that application and version.");
+  }
+
+  const before = await listApplications();
+  const server = before.servers.find((s) => s.id === serverId);
+  if (!server) throw new Error("No such server on this account.");
+  const known = new Set(before.apps.map((a) => a.id));
+
+  const body = await post("/app", {
+    server_id: serverId,
+    application,
+    app_version: version,
+    app_label: name,
+  });
+
+  const operationId = String(body.operation_id ?? "");
+  await settle(operationId);
+
+  let app: CloudwaysApp | null = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const now = await listApplications();
+    const fresh = now.apps.filter((a) => a.serverId === serverId && !known.has(a.id));
+    // By name among the new ones, in case somebody else created one at the
+    // same moment. Falling back to whatever is new beats reporting nothing.
+    app = fresh.find((a) => a.label === name) ?? fresh[0] ?? null;
+    if (app) break;
+    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 4000));
+  }
+
+  return { operationId, app, label: name, serverLabel: server.label };
+}
+
 /** What a primary domain is allowed to look like. */
 const HOSTNAME = /^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 

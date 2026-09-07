@@ -3796,6 +3796,15 @@ body:has(.bulkbar) main {
   justify-content: center;
 }
 
+/* Refresh and New application, side by side in the card heading. Refresh used
+   to carry a class that was never defined, so it drew as a bare button next to
+   properly styled ones; both are ghost buttons now. */
+.app-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* Narrower than a market picker: it holds server names, which are short. */
 .app-server-filter {
   flex: 0 0 auto;

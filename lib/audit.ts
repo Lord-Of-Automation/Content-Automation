@@ -39,6 +39,9 @@ export type AuditAction =
    * or nothing. What it was before is the only way back.
    */
   | "app-domain-changed"
+  /** A site installed on a host. Nothing existing changes, but a server
+      gains a tenant, and on a full one that is worth being able to trace. */
+  | "app-created"
   /** A step frozen so it stops running. Logged: it changes what a run does. */
   | "step-pinned"
   | "step-unpinned";
