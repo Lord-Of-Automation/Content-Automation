@@ -3876,16 +3876,83 @@ body:has(.bulkbar) main {
   color: var(--accent);
 }
 
-/* The delete half of the application sheet, set apart from the domain half
-   above it. A rule and a heading in the warning colour, so nobody scrolls into
-   it thinking they are still in the part that can be undone. */
-.sheet-danger {
-  border-top: 1px solid var(--line);
-  padding-top: 16px;
-}
-
+/* The delete tab. It no longer needs a rule to separate it from anything, but
+   the heading keeps its colour: the tab is one click from the routine ones and
+   should not look like them once you are in it. */
 .sheet-danger h3 {
   color: var(--bad);
+}
+
+/* ------------------------------------------------------- tabbed sheet
+
+   Panel on the left, tabs down the right. The three jobs in this sheet are not
+   steps and are not related, so stacking them made it long and put the
+   irreversible one directly under the routine one. */
+.sheet-split {
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.sheet-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+.sheet-tabs {
+  flex: 0 0 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border-left: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.sheet-tab {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 9px 11px;
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--ink-2);
+  text-align: left;
+  justify-content: flex-start;
+  cursor: pointer;
+}
+
+.sheet-tab:hover {
+  color: var(--ink);
+  background: var(--panel);
+}
+
+.sheet-tab.is-on {
+  background: var(--panel);
+  border-color: var(--line-2);
+  color: var(--ink);
+}
+
+/* Only once selected. Painted red in the list it would pull the eye to the one
+   thing nobody should reach for by accident. */
+.sheet-tab.is-danger.is-on {
+  color: var(--bad);
+}
+
+/* Narrow screens have no room for a column beside the panel, so the tabs go
+   above it as a row. */
+@media (max-width: 720px) {
+  .sheet-split {
+    flex-direction: column-reverse;
+  }
+
+  .sheet-tabs {
+    flex: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-left: 0;
+    border-bottom: 1px solid var(--line);
+  }
 }
 
 /* The heading over Go To Admin, Modify and Flush cache. Right, because the
