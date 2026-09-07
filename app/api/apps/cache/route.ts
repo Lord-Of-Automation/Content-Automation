@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
 import { CloudwaysConfigError, purgeAllVarnish, purgeVarnish } from "@/lib/cloudways";
+import { purgeZone } from "@/lib/cloudflare";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   const session = await auth();
   const actor = session?.user?.name ?? "unknown";
 
-  let body: { serverId?: string; all?: boolean };
+  let body: { serverId?: string; all?: boolean; domain?: string };
   try {
     body = await request.json();
   } catch {
@@ -34,11 +35,30 @@ export async function POST(request: Request) {
   }
 
   const serverId = String(body.serverId ?? "").trim();
-  if (!serverId && !body.all) {
-    return NextResponse.json({ error: "Which server?" }, { status: 400 });
+  const domain = String(body.domain ?? "").trim().toLowerCase();
+  if (!serverId && !body.all && !domain) {
+    return NextResponse.json({ error: "Which server or site?" }, { status: 400 });
   }
 
   try {
+    /**
+     * One site, through Cloudflare.
+     *
+     * The per-application purge Cloudways does not offer. Every site here
+     * answers through Cloudflare, so the copy a visitor gets is Cloudflare's,
+     * and Cloudflare purges by zone, which is one domain and therefore one
+     * site. This is the only purge on this page that means exactly what its
+     * button says.
+     */
+    if (domain) {
+      const result = await purgeZone(domain);
+      if (!result.ok) {
+        return NextResponse.json({ error: result.message }, { status: 400 });
+      }
+      await record(actor, "app-cache-purged", `Cloudflare cache for ${domain}`);
+      return NextResponse.json({ domain, zoneId: result.zoneId, scope: "site" });
+    }
+
     // Every server, for the button that clears the whole estate. Reported per
     // server, because one refusing while the others go through is a real
     // outcome and "it failed" would be the wrong summary of it.

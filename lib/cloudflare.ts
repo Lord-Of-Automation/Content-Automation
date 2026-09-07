@@ -367,6 +367,57 @@ export async function createZone(
 
 // -------------------------------------------------------------------- records
 
+/**
+ * Clear the cache for one site.
+ *
+ * The per-application purge Cloudways cannot do. Its API only purges Varnish by
+ * server, and it turned out not to matter: every site in this estate answers
+ * through Cloudflare, so the copy a visitor is served is Cloudflare's, and
+ * Cloudflare purges by zone. A zone is a domain, and a domain is one site.
+ *
+ * Everything rather than a list of addresses. Purging named files is the
+ * careful option and the wrong default here: after an edit nobody knows which
+ * pages changed, and a site that serves a stale page because it was not on the
+ * list is worse than one that refills a cache it did not need to.
+ *
+ * Needs the Cache Purge permission, which is not one of the three this console
+ * has asked for until now, so a token that reads and edits zones perfectly well
+ * may still refuse this. The refusal is passed through rather than flattened,
+ * because "add a permission" and "the token is wrong" want different reactions.
+ */
+export async function purgeZone(
+  domain: string,
+): Promise<{ ok: boolean; zoneId: string; message: string }> {
+  const found = await findZone(domain);
+  if (!found) {
+    return {
+      ok: false,
+      zoneId: "",
+      message: `No Cloudflare zone for ${domain} on any configured account.`,
+    };
+  }
+
+  const answer = await call<{ id?: string }>(
+    `/zones/${found.zone.id}/purge_cache`,
+    found.account.token,
+    { method: "POST", body: JSON.stringify({ purge_everything: true }) },
+  );
+
+  return {
+    ok: answer.ok,
+    zoneId: found.zone.id,
+    message: answer.ok
+      ? ""
+      : // 10000 is Cloudflare's "authentication error", which for a token that
+        // plainly works is nearly always a missing permission rather than a
+        // bad token, and saying so saves an hour of checking the wrong thing.
+        answer.code === 10000
+        ? "Cloudflare refused the purge. The token needs the Cache Purge " +
+          "permission, which is separate from the zone and DNS ones."
+        : answer.message,
+  };
+}
+
 export async function listRecords(zoneId: string, token: string): Promise<CfRecord[]> {
   const out: CfRecord[] = [];
 

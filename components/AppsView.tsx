@@ -128,6 +128,15 @@ export default function AppsView() {
   const [flushAsking, setFlushAsking] = useState(false);
   const [flushBusy, setFlushBusy] = useState(false);
   const [flushed, setFlushed] = useState<string | null>(null);
+  /**
+   * The one site being cleared, through Cloudflare rather than the host.
+   *
+   * A different action from the button beside the filter, and the only one on
+   * this page whose reach is what its label says. Cloudways purges Varnish by
+   * server and nothing smaller; Cloudflare purges by zone, a zone is a domain,
+   * and a domain is one site.
+   */
+  const [purging, setPurging] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -209,6 +218,29 @@ export default function AppsView() {
       setFlushAsking(false);
     } finally {
       setFlushBusy(false);
+    }
+  }
+
+  async function purgeSite(app: App) {
+    setPurging(app.key);
+    setError(null);
+    try {
+      const response = await fetch("/api/apps/cache", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ domain: app.domain }),
+      });
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? `The purge returned ${response.status}.`);
+      setFlushed(`Cloudflare cache cleared for ${app.domain}.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That cache could not be cleared.");
+    } finally {
+      setPurging(null);
     }
   }
 
@@ -548,6 +580,20 @@ export default function AppsView() {
                               Go To Admin
                             </a>
                           ) : null}
+                          {/* Only where there is a domain to purge: a zone
+                              is a domain, and a site nobody has pointed one at
+                              has no cache in front of it. */}
+                          {a.domain ? (
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => void purgeSite(a)}
+                              disabled={purging === a.key}
+                              title={`Clear the Cloudflare cache for ${a.domain}, and nothing else`}
+                            >
+                              {purging === a.key ? "Clearing…" : "Clear cache"}
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             className="btn btn-ghost btn-sm"
@@ -585,8 +631,11 @@ export default function AppsView() {
                 rest dropped before anything reaches your browser; it is what
                 was set at install, so it will be out of date if someone has
                 changed it since. Hostinger returns no passwords, and supports
-                neither cloning, domain changes nor a cache this can clear, so
-                those controls do not appear on its rows.
+                neither cloning nor domain changes, so those controls do not
+                appear on its rows. <strong>Clear cache</strong> on a row goes
+                through Cloudflare and clears that one site; the button beside
+                the filter goes through Cloudways, which purges Varnish by
+                server and offers nothing smaller.
               </p>
             </>
           ) : null}

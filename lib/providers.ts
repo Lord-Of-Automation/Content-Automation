@@ -121,7 +121,9 @@ export const PROVIDERS: ProviderSpec[] = [
       "live. One line per account: a token, a space, then that account's id. A " +
       "token only ever sees the account it was issued for, so an estate spread " +
       "over several accounts needs one line for each or most of it stays " +
-      "invisible. Each token needs Zone:Read, Zone:Edit and DNS:Edit.",
+      "invisible. Each token needs Zone:Read, Zone:Edit and DNS:Edit, and " +
+      "Cache Purge as well if you want the per-site Clear cache button on " +
+      "the Applications page.",
     fields: [
       {
         name: "apiToken",
