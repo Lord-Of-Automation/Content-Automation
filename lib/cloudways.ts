@@ -670,6 +670,48 @@ export async function purgeVarnish(serverId: string): Promise<CachePurge> {
   return { serverLabel: server.label, apps: server.apps };
 }
 
+export interface CachePurgeAll {
+  servers: Array<{ label: string; apps: number; ok: boolean; note: string }>;
+  /** Applications whose cache was actually cleared, failures excluded. */
+  apps: number;
+}
+
+/**
+ * Clear Varnish everywhere.
+ *
+ * One server at a time rather than all at once. Three requests is not worth
+ * parallelising, and doing them in order means a server that refuses is one
+ * line in the result rather than an exception that hides whether the others
+ * went through.
+ *
+ * Nothing here throws for a single failure. "Two of three cleared" is a useful
+ * answer and the truthful one; turning it into an error would leave the caller
+ * unsure which state anything is in.
+ */
+export async function purgeAllVarnish(): Promise<CachePurgeAll> {
+  const { servers } = await listApplications();
+
+  const results: CachePurgeAll["servers"] = [];
+  for (const server of servers) {
+    try {
+      await post("/service/varnish", { server_id: server.id, action: "purge" });
+      results.push({ label: server.label, apps: server.apps, ok: true, note: "" });
+    } catch (error) {
+      results.push({
+        label: server.label,
+        apps: server.apps,
+        ok: false,
+        note: error instanceof Error ? error.message : "The purge was refused.",
+      });
+    }
+  }
+
+  return {
+    servers: results,
+    apps: results.filter((r) => r.ok).reduce((n, r) => n + r.apps, 0),
+  };
+}
+
 /** What a primary domain is allowed to look like. */
 const HOSTNAME = /^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 

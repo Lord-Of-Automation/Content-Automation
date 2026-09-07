@@ -3,12 +3,13 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
-import { CloudwaysConfigError, purgeVarnish } from "@/lib/cloudways";
+import { CloudwaysConfigError, purgeAllVarnish, purgeVarnish } from "@/lib/cloudways";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// One read to name the server, then the purge itself.
-export const maxDuration = 60;
+// One read to name the servers, then a purge each. Sequential, so the whole
+// estate needs more room than a single server did.
+export const maxDuration = 90;
 
 /**
  * Clearing the Varnish cache on a server.
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
   const session = await auth();
   const actor = session?.user?.name ?? "unknown";
 
-  let body: { serverId?: string };
+  let body: { serverId?: string; all?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -33,9 +34,27 @@ export async function POST(request: Request) {
   }
 
   const serverId = String(body.serverId ?? "").trim();
-  if (!serverId) return NextResponse.json({ error: "Which server?" }, { status: 400 });
+  if (!serverId && !body.all) {
+    return NextResponse.json({ error: "Which server?" }, { status: 400 });
+  }
 
   try {
+    // Every server, for the button that clears the whole estate. Reported per
+    // server, because one refusing while the others go through is a real
+    // outcome and "it failed" would be the wrong summary of it.
+    if (body.all) {
+      const all = await purgeAllVarnish();
+      const failed = all.servers.filter((s) => !s.ok);
+      await record(
+        actor,
+        "app-cache-purged",
+        `Varnish across ${all.servers.length - failed.length} of ${all.servers.length} ` +
+          `servers, ${all.apps} applications` +
+          (failed.length ? `; refused by ${failed.map((s) => s.label).join(", ")}` : ""),
+      );
+      return NextResponse.json(all);
+    }
+
     const result = await purgeVarnish(serverId);
     await record(
       actor,

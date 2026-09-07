@@ -101,6 +101,8 @@ export default function AppsView() {
   const [flushing, setFlushing] = useState<App | null>(null);
   const [flushBusy, setFlushBusy] = useState(false);
   const [flushed, setFlushed] = useState<string | null>(null);
+  /** The whole-estate purge, which is a different question from one server. */
+  const [flushingAll, setFlushingAll] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -157,6 +159,41 @@ export default function AppsView() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "The cache could not be cleared.");
       setFlushing(null);
+    } finally {
+      setFlushBusy(false);
+    }
+  }
+
+  async function flushEverything() {
+    setFlushBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/apps/cache", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      });
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? `The purge returned ${response.status}.`);
+
+      // Reported per server. One refusing while the rest go through is a real
+      // outcome, and "done" would be the wrong word for it.
+      const done = (payload.servers ?? []).filter((s: { ok: boolean }) => s.ok);
+      const failed = (payload.servers ?? []).filter((s: { ok: boolean }) => !s.ok);
+      setFlushed(
+        failed.length
+          ? `Varnish cleared on ${done.length} of ${payload.servers.length} servers. ` +
+            `${failed.map((s: { label: string }) => s.label).join(", ")} refused.`
+          : `Varnish cleared on every server, covering ${payload.apps} applications.`,
+      );
+      setFlushingAll(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The caches could not be cleared.");
+      setFlushingAll(false);
     } finally {
       setFlushBusy(false);
     }
@@ -323,6 +360,17 @@ export default function AppsView() {
                     onChange={setServer}
                   />
                 </div>
+                {/* Deliberately not tied to the filter beside it. The label
+                    says every website and it means every website, on all
+                    servers, whichever one the table happens to be showing. */}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setFlushingAll(true)}
+                  disabled={flushBusy}
+                >
+                  {flushBusy ? "Clearing…" : "Flush Cache On Every Website"}
+                </button>
                 <span className="domain-counts">
                   <span className="domain-count">
                     {shown.length > visible ? (
@@ -481,6 +529,27 @@ export default function AppsView() {
           ) : null}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={flushingAll}
+        title="Clear every cache"
+        body={
+          <>
+            Clears Varnish on all{" "}
+            <strong>{data?.servers.length ?? 0}</strong> servers, covering every
+            one of the <strong>{data?.apps.length ?? 0}</strong> applications on
+            this account. Each of them serves from the origin until its cache
+            refills, so the servers work harder for a minute afterwards. Nothing
+            is lost and there is nothing to undo.
+          </>
+        }
+        confirmLabel="Clear them all"
+        busyLabel="Clearing…"
+        cancelLabel="Cancel"
+        busy={flushBusy}
+        onConfirm={() => void flushEverything()}
+        onDismiss={() => setFlushingAll(false)}
+      />
 
       <ConfirmDialog
         open={!!flushing}
