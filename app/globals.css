@@ -4411,3 +4411,50 @@ body:has(.bulkbar) main {
     position: static;
   }
 }
+
+/* The vocabulary the generated pages use, enough that the editing canvas does
+   not look broken beside the preview. Plainer than the real design on purpose:
+   this surface is for the words, and the preview beside it shows the look. */
+.canvas .lead {
+  font-size: 16.5px;
+  color: var(--ink-2);
+}
+
+.canvas .grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  padding: 0;
+  list-style: none;
+}
+
+.canvas .card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel-2);
+}
+
+.canvas .card > :last-child,
+.canvas .cta > :last-child {
+  margin-bottom: 0;
+}
+
+.canvas .cta {
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+.canvas .btn {
+  display: inline-block;
+  padding: 8px 15px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  font-size: 13.5px;
+  text-decoration: none;
+}
