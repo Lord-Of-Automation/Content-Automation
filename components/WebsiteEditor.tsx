@@ -61,12 +61,18 @@ const DESC_LIMIT = 155;
 /**
  * Editing a website that has not been hosted yet.
  *
- * Pages down the left, the one being worked on beside them, and three ways to
- * work on it. Preview is the whole site with its header, navigation and footer,
- * which is the only view that answers "what does this look like". Edit renders
- * the page body alone and lets you type into it, because editing wants the
- * writing and not the furniture around it. HTML is the same page as markup,
- * still there because a rendered page cannot show you a stray tag.
+ * Pages down the left, the page being worked on in the middle, the whole site
+ * rendered on the right and keeping up as you type.
+ *
+ * The preview used to be a third tab beside Edit and HTML, which meant seeing
+ * the result and changing it were two things you switched between — so nobody
+ * looked at the result until they had stopped editing. It is a pane now, and
+ * the editor reports changes a beat after each keystroke rather than waiting
+ * for you to click away.
+ *
+ * Edit renders the page body alone and lets you type into it, because editing
+ * wants the writing and not the furniture around it. HTML is the same page as
+ * markup, still there because a rendered page cannot show you a stray tag.
  *
  * The markup is read back only when you click away from the page, not on every
  * keystroke. Browsers normalise contenteditable markup as they go, so writing
@@ -160,7 +166,15 @@ export default function WebsiteEditor({ id }: { id: string }) {
    * look like", and until now nothing in the console did. Code is still here,
    * and still the only way to reach markup a rendered page cannot show you.
    */
-  const [view, setView] = useState<"preview" | "visual" | "code">("visual");
+  const [view, setView] = useState<"visual" | "code">("visual");
+  /**
+   * Whether the preview sits beside the editor.
+   *
+   * On by default, and a pane rather than a mode. It was a third tab, which
+   * meant seeing the result and changing it were two things you switched
+   * between — so nobody looked at the result until they had stopped editing.
+   */
+  const [showPreview, setShowPreview] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -413,6 +427,15 @@ export default function WebsiteEditor({ id }: { id: string }) {
                 Header and footer
               </button>
             </div>
+            {section === "pages" && !showPreview ? (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setShowPreview(true)}
+              >
+                Show preview
+              </button>
+            ) : null}
           </div>
 
           {section === "design" && header && footer && theme ? (
@@ -608,7 +631,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
           ) : null}
 
           {section === "pages" && pages.length ? (
-            <div className="editor-split">
+            <div className={showPreview ? "editor-split has-preview" : "editor-split"}>
               <nav className="editor-pages" aria-label="Pages">
                 {pages.map((p, i) => (
                   <button
@@ -693,13 +716,6 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     <div className="seg seg-sm">
                       <button
                         type="button"
-                        className={view === "preview" ? "seg-btn is-on" : "seg-btn"}
-                        onClick={() => setView("preview")}
-                      >
-                        Preview
-                      </button>
-                      <button
-                        type="button"
                         className={view === "visual" ? "seg-btn is-on" : "seg-btn"}
                         onClick={() => setView("visual")}
                       >
@@ -715,33 +731,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     </div>
                   </div>
 
-                  {view === "preview" ? (
-                    <>
-                      <SitePreview
-                        site={{
-                          name,
-                          tagline,
-                          language: site.language ?? "en",
-                          header: header ?? site.header,
-                          footer: footer ?? site.footer,
-                          theme: theme ?? site.theme,
-                        }}
-                        pages={pages}
-                        current={page.slug}
-                        onNavigate={(slug) => {
-                          const to = pages.findIndex((p) => p.slug === slug);
-                          if (to >= 0) setAt(to);
-                        }}
-                      />
-                      <p className="provider-hint">
-                        The whole site, header and footer included, and the
-                        navigation works. This is the document static hosting
-                        writes to a file; a WordPress theme supplies its own
-                        header and footer, so there the shell is a stand-in for
-                        whatever the theme does.
-                      </p>
-                    </>
-                  ) : view === "visual" ? (
+                  {view === "visual" ? (
                     <>
                       <PageCanvas
                         key={`${site.id}-${at}`}
@@ -773,6 +763,42 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     </>
                   )}
                 </div>
+              ) : null}
+
+              {showPreview && page ? (
+                <aside className="editor-preview">
+                  <div className="editor-body-head">
+                    <span className="field-label">Live preview</span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setShowPreview(false)}
+                    >
+                      Hide
+                    </button>
+                  </div>
+                  <SitePreview
+                    site={{
+                      name,
+                      tagline,
+                      language: site.language ?? "en",
+                      header: header ?? site.header,
+                      footer: footer ?? site.footer,
+                      theme: theme ?? site.theme,
+                    }}
+                    pages={pages}
+                    current={page.slug}
+                    onNavigate={(slug) => {
+                      const to = pages.findIndex((p) => p.slug === slug);
+                      if (to >= 0) setAt(to);
+                    }}
+                  />
+                  <p className="provider-hint">
+                    The whole site, header and footer included, updating as you
+                    type. The navigation works. This is the document the
+                    download writes to a file.
+                  </p>
+                </aside>
               ) : null}
             </div>
           ) : null}

@@ -4367,3 +4367,47 @@ body:has(.bulkbar) main {
   padding: 3px;
   cursor: pointer;
 }
+
+/* ------------------------------------------------- editor with a live preview
+
+   Pages, the page, and the site as it will look, all at once. The preview is a
+   pane rather than a mode: seeing the result and changing it should not be two
+   things you switch between. */
+.editor-split.has-preview {
+  align-items: stretch;
+}
+
+.editor-split.has-preview .editor-panel {
+  flex: 1 1 380px;
+  min-width: 0;
+}
+
+.editor-preview {
+  flex: 1 1 460px;
+  min-width: 0;
+  position: sticky;
+  top: 14px;
+  align-self: flex-start;
+}
+
+.editor-preview .site-preview {
+  height: 58vh;
+  min-height: 360px;
+}
+
+.editor-preview .editor-body-head {
+  margin-top: 0;
+}
+
+/* Three columns is too many below this. The preview goes underneath, where it
+   is still live and still useful, rather than being squeezed out. */
+@media (max-width: 1200px) {
+  .editor-split.has-preview {
+    flex-wrap: wrap;
+  }
+
+  .editor-preview {
+    flex: 1 1 100%;
+    position: static;
+  }
+}

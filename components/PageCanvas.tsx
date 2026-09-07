@@ -65,6 +65,12 @@ export default function PageCanvas({
   onChange: (html: string) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // A pending read must not fire into a component that has gone.
+  useEffect(() => () => {
+    if (pending.current) clearTimeout(pending.current);
+  }, []);
 
   /**
    * Written imperatively, on different terms depending on who is typing.
@@ -96,11 +102,34 @@ export default function PageCanvas({
       contentEditable={editable}
       suppressContentEditableWarning
       spellCheck
-      // Read back on blur rather than on every keystroke. Reading innerHTML on
-      // input would rewrite the markup mid-word, and browsers normalise it as
-      // they go, so the text would shift under the cursor.
+      /**
+       * Read back as you type, a beat behind.
+       *
+       * This used to wait for blur, which was safe and made the preview beside
+       * it useless: nothing moved until you clicked away. Reporting on every
+       * keystroke is what makes a live preview live.
+       *
+       * Safe here only because of the effect above. Telling the parent does not
+       * bring the markup back into this element, so the caret stays where it
+       * is — the thing that breaks a contenteditable is being re-rendered, not
+       * being read.
+       *
+       * Delayed by a beat all the same. Reading innerHTML on every key is work
+       * for a preview nobody can read mid-word, and the pause costs nothing.
+       */
+      onInput={(e) => {
+        if (!editable) return;
+        const el = e.currentTarget;
+        if (pending.current) clearTimeout(pending.current);
+        pending.current = setTimeout(() => {
+          const next = el.innerHTML;
+          if (next !== html) onChange(next);
+        }, 250);
+      }}
       onBlur={(e) => {
         if (!editable) return;
+        // Whatever the pause was still holding, without waiting for it.
+        if (pending.current) clearTimeout(pending.current);
         const next = (e.target as HTMLDivElement).innerHTML;
         if (next !== html) onChange(next);
       }}
