@@ -133,7 +133,8 @@ type EngineRun = {
   /** Counted by the engine as it spent it. Absent on a run older than that. */
   cost?: CostBreakdown | null;
   /** Which pipeline ran it. Absent on a run from before there was a choice. */
-  mode?: "optimise" | "gap";
+  /** Build joined these when a run stopped needing a site to start from. */
+  mode?: "optimise" | "gap" | "build";
   steps?: EngineStep[];
 };
 
@@ -417,6 +418,34 @@ export async function fetchBuiltSite(runId: string): Promise<BuiltSite | null> {
 
 export async function retryExecution(id: string): Promise<{ id: string; status: N8nStatus }> {
   const run = await call<EngineRun>(`/runs/${encodeURIComponent(id)}`);
+
+  /**
+   * A build has no site to point at, which is the whole point of one.
+   *
+   * The check below wants a website_url, so every failed build answered a
+   * resume with "no recorded input" — which was true of the field it looked at
+   * and false about the run, since a build records a brief, a topic and
+   * everything else it was given.
+   *
+   * Resuming one is the same request again with the earlier run named, and the
+   * engine skips the plan, the header and every page that run already wrote.
+   */
+  if ((run.mode ?? "optimise") === "build") {
+    const { wp_username, wp_password, wp_domain, resume_from, ...carried } =
+      (run.input ?? {}) as Record<string, unknown>;
+    void wp_username; void wp_password; void wp_domain; void resume_from;
+
+    const started = await call<{ id: string }>(
+      "/runs",
+      {
+        method: "POST",
+        body: JSON.stringify({ ...carried, mode: "build", resume_from: id }),
+      },
+      30_000,
+    );
+    return { id: started.id ?? "", status: "new" };
+  }
+
   const inputs = inputsOf(run);
   if (!inputs?.website_url) {
     throw new Error(`Run ${id} has no recorded input to retry from.`);

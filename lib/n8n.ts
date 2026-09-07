@@ -56,7 +56,8 @@ export type StartRunInput = {
    * Which pipeline runs it. Absent means the optimiser, which is what every
    * caller written before there was a choice means.
    */
-  mode?: "optimise" | "gap";
+  /** Build joined these when a run stopped needing a site to start from. */
+  mode?: "optimise" | "gap" | "build";
   /** The competitor crawl export a gap run works from. */
   ideas_sheet_id?: string;
 };
