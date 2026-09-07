@@ -331,7 +331,9 @@ export default function AppsView() {
                         </button>
                       </th>
                     ))}
-                    <th />
+                    {/* Not sortable: it holds controls, not a value to order
+                        rows by. Right, to sit over the buttons beneath it. */}
+                    <th className="act-head">Actions</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -3887,3 +3887,9 @@ body:has(.bulkbar) main {
 .sheet-danger h3 {
   color: var(--bad);
 }
+
+/* The heading over Go To Admin, Modify and Flush cache. Right, because the
+   buttons under it are, and .logs th sets every heading left by default. */
+.logs th.act-head {
+  text-align: right;
+}
