@@ -327,14 +327,20 @@ export default function AppsView() {
                               SSL
                             </span>
                           ) : null}
+                          {/* An anchor rather than a button, because it goes
+                              somewhere and should middle-click and open in a
+                              new tab like any other link. The button styles
+                              share their declaration block with bare buttons,
+                              so it stands the same height as Modify beside
+                              it. */}
                           {a.adminPath ? (
                             <a
-                              className="app-admin"
+                              className="btn btn-ghost btn-sm"
                               href={`${home(a)}${a.adminPath}`}
                               target="_blank"
                               rel="noreferrer noopener"
                             >
-                              admin
+                              Go To Admin
                             </a>
                           ) : null}
                           <button
