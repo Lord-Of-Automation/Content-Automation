@@ -5,7 +5,7 @@ import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
 import { fetchBuiltSite, startBuild } from "@/lib/engine";
 import {
-  cleanPages, listWebsites, newWebsiteId, saveWebsite, type Website,
+  listWebsites, newWebsiteId, saveWebsite, settleFrom, type Website,
 } from "@/lib/websites";
 
 export const runtime = "nodejs";
@@ -26,26 +26,8 @@ export const maxDuration = 60;
 async function catchUp(site: Website, actor: string): Promise<Website> {
   if (site.status !== "building" || !site.runId) return site;
 
-  const built = await fetchBuiltSite(site.runId);
-  if (!built?.site) return site;
-
-  const pages = cleanPages(built.site.pages);
-  const updated: Website = {
-    ...site,
-    name: site.name || built.site.name,
-    tagline: built.site.tagline || site.tagline,
-    language: built.site.language || site.language,
-    pages,
-    // Only once the run says it finished. A build with three of five pages
-    // written is not ready, and calling it ready would hide the other two.
-    status: built.complete ? (pages.length ? "ready" : "failed") : "building",
-    note:
-      built.complete && !pages.length
-        ? "The run finished without writing any pages."
-        : site.note,
-    updatedAt: new Date().toISOString(),
-    updatedBy: actor,
-  };
+  const updated = settleFrom(site, await fetchBuiltSite(site.runId), actor);
+  if (updated === site) return site;
 
   await saveWebsite(updated);
   return updated;

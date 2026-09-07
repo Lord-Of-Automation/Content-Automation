@@ -5,7 +5,7 @@ import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
 import { fetchBuiltSite } from "@/lib/engine";
 import {
-  cleanPages, getWebsite, removeWebsite, saveWebsite, type Website,
+  cleanPages, getWebsite, removeWebsite, saveWebsite, settleFrom, type Website,
 } from "@/lib/websites";
 
 export const runtime = "nodejs";
@@ -36,21 +36,9 @@ export async function GET(
     // Same catch-up as the list, so opening a site that is still being written
     // shows the pages that exist rather than an empty editor.
     if (site.status === "building" && site.runId) {
-      const built = await fetchBuiltSite(site.runId);
-      if (built?.site) {
-        const pages = cleanPages(built.site.pages);
-        site = {
-          ...site,
-          tagline: built.site.tagline || site.tagline,
-          pages,
-          status: built.complete ? (pages.length ? "ready" : "failed") : "building",
-          note:
-            built.complete && !pages.length
-              ? "The run finished without writing any pages."
-              : site.note,
-          updatedAt: new Date().toISOString(),
-          updatedBy: actor,
-        };
+      const settled = settleFrom(site, await fetchBuiltSite(site.runId), actor);
+      if (settled !== site) {
+        site = settled;
         await saveWebsite(site);
       }
     }

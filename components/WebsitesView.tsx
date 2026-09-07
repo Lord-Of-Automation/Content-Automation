@@ -52,6 +52,8 @@ export default function WebsitesView() {
   const [format, setFormat] = useState<"wordpress" | "static">("wordpress");
   const [pageCount, setPageCount] = useState("5");
   const [busy, setBusy] = useState(false);
+  /** The site a row action is working on, so only its buttons go quiet. */
+  const [acting, setActing] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -119,6 +121,44 @@ export default function WebsitesView() {
       setError(e instanceof Error ? e.message : "The website could not be started.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * Stop a build, or throw a site away.
+   *
+   * Stopping keeps whatever was written: three pages of five is three real
+   * pages, and discarding them because the fourth never came would throw away
+   * work that was paid for. Deleting is the one that loses the writing, so it
+   * asks first.
+   */
+  async function act(site: Website, what: "stop" | "delete") {
+    if (what === "delete") {
+      const sure = window.confirm(
+        `Delete ${site.name}? Its ${site.pages.length} page(s) go with it and ` +
+          "nothing here can bring them back.",
+      );
+      if (!sure) return;
+    }
+
+    setActing(site.id);
+    setError(null);
+    try {
+      const response = await fetch(
+        what === "stop" ? `/api/websites/${site.id}/stop` : `/api/websites/${site.id}`,
+        { method: what === "stop" ? "POST" : "DELETE" },
+      );
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? `That returned ${response.status}.`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That could not be done.");
+    } finally {
+      setActing(null);
     }
   }
 
@@ -304,9 +344,29 @@ export default function WebsitesView() {
                             Run log
                           </Link>
                         ) : null}
-                        <Link className="btn btn-ghost btn-sm" href={`/websites/${s.id}`}>
-                          Edit
-                        </Link>
+                        {s.status === "building" ? (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => void act(s, "stop")}
+                            disabled={acting === s.id}
+                            title="Stop writing. The pages already written are kept."
+                          >
+                            {acting === s.id ? "Stopping…" : "Stop"}
+                          </button>
+                        ) : (
+                          <Link className="btn btn-ghost btn-sm" href={`/websites/${s.id}`}>
+                            Edit
+                          </Link>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-sm"
+                          onClick={() => void act(s, "delete")}
+                          disabled={acting === s.id}
+                        >
+                          Delete
+                        </button>
                       </div>
                     </td>
                   </tr>

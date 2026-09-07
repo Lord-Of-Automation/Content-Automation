@@ -55,6 +55,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stopping, setStopping] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -106,6 +107,26 @@ export default function WebsiteEditor({ id }: { id: string }) {
     setPages((rows) => rows.map((p, i) => (i === at ? { ...p, ...patch } : p)));
     setDirty(true);
     setSaved(false);
+  }
+
+  async function stop() {
+    setStopping(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/websites/${id}/stop`, { method: "POST" });
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? `The stop returned ${response.status}.`);
+      setSite(payload.website as Website);
+      setPages((payload.website as Website).pages);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The build could not be stopped.");
+    } finally {
+      setStopping(false);
+    }
   }
 
   async function save() {
@@ -170,6 +191,17 @@ export default function WebsiteEditor({ id }: { id: string }) {
             <Link className="btn btn-ghost btn-sm" href="/websites">
               All websites
             </Link>
+            {site.status === "building" ? (
+              <button
+                type="button"
+                className="btn btn-ghost bar-btn"
+                onClick={() => void stop()}
+                disabled={stopping}
+                title="Stop writing. The pages already written are kept."
+              >
+                {stopping ? "Stopping…" : "Stop writing"}
+              </button>
+            ) : null}
             <button
               type="button"
               className="btn btn-primary bar-btn"

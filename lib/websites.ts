@@ -129,6 +129,68 @@ export async function removeWebsite(id: string): Promise<boolean> {
   return true;
 }
 
+/** What the engine hands over when asked what a build has written. */
+export interface BuiltPayload {
+  status: string;
+  complete: boolean;
+  site: {
+    name?: string;
+    tagline?: string;
+    language?: string;
+    pages?: unknown;
+  };
+}
+
+/** A run that has stopped, however it stopped. */
+function runEnded(status: string): boolean {
+  return status === "success" || status === "error" || status === "canceled";
+}
+
+/**
+ * Fold what a run has written into the stored site.
+ *
+ * The settling rule is the part worth getting right, and the first version got
+ * it wrong: it only finished a site when the run succeeded, so a build that was
+ * cancelled or failed stayed "writing" for ever and the page polled a run that
+ * had stopped. Any ending settles it now.
+ *
+ * How it ended decides the wording, not whether the pages are kept. A run
+ * stopped after three of five pages wrote three real pages, and throwing them
+ * away because the fourth never came would be discarding work somebody paid
+ * for. So pages win: whatever exists becomes the site, and the note says how it
+ * came to stop.
+ */
+export function settleFrom(site: Website, built: BuiltPayload | null, actor: string): Website {
+  if (!built?.site) return site;
+
+  const pages = cleanPages(built.site.pages);
+  const ended = runEnded(built.status);
+
+  const note = !ended
+    ? site.note
+    : pages.length
+      ? built.status === "success"
+        ? ""
+        : built.status === "canceled"
+          ? `Stopped after ${pages.length} page${pages.length === 1 ? "" : "s"}. What it wrote is here.`
+          : `The run failed after ${pages.length} page${pages.length === 1 ? "" : "s"}. What it wrote is here.`
+      : built.status === "canceled"
+        ? "Stopped before it wrote anything."
+        : "The run ended without writing any pages.";
+
+  return {
+    ...site,
+    name: site.name || String(built.site.name ?? ""),
+    tagline: String(built.site.tagline ?? "") || site.tagline,
+    language: String(built.site.language ?? "") || site.language,
+    pages,
+    status: !ended ? "building" : pages.length ? "ready" : "failed",
+    note,
+    updatedAt: new Date().toISOString(),
+    updatedBy: actor,
+  };
+}
+
 function line(value: unknown, cap = MAX_LINE): string {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, cap);
 }
