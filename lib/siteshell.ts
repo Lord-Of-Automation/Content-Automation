@@ -226,19 +226,60 @@ code {
 pre { background: var(--panel); padding: 16px 18px; border-radius: 10px; overflow-x: auto; }
 pre code { background: none; padding: 0; }
 
+/* ---------------------------------------------------------------- footer */
+footer.site {
+  margin-top: 84px; padding: 46px 0 30px;
+  border-top: 1px solid var(--hair); background: var(--panel);
+  font-size: 15px;
+}
+.footer-cols {
+  display: grid; gap: 30px;
+  grid-template-columns: minmax(220px, 1.6fr) repeat(auto-fit, minmax(150px, 1fr));
+  margin-bottom: 34px;
+}
+.footer-about { color: var(--muted); margin: 0; max-width: 44ch; }
+.footer-about strong { display: block; color: var(--ink); font-size: 17px; margin-bottom: 7px; }
+footer.site nav { display: flex; flex-direction: column; gap: 9px; }
+footer.site nav a {
+  color: var(--muted); text-decoration: none; font-size: 15px;
+  transition: color .15s ease;
+}
+footer.site nav a:hover { color: var(--ink); }
+.footer-base {
+  padding-top: 22px; border-top: 1px solid var(--hair);
+  color: var(--muted); font-size: 14px;
+  display: flex; gap: 14px; flex-wrap: wrap; justify-content: space-between;
+}
+
+/* A picture whose address is broken should look like a picture to fix, not
+   like a gap somebody left in the page. */
+img:not([src]), img[src=""] {
+  min-height: 90px; background: var(--panel);
+  border: 1px dashed var(--hair);
+}
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  main.wrap { padding-top: 36px; }
+  .brand-tagline { display: none; }
+  header.site .wrap { min-height: 60px; gap: 14px; }
+}
 `;
 }
 
 /**
- * The half a designed header must not be able to reach.
+ * The half a designed shell must not be able to reach.
  *
- * Emitted after the shell's own CSS, so a header design can style its own
- * markup and the header and footer it replaces, and cannot reach .btn, .card,
- * .grid, .hero, .cta or .lead. Those belong to the pages, which were written
- * separately and are not its to change.
+ * The page vocabulary and nothing else: .lead, .hero, .grid, .card, .btn, .cta
+ * and the safety nets. Those belong to the pages, which were written
+ * separately, and are not a header's to change.
  *
- * This was one stylesheet, all of it before the design, which meant a header
- * that wrote a broad selector restyled every page on the site.
+ * Everything else stays in the base, before the design, and that includes the
+ * header and footer. A designed shell replaces both, so it has to be able to
+ * override how they were styled. The first version of this split put the
+ * footer here by accident, which meant the base footer overrode the designed
+ * one and a design that drew a good footer got the old one's spacing and
+ * background anyway.
  */
 function guards(): string {
   return `
@@ -303,43 +344,9 @@ function guards(): string {
 .cta p { color: var(--muted); max-width: 54ch; margin-left: auto; margin-right: auto; }
 .cta > :last-child { margin-bottom: 0; }
 
-/* ---------------------------------------------------------------- footer */
-footer.site {
-  margin-top: 84px; padding: 46px 0 30px;
-  border-top: 1px solid var(--hair); background: var(--panel);
-  font-size: 15px;
-}
-.footer-cols {
-  display: grid; gap: 30px;
-  grid-template-columns: minmax(220px, 1.6fr) repeat(auto-fit, minmax(150px, 1fr));
-  margin-bottom: 34px;
-}
-.footer-about { color: var(--muted); margin: 0; max-width: 44ch; }
-.footer-about strong { display: block; color: var(--ink); font-size: 17px; margin-bottom: 7px; }
-footer.site nav { display: flex; flex-direction: column; gap: 9px; }
-footer.site nav a {
-  color: var(--muted); text-decoration: none; font-size: 15px;
-  transition: color .15s ease;
-}
-footer.site nav a:hover { color: var(--ink); }
-.footer-base {
-  padding-top: 22px; border-top: 1px solid var(--hair);
-  color: var(--muted); font-size: 14px;
-  display: flex; gap: 14px; flex-wrap: wrap; justify-content: space-between;
-}
-
-/* A picture whose address is broken should look like a picture to fix, not
-   like a gap somebody left in the page. */
-img:not([src]), img[src=""] {
-  min-height: 90px; background: var(--panel);
-  border: 1px dashed var(--hair);
-}
-
+/* The one responsive rule that belongs with the vocabulary rather than the
+   base: it has to come after .cta itself or it loses on source order. */
 @media (max-width: 640px) {
-  body { font-size: 16px; }
-  main.wrap { padding-top: 36px; }
-  .brand-tagline { display: none; }
-  header.site .wrap { min-height: 60px; gap: 14px; }
   .cta { padding: 26px 20px; }
 }
 

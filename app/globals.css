@@ -213,12 +213,6 @@ main.wide {
   flex-wrap: wrap;
 }
 
-/* The title takes what it needs; the buttons take what is left. */
-.card-head > div:first-child {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 .card-head h2 {
   margin: 0;
   font-size: 14px;
@@ -3829,12 +3823,15 @@ body:has(.bulkbar) main {
 /* Refresh and New application, side by side in the card heading. Refresh used
    to carry a class that was never defined, so it drew as a bare button next to
    properly styled ones; both are ghost buttons now. */
+/* Pushed to the far end of the heading it sits in, rather than the heading
+   being told to grow. One rule on the buttons beats one on every card. */
 .app-head-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  margin-left: auto;
 }
 
 /* A dropdown standing in a filter bar. Narrower than a market picker: these
