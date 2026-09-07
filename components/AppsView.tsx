@@ -486,6 +486,7 @@ export default function AppsView() {
       {managing ? (
         <AppDomain
           app={managing}
+          servers={data?.servers ?? []}
           onClose={() => setManaging(null)}
           onDone={() => {
             setManaging(null);

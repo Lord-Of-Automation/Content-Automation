@@ -425,6 +425,20 @@ export interface CreatedApp {
 /** Letters, digits and the punctuation a site name actually uses. */
 const APP_LABEL = /^[A-Za-z0-9][A-Za-z0-9 ._-]*$/;
 
+/** Shared by create and clone, which have the same rules and the same reasons. */
+function checkLabel(label: string): string {
+  const name = label.trim();
+  if (!name) throw new Error("The application needs a name.");
+  if (name.length > 50) throw new Error("That name is too long. Fifty characters is the limit.");
+  if (!APP_LABEL.test(name)) {
+    throw new Error(
+      "A name can hold letters, digits, spaces, dots, dashes and underscores, " +
+        "and has to start with a letter or digit.",
+    );
+  }
+  return name;
+}
+
 /**
  * Install a new application on one of this account's servers.
  *
@@ -444,15 +458,7 @@ export async function createApplication(
   version: string,
   label: string,
 ): Promise<CreatedApp> {
-  const name = label.trim();
-  if (!name) throw new Error("The application needs a name.");
-  if (name.length > 50) throw new Error("That name is too long. Fifty characters is the limit.");
-  if (!APP_LABEL.test(name)) {
-    throw new Error(
-      "A name can hold letters, digits, spaces, dots, dashes and underscores, " +
-        "and has to start with a letter or digit.",
-    );
-  }
+  const name = checkLabel(label);
 
   const catalogue = await listInstallable();
   if (!catalogue.some((c) => c.application === application && c.version === version)) {
@@ -480,6 +486,64 @@ export async function createApplication(
     const fresh = now.apps.filter((a) => a.serverId === serverId && !known.has(a.id));
     // By name among the new ones, in case somebody else created one at the
     // same moment. Falling back to whatever is new beats reporting nothing.
+    app = fresh.find((a) => a.label === name) ?? fresh[0] ?? null;
+    if (app) break;
+    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 4000));
+  }
+
+  return { operationId, app, label: name, serverLabel: server.label };
+}
+
+/**
+ * Copy an application, with its files and its database, to this server or
+ * another one.
+ *
+ * Two endpoints rather than one: Cloudways separates a copy that stays put from
+ * a copy that crosses servers, and sending a destination to the first is not
+ * how it takes it. Which one is used follows from where the copy is going, so
+ * the caller picks a server rather than picking an endpoint.
+ *
+ * Expect this to come back still building more often than the others here. A
+ * clone copies every file and the whole database, which on a real site takes
+ * longer than any web request should wait for, so "not finished yet" is the
+ * normal answer rather than a bad sign.
+ *
+ * Safe as writes go. The source is read, never altered — a clone that fails
+ * leaves the original exactly as it was.
+ */
+export async function cloneApplication(
+  serverId: string,
+  appId: string,
+  label: string,
+  destinationServerId?: string,
+): Promise<CreatedApp> {
+  const name = checkLabel(label);
+
+  const source = await findApp(serverId, appId);
+  if (!source) throw new Error("No such application on that server.");
+
+  const before = await listApplications();
+  const target = destinationServerId?.trim() || serverId;
+  const server = before.servers.find((s) => s.id === target);
+  if (!server) throw new Error("No such server on this account.");
+  const known = new Set(before.apps.map((a) => a.id));
+
+  const staying = target === serverId;
+  const body = await post(staying ? "/app/clone" : "/app/cloneToOtherServer", {
+    server_id: serverId,
+    app_id: appId,
+    app_label: name,
+    ...(staying ? {} : { destination_server_id: target }),
+  });
+
+  const operationId = String(body.operation_id ?? "");
+  await settle(operationId);
+
+  // The copy lands on the destination, which is not always where it came from.
+  let app: CloudwaysApp | null = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const now = await listApplications();
+    const fresh = now.apps.filter((a) => a.serverId === target && !known.has(a.id));
     app = fresh.find((a) => a.label === name) ?? fresh[0] ?? null;
     if (app) break;
     if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 4000));

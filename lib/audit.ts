@@ -51,6 +51,9 @@ export type AuditAction =
    * this line is the whole record that it ever existed.
    */
   | "app-deleted"
+  /** A copy of a site, which is a second site. Worth knowing where the
+      extra tenant on a busy server came from. */
+  | "app-cloned"
   /** A step frozen so it stops running. Logged: it changes what a run does. */
   | "step-pinned"
   | "step-unpinned";

@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { Select } from "@/components/Select";
+
+type Server = { id: string; label: string; apps: number };
+
 type App = {
   id: string;
   label: string;
@@ -22,25 +26,29 @@ type Result = {
 };
 
 /**
- * Managing one application: its primary domain, or its existence.
+ * Managing one application: its domain, a copy of it, or its removal.
  *
- * Both actions ask twice and they ask differently, in proportion to what they
- * cost. A domain change is confirmed by reading the change written out in full,
- * because the mistake it invites is a typo and seeing it spelled out catches
- * one. A deletion is confirmed by typing the application's name, because the
- * mistake it invites is acting on the wrong row and only naming the thing
- * catches that.
+ * Three sections, ordered by what they cost and guarded in proportion. Cloning
+ * only reads the original, so it asks once. Changing the domain is confirmed by
+ * reading the change written out in full, because the mistake it invites is a
+ * typo and seeing it spelled out catches one. Deleting is confirmed by typing
+ * the application's name, because the mistake it invites is acting on the wrong
+ * row, and only naming the thing catches that.
  *
- * Neither closes on success. A domain change leaves a certificate to reissue
- * and possibly a WordPress database still holding the old address, and closing
- * on a green tick is how both get forgotten.
+ * None of them closes on success. A domain change leaves a certificate to
+ * reissue and possibly a WordPress database still holding the old address; a
+ * clone usually outlives the request that started it. Closing on a green tick
+ * is how the part that still needs doing gets forgotten.
  */
 export default function AppDomain({
   app,
+  servers,
   onClose,
   onDone,
 }: {
   app: App;
+  /** Where a copy could go. Handed down rather than fetched again. */
+  servers: Server[];
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -51,6 +59,13 @@ export default function AppDomain({
   /** Typed out by hand, and checked again on the server before anything goes. */
   const [confirmName, setConfirmName] = useState("");
   const [deleted, setDeleted] = useState<{ label: string; gone: boolean } | null>(null);
+  const [cloneName, setCloneName] = useState("");
+  const [cloneTo, setCloneTo] = useState(app.serverId);
+  const [cloned, setCloned] = useState<{
+    label: string;
+    serverLabel: string;
+    app: { stagingUrl: string } | null;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const shell = useRef<HTMLDialogElement>(null);
@@ -124,6 +139,34 @@ export default function AppDomain({
     }
   }
 
+  async function clone() {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/apps/clone", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          serverId: app.serverId,
+          appId: app.id,
+          label: cloneName,
+          destinationServerId: cloneTo,
+        }),
+      });
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? `The clone returned ${response.status}.`);
+      setCloned(payload);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The application could not be copied.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // What has to be typed to arm the delete. The domain when there is one,
   // because that is what the row is called and what anyone would recognise.
   const fullName = (app.domain || app.label).trim().toLowerCase();
@@ -143,18 +186,51 @@ export default function AppDomain({
             type="button"
             className="btn btn-ghost"
             onClick={() => {
-              if (result?.changed || deleted) onDone();
+              if (result?.changed || deleted || cloned) onDone();
               else onClose();
             }}
           >
-            {result?.changed || deleted ? "Done" : "Cancel"}
+            {result?.changed || deleted || cloned ? "Done" : "Cancel"}
           </button>
         </div>
 
         <div className="sheet-body">
           {error ? <div className="notice bad">{error}</div> : null}
 
-          {deleted ? (
+          {cloned ? (
+            <section className="sheet-section">
+              {cloned.app ? (
+                <>
+                  <div className="notice ok">
+                    <strong>{cloned.label}</strong> is a copy of{" "}
+                    {app.domain || app.label}, on {cloned.serverLabel}.
+                  </div>
+                  <p className="stage-hint">
+                    It answers on its own address straight away, with no domain
+                    pointed at it and nothing shared with the original.
+                  </p>
+                  <p>
+                    <a
+                      className="btn btn-ghost btn-sm"
+                      href={cloned.app.stagingUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      Open the copy
+                    </a>
+                  </p>
+                </>
+              ) : (
+                <div className="notice warn">
+                  <strong>Cloudways is still copying {cloned.label}.</strong> A
+                  clone moves every file and the whole database, which takes
+                  longer than this could wait for. It will appear in the list
+                  when it lands. The original was only read, so it is untouched
+                  either way.
+                </div>
+              )}
+            </section>
+          ) : deleted ? (
             <section className="sheet-section">
               {deleted.gone ? (
                 <div className="notice ok">
@@ -309,6 +385,49 @@ export default function AppDomain({
                       Change primary domain
                     </button>
                   )}
+                </div>
+              </section>
+
+              <section className="sheet-section">
+                <h3>Clone this application</h3>
+                <p className="stage-hint">
+                  Copies the files and the database into a new application. The
+                  original is only read, so nothing about it changes. The copy
+                  starts with no domain, on an address of its own.
+                </p>
+
+                {servers.length > 1 ? (
+                  <Select
+                    id="clone-server"
+                    value={cloneTo}
+                    onChange={setCloneTo}
+                    options={servers.map((s) => ({
+                      value: s.id,
+                      label: s.id === app.serverId ? `${s.label} (same server)` : s.label,
+                      hint: `${s.apps} app${s.apps === 1 ? "" : "s"}`,
+                    }))}
+                  />
+                ) : null}
+
+                <input
+                  type="text"
+                  value={cloneName}
+                  placeholder={`Copy of ${app.domain || app.label}`}
+                  autoComplete="off"
+                  spellCheck={false}
+                  maxLength={50}
+                  onChange={(e) => setCloneName(e.target.value)}
+                />
+
+                <div className="sheet-actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => void clone()}
+                    disabled={!cloneName.trim() || busy}
+                  >
+                    {busy ? "Copying…" : "Clone"}
+                  </button>
                 </div>
               </section>
 
