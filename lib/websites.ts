@@ -37,6 +37,76 @@ export interface WebsitePage {
   order: number;
 }
 
+/**
+ * The parts of a site that are not any one page.
+ *
+ * Kept as data rather than baked into the renderer, because "change the footer"
+ * is the second thing anybody wants after "change the words" and neither should
+ * mean editing markup. What the renderer keeps is the arrangement; what lives
+ * here is every decision inside it.
+ */
+export interface SiteLink {
+  label: string;
+  url: string;
+}
+
+export interface SiteHeader {
+  /** An image instead of the name in words. Empty means use the name. */
+  logoUrl: string;
+  showName: boolean;
+  showTagline: boolean;
+  /** Whether the pages appear as navigation at all. */
+  showNav: boolean;
+  /** Anything beyond the pages: a shop, a booking form, somewhere else. */
+  links: SiteLink[];
+}
+
+export interface SiteFooter {
+  text: string;
+  links: SiteLink[];
+  /** A line saying who owns it, with the year filled in when rendered. */
+  showCopyright: boolean;
+}
+
+export interface SiteTheme {
+  /** Links, and anything the design wants to draw the eye to. */
+  accent: string;
+  background: string;
+  ink: string;
+  font: "sans" | "serif";
+  /** How wide the text column runs, in pixels. */
+  width: number;
+}
+
+/**
+ * What a site looks like before anybody changes it.
+ *
+ * Applied when a record is read rather than when one is written, so a site
+ * created before any of this existed gets the defaults instead of a page with
+ * no header and a footer that renders as "undefined".
+ */
+export const DEFAULT_HEADER: SiteHeader = {
+  logoUrl: "",
+  showName: true,
+  showTagline: true,
+  showNav: true,
+  links: [],
+};
+
+export const DEFAULT_FOOTER: SiteFooter = {
+  text: "",
+  links: [],
+  showCopyright: true,
+};
+
+export const DEFAULT_THEME: SiteTheme = {
+  accent: "#2f6df6",
+  background: "#ffffff",
+  ink: "#1b2430",
+  font: "sans",
+  width: 760,
+};
+
 export interface Website {
   id: string;
   name: string;
@@ -59,6 +129,9 @@ export interface Website {
   runId: string;
   note: string;
   pages: WebsitePage[];
+  header: SiteHeader;
+  footer: SiteFooter;
+  theme: SiteTheme;
   createdAt: string;
   createdBy: string;
   updatedAt: string;
@@ -106,11 +179,14 @@ export function newWebsiteId(): string {
 /** Newest first: the one you just made is the one you want. */
 export async function listWebsites(): Promise<Website[]> {
   const rows = await read();
-  return [...rows].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return [...rows]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map(withDefaults);
 }
 
 export async function getWebsite(id: string): Promise<Website | null> {
-  return (await read()).find((w) => w.id === id) ?? null;
+  const found = (await read()).find((w) => w.id === id);
+  return found ? withDefaults(found) : null;
 }
 
 export async function saveWebsite(site: Website): Promise<void> {
@@ -193,6 +269,72 @@ export function settleFrom(site: Website, built: BuiltPayload | null, actor: str
 
 function line(value: unknown, cap = MAX_LINE): string {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, cap);
+}
+
+/** A colour a browser will accept, or the default rather than nothing. */
+function colour(value: unknown, fallback: string): string {
+  const raw = String(value ?? "").trim();
+  return /^#[0-9a-f]{3}$|^#[0-9a-f]{6}$/i.test(raw) ? raw : fallback;
+}
+
+function links(value: unknown): SiteLink[] {
+  const list = Array.isArray(value) ? value : [];
+  return list
+    .slice(0, 12)
+    .map((raw) => {
+      const item = (raw ?? {}) as Record<string, unknown>;
+      return { label: line(item.label, 60), url: line(item.url, 300) };
+    })
+    .filter((l) => l.label && l.url);
+}
+
+export function cleanHeader(raw: unknown): SiteHeader {
+  const h = (raw ?? {}) as Record<string, unknown>;
+  return {
+    logoUrl: line(h.logoUrl, 500),
+    showName: h.showName !== false,
+    showTagline: h.showTagline !== false,
+    showNav: h.showNav !== false,
+    links: links(h.links),
+  };
+}
+
+export function cleanFooter(raw: unknown): SiteFooter {
+  const f = (raw ?? {}) as Record<string, unknown>;
+  return {
+    text: String(f.text ?? "").trim().slice(0, 1000),
+    links: links(f.links),
+    showCopyright: f.showCopyright !== false,
+  };
+}
+
+export function cleanTheme(raw: unknown): SiteTheme {
+  const s = (raw ?? {}) as Record<string, unknown>;
+  return {
+    accent: colour(s.accent, DEFAULT_THEME.accent),
+    background: colour(s.background, DEFAULT_THEME.background),
+    ink: colour(s.ink, DEFAULT_THEME.ink),
+    font: s.font === "serif" ? "serif" : "sans",
+    // Narrow enough to read, wide enough for a table. Outside that is a
+    // typo rather than a preference.
+    width: Math.max(480, Math.min(1400, Number(s.width) || DEFAULT_THEME.width)),
+  };
+}
+
+/**
+ * A stored record, made whole.
+ *
+ * Every read goes through this. A site written before headers existed has none,
+ * and a renderer handed one of those would draw "undefined" where the footer
+ * should be.
+ */
+export function withDefaults(site: Website): Website {
+  return {
+    ...site,
+    header: cleanHeader(site.header),
+    footer: cleanFooter(site.footer),
+    theme: cleanTheme(site.theme),
+  };
 }
 
 /**

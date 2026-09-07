@@ -5,7 +5,8 @@ import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
 import { fetchBuiltSite } from "@/lib/engine";
 import {
-  cleanPages, getWebsite, removeWebsite, saveWebsite, settleFrom, type Website,
+  cleanFooter, cleanHeader, cleanPages, cleanTheme, getWebsite, removeWebsite,
+  saveWebsite, settleFrom, type Website,
 } from "@/lib/websites";
 
 export const runtime = "nodejs";
@@ -71,7 +72,14 @@ export async function PUT(
   const session = await auth();
   const actor = session?.user?.name ?? "unknown";
 
-  let body: { name?: string; tagline?: string; pages?: unknown };
+  let body: {
+    name?: string;
+    tagline?: string;
+    pages?: unknown;
+    header?: unknown;
+    footer?: unknown;
+    theme?: unknown;
+  };
   try {
     body = await request.json();
   } catch {
@@ -95,6 +103,11 @@ export async function PUT(
       name: String(body.name ?? site.name).trim().slice(0, 80) || site.name,
       tagline: String(body.tagline ?? site.tagline).trim().slice(0, 200),
       pages,
+      // Cleaned rather than trusted, and defaulted rather than dropped: an edit
+      // that only touched a page must not blank the footer.
+      header: body.header === undefined ? site.header : cleanHeader(body.header),
+      footer: body.footer === undefined ? site.footer : cleanFooter(body.footer),
+      theme: body.theme === undefined ? site.theme : cleanTheme(body.theme),
       // An edit settles a site that failed to build: whatever the run did, the
       // pages in front of you now are the site.
       status: site.status === "building" ? site.status : "ready",

@@ -28,7 +28,7 @@ export default function SitePreview({
   current,
   onNavigate,
 }: {
-  site: { name: string; tagline: string; language: string };
+  site: Omit<ShellSite, "pages">;
   pages: ShellPage[];
   /** The slug being shown. Empty is the front page. */
   current: string;
@@ -36,10 +36,7 @@ export default function SitePreview({
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
 
-  const shell: ShellSite = useMemo(
-    () => ({ name: site.name, tagline: site.tagline, language: site.language, pages }),
-    [site.name, site.tagline, site.language, pages],
-  );
+  const shell: ShellSite = useMemo(() => ({ ...site, pages }), [site, pages]);
 
   const page = useMemo(
     () => pages.find((p) => p.slug === current) ?? pages[0],
@@ -47,7 +44,16 @@ export default function SitePreview({
   );
 
   const html = useMemo(
-    () => (page ? renderPage(shell, page, { current, interactive: true }) : ""),
+    () =>
+      page
+        ? renderPage(shell, page, {
+            current,
+            interactive: true,
+            // Passed in rather than read inside the renderer, which stays pure
+            // so the preview and the export produce the same bytes.
+            year: new Date().getFullYear(),
+          })
+        : "",
     [shell, page, current],
   );
 

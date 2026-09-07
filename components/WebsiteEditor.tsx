@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import PageCanvas from "@/components/PageCanvas";
 import SitePreview from "@/components/SitePreview";
+import { Select } from "@/components/Select";
 
 type Page = {
   slug: string;
@@ -16,6 +17,26 @@ type Page = {
   order: number;
 };
 
+type Link = { label: string; url: string };
+
+type Header = {
+  logoUrl: string;
+  showName: boolean;
+  showTagline: boolean;
+  showNav: boolean;
+  links: Link[];
+};
+
+type Footer = { text: string; links: Link[]; showCopyright: boolean };
+
+type Theme = {
+  accent: string;
+  background: string;
+  ink: string;
+  font: "sans" | "serif";
+  width: number;
+};
+
 type Website = {
   id: string;
   name: string;
@@ -24,6 +45,9 @@ type Website = {
   topic: string;
   format: "wordpress" | "static";
   language: string;
+  header: Header;
+  footer: Footer;
+  theme: Theme;
   status: "building" | "ready" | "failed";
   runId: string;
   note: string;
@@ -51,11 +75,76 @@ const DESC_LIMIT = 155;
  * Nothing saves by itself. A site being edited is a draft of a draft, and an
  * autosave that fired mid-sentence would make the undo history useless.
  */
+/**
+ * A list of label-and-address pairs.
+ *
+ * The same control for the header and the footer, because they are the same
+ * thing in two places and two near-identical blocks would drift.
+ */
+function LinkList({
+  label,
+  hint,
+  links,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  links: Link[];
+  onChange: (links: Link[]) => void;
+}) {
+  return (
+    <>
+      <label className="field-label">{label}</label>
+      <p className="provider-hint">{hint}</p>
+      {links.map((link, i) => (
+        <div className="link-row" key={i}>
+          <input
+            type="text"
+            value={link.label}
+            placeholder="Label"
+            onChange={(e) =>
+              onChange(links.map((l, at) => (at === i ? { ...l, label: e.target.value } : l)))
+            }
+          />
+          <input
+            type="text"
+            value={link.url}
+            placeholder="https://..."
+            onChange={(e) =>
+              onChange(links.map((l, at) => (at === i ? { ...l, url: e.target.value } : l)))
+            }
+          />
+          <button
+            type="button"
+            className="btn btn-danger btn-sm"
+            onClick={() => onChange(links.filter((_, at) => at !== i))}
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        onClick={() => onChange([...links, { label: "", url: "" }])}
+        disabled={links.length >= 12}
+      >
+        Add a link
+      </button>
+    </>
+  );
+}
+
 export default function WebsiteEditor({ id }: { id: string }) {
   const [site, setSite] = useState<Website | null>(null);
   const [pages, setPages] = useState<Page[]>([]);
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
+  const [header, setHeader] = useState<Header | null>(null);
+  const [footer, setFooter] = useState<Footer | null>(null);
+  const [theme, setTheme] = useState<Theme | null>(null);
+  /** Which page, or the site furniture that surrounds all of them. */
+  const [section, setSection] = useState<"pages" | "design">("pages");
   const [at, setAt] = useState(0);
 
   const [loading, setLoading] = useState(true);
@@ -88,6 +177,9 @@ export default function WebsiteEditor({ id }: { id: string }) {
       setPages(found.pages);
       setName(found.name);
       setTagline(found.tagline);
+      setHeader(found.header);
+      setFooter(found.footer);
+      setTheme(found.theme);
       setDirty(false);
       setError(null);
     } catch (e) {
@@ -152,7 +244,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
       const response = await fetch(`/api/websites/${id}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, tagline, pages }),
+        body: JSON.stringify({ name, tagline, pages, header, footer, theme }),
       });
       if (response.status === 401) {
         window.location.href = "/login";
@@ -161,8 +253,12 @@ export default function WebsiteEditor({ id }: { id: string }) {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? `The save returned ${response.status}.`);
 
-      setSite(payload.website as Website);
-      setPages((payload.website as Website).pages);
+      const back = payload.website as Website;
+      setSite(back);
+      setPages(back.pages);
+      setHeader(back.header);
+      setFooter(back.footer);
+      setTheme(back.theme);
       setDirty(false);
       setSaved(true);
     } catch (e) {
@@ -170,6 +266,11 @@ export default function WebsiteEditor({ id }: { id: string }) {
     } finally {
       setSaving(false);
     }
+  }
+
+  function touch() {
+    setDirty(true);
+    setSaved(false);
   }
 
   const counts = useMemo(
@@ -207,6 +308,15 @@ export default function WebsiteEditor({ id }: { id: string }) {
             <Link className="btn btn-ghost btn-sm" href="/websites">
               All websites
             </Link>
+            {pages.length ? (
+              <a
+                className="btn btn-ghost bar-btn"
+                href={`/api/websites/${id}/export`}
+                title="Every page as an HTML file, in a zip you can open from a folder."
+              >
+                Download
+              </a>
+            ) : null}
             {site.status === "building" ? (
               <button
                 type="button"
@@ -286,7 +396,218 @@ export default function WebsiteEditor({ id }: { id: string }) {
             </div>
           </section>
 
-          {pages.length ? (
+          <div className="editor-sections">
+            <div className="seg seg-sm">
+              <button
+                type="button"
+                className={section === "pages" ? "seg-btn is-on" : "seg-btn"}
+                onClick={() => setSection("pages")}
+              >
+                Pages
+              </button>
+              <button
+                type="button"
+                className={section === "design" ? "seg-btn is-on" : "seg-btn"}
+                onClick={() => setSection("design")}
+              >
+                Header and footer
+              </button>
+            </div>
+          </div>
+
+          {section === "design" && header && footer && theme ? (
+            <div className="editor-split">
+              <div className="editor-panel">
+                <h3>Header</h3>
+                <p className="stage-hint">
+                  What sits above every page. A WordPress theme supplies its
+                  own, so these shape the preview and the download rather than
+                  the live site; for a static site they are the real thing.
+                </p>
+
+                <label className="field-label" htmlFor="logo-url">
+                  Logo image address
+                </label>
+                <input
+                  id="logo-url"
+                  type="text"
+                  value={header.logoUrl}
+                  placeholder="https://example.com/logo.png, or leave blank to use the name"
+                  onChange={(e) => {
+                    setHeader({ ...header, logoUrl: e.target.value });
+                    touch();
+                  }}
+                />
+
+                <div className="check-row">
+                  {(
+                    [
+                      ["showName", "Show the site name"],
+                      ["showTagline", "Show the tagline"],
+                      ["showNav", "Show navigation"],
+                    ] as Array<["showName" | "showTagline" | "showNav", string]>
+                  ).map(([key, label]) => (
+                    <label className="check" key={key}>
+                      <input
+                        type="checkbox"
+                        checked={header[key]}
+                        onChange={(e) => {
+                          setHeader({ ...header, [key]: e.target.checked });
+                          touch();
+                        }}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+
+                <LinkList
+                  label="Extra links in the header"
+                  hint="Beyond the pages themselves: a shop, a booking form, somewhere else entirely."
+                  links={header.links}
+                  onChange={(links) => {
+                    setHeader({ ...header, links });
+                    touch();
+                  }}
+                />
+
+                <h3 className="editor-subhead">Footer</h3>
+
+                <label className="field-label" htmlFor="footer-text">
+                  Footer text
+                </label>
+                <textarea
+                  id="footer-text"
+                  rows={3}
+                  value={footer.text}
+                  placeholder="An address, opening hours, a line about who you are."
+                  onChange={(e) => {
+                    setFooter({ ...footer, text: e.target.value });
+                    touch();
+                  }}
+                />
+
+                <div className="check-row">
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={footer.showCopyright}
+                      onChange={(e) => {
+                        setFooter({ ...footer, showCopyright: e.target.checked });
+                        touch();
+                      }}
+                    />
+                    Show a copyright line
+                  </label>
+                </div>
+
+                <LinkList
+                  label="Footer links"
+                  hint="Privacy, terms, anything that belongs at the bottom."
+                  links={footer.links}
+                  onChange={(links) => {
+                    setFooter({ ...footer, links });
+                    touch();
+                  }}
+                />
+
+                <h3 className="editor-subhead">Look</h3>
+                <p className="stage-hint">
+                  Deliberately few settings. This shows writing rather than
+                  design, and a strong theme flatters copy and hides what you
+                  are trying to judge.
+                </p>
+
+                <div className="site-row">
+                  {(
+                    [
+                      ["accent", "Accent"],
+                      ["background", "Background"],
+                      ["ink", "Text"],
+                    ] as Array<["accent" | "background" | "ink", string]>
+                  ).map(([key, label]) => (
+                    <div key={key}>
+                      <label className="field-label" htmlFor={`theme-${key}`}>
+                        {label}
+                      </label>
+                      <input
+                        id={`theme-${key}`}
+                        type="color"
+                        className="colour-input"
+                        value={theme[key]}
+                        onChange={(e) => {
+                          setTheme({ ...theme, [key]: e.target.value });
+                          touch();
+                        }}
+                      />
+                    </div>
+                  ))}
+                  <div>
+                    <label className="field-label" htmlFor="theme-font">
+                      Typeface
+                    </label>
+                    <Select
+                      id="theme-font"
+                      value={theme.font}
+                      onChange={(v) => {
+                        setTheme({ ...theme, font: v === "serif" ? "serif" : "sans" });
+                        touch();
+                      }}
+                      options={[
+                        { value: "sans", label: "Sans serif" },
+                        { value: "serif", label: "Serif" },
+                      ]}
+                    />
+                  </div>
+                  <div>
+                    <label className="field-label" htmlFor="theme-width">
+                      Text width
+                    </label>
+                    <Select
+                      id="theme-width"
+                      value={String(theme.width)}
+                      onChange={(v) => {
+                        setTheme({ ...theme, width: Number(v) });
+                        touch();
+                      }}
+                      options={[
+                        { value: "640", label: "Narrow", hint: "640px" },
+                        { value: "760", label: "Comfortable", hint: "760px" },
+                        { value: "920", label: "Wide", hint: "920px" },
+                        { value: "1100", label: "Very wide", hint: "1100px" },
+                      ]}
+                    />
+                  </div>
+                </div>
+
+                {pages.length ? (
+                  <>
+                    <div className="editor-body-head">
+                      <span className="field-label">How it looks</span>
+                    </div>
+                    <SitePreview
+                      site={{
+                        name,
+                        tagline,
+                        language: site.language ?? "en",
+                        header,
+                        footer,
+                        theme,
+                      }}
+                      pages={pages}
+                      current={pages[at]?.slug ?? ""}
+                      onNavigate={(slug) => {
+                        const to = pages.findIndex((p) => p.slug === slug);
+                        if (to >= 0) setAt(to);
+                      }}
+                    />
+                  </>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {section === "pages" && pages.length ? (
             <div className="editor-split">
               <nav className="editor-pages" aria-label="Pages">
                 {pages.map((p, i) => (
@@ -397,7 +718,14 @@ export default function WebsiteEditor({ id }: { id: string }) {
                   {view === "preview" ? (
                     <>
                       <SitePreview
-                        site={{ name, tagline, language: site.language ?? "en" }}
+                        site={{
+                          name,
+                          tagline,
+                          language: site.language ?? "en",
+                          header: header ?? site.header,
+                          footer: footer ?? site.footer,
+                          theme: theme ?? site.theme,
+                        }}
                         pages={pages}
                         current={page.slug}
                         onNavigate={(slug) => {

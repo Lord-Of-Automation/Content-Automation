@@ -5,7 +5,8 @@ import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
 import { fetchBuiltSite, startBuild } from "@/lib/engine";
 import {
-  listWebsites, newWebsiteId, saveWebsite, settleFrom, type Website,
+  DEFAULT_FOOTER, DEFAULT_HEADER, DEFAULT_THEME, listWebsites, newWebsiteId,
+  saveWebsite, settleFrom, type Website,
 } from "@/lib/websites";
 
 export const runtime = "nodejs";
@@ -126,6 +127,9 @@ export async function POST(request: Request) {
       runId: started.executionId,
       note: started.note ?? "",
       pages: [],
+      header: DEFAULT_HEADER,
+      footer: DEFAULT_FOOTER,
+      theme: DEFAULT_THEME,
       createdAt: now,
       createdBy: actor,
       updatedAt: now,
