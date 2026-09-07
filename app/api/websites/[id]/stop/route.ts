@@ -56,7 +56,29 @@ export async function POST(
 
     // Read back rather than assumed. The engine stops between steps, so the
     // page in progress may still have landed by the time this asks.
-    const settled = settleFrom(site, await fetchBuiltSite(site.runId), actor);
+    let settled = settleFrom(site, await fetchBuiltSite(site.runId), actor);
+
+    /**
+     * Somebody pressed Stop, so it is stopped.
+     *
+     * The read-back can come back knowing nothing: an older engine answers the
+     * request for a build's pages with a 404 when it wrote none, and a run that
+     * failed while planning wrote none. Leaving the record at "writing" after
+     * an explicit stop is the one outcome this must not have, because there is
+     * then no way at all to clear it from the page.
+     */
+    if (settled.status === "building") {
+      settled = {
+        ...settled,
+        status: settled.pages.length ? "ready" : "failed",
+        note: settled.pages.length
+          ? `Stopped after ${settled.pages.length} page${settled.pages.length === 1 ? "" : "s"}. What it wrote is here.`
+          : "Stopped. Nothing had been written, so there is nothing to keep.",
+        updatedAt: new Date().toISOString(),
+        updatedBy: actor,
+      };
+    }
+
     await saveWebsite(settled);
 
     return NextResponse.json({ website: settled });

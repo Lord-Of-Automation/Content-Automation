@@ -223,7 +223,12 @@ export async function removeWebsite(id: string): Promise<boolean> {
 export interface BuiltPayload {
   status: string;
   complete: boolean;
-  site: {
+  /** Whether the run has stopped, however it stopped. */
+  finished?: boolean;
+  /** Why it stopped, when it stopped badly. */
+  error?: string | null;
+  /** Null when the run ended before writing anything. */
+  site: null | {
     name?: string;
     tagline?: string;
     language?: string;
@@ -258,10 +263,36 @@ function runEnded(status: string): boolean {
  * came to stop.
  */
 export function settleFrom(site: Website, built: BuiltPayload | null, actor: string): Website {
-  if (!built?.site) return site;
+  // Nothing came back at all: the engine is unreachable or the run is gone.
+  // Leave it alone; the next read may know more.
+  if (!built) return site;
+
+  const ended = built.finished ?? runEnded(built.status);
+
+  /**
+   * A run that ended having written nothing.
+   *
+   * This is what a build looks like when it fails while planning, and it used
+   * to leave a site at "writing" for ever: the engine answered the request for
+   * its pages with a 404, the console could not tell that apart from any other
+   * failed request, and went on waiting for a run that had already stopped.
+   */
+  if (!built.site) {
+    if (!ended) return site;
+    return {
+      ...site,
+      status: "failed",
+      note:
+        built.error ||
+        (built.status === "canceled"
+          ? "Stopped before it wrote anything."
+          : "The run ended without writing any pages."),
+      updatedAt: new Date().toISOString(),
+      updatedBy: actor,
+    };
+  }
 
   const pages = cleanPages(built.site.pages);
-  const ended = runEnded(built.status);
 
   const note = !ended
     ? site.note
