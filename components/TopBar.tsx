@@ -10,7 +10,7 @@ export default async function TopBar({
 }: {
   current:
     | "runs" | "loop" | "logs"
-    | "domains" | "generator" | "apps" | "performance"
+    | "domains" | "generator" | "websites" | "apps" | "performance"
     | "accounts" | "keys";
 }) {
   const session = await auth();
@@ -61,7 +61,15 @@ export default async function TopBar({
               },
             ]}
           />
-          {/* Between Domains and Performance on purpose: what is registered,
+          {/* What this platform wrote, before anything hosts it. Ahead of
+              Applications because that is the order the work happens in. */}
+          <Link
+            href="/websites"
+            className={current === "websites" ? "topnav-link is-current" : "topnav-link"}
+          >
+            Websites
+          </Link>
+          {/* Between Websites and Performance on purpose: what is registered,
               what is running on it, what it earns. */}
           <Link
             href="/apps"

@@ -347,6 +347,70 @@ export async function findExecutionStartedAfter(): Promise<ExecutionSummary | nu
  * original execution, which is why a retry there so often reproduced the
  * original failure exactly.
  */
+/**
+ * Start a run that writes a website from nothing.
+ *
+ * Its own function rather than a flag on startRun, because it shares almost
+ * nothing with one: no site to crawl, no WordPress credentials to carry, and a
+ * brief instead of a URL. Passing an empty website_url through the ordinary
+ * path would mean loosening a check that every other run depends on.
+ */
+export async function startBuild(input: {
+  brief: string;
+  topic: string;
+  keywords: string[];
+  site_format: "wordpress" | "static";
+  page_count: number;
+  site_name: string;
+  language: string;
+}): Promise<{ executionId: string; note: string | null }> {
+  const result = await call<{ id: string; note?: string }>(
+    "/runs",
+    { method: "POST", body: JSON.stringify({ ...input, mode: "build" }) },
+    30_000,
+  );
+  return { executionId: result.id, note: result.note ?? null };
+}
+
+/** A generated site, once its run has written some of it. */
+export interface BuiltSite {
+  status: string;
+  complete: boolean;
+  site: {
+    name: string;
+    tagline: string;
+    description: string;
+    topic: string;
+    keywords: string[];
+    format: "wordpress" | "static";
+    language: string;
+    pages: Array<{
+      slug: string;
+      title: string;
+      metaTitle: string;
+      metaDescription: string;
+      bodyHtml: string;
+      keywords: string[];
+      order: number;
+    }>;
+  };
+}
+
+/**
+ * Fetch what a build run has written.
+ *
+ * Null rather than throwing when there is nothing yet: a run that has not
+ * reached its first page is an ordinary state on the way to a finished site,
+ * not a failure worth surfacing.
+ */
+export async function fetchBuiltSite(runId: string): Promise<BuiltSite | null> {
+  try {
+    return await call<BuiltSite>(`/runs/${encodeURIComponent(runId)}/site`, {}, 30_000);
+  } catch {
+    return null;
+  }
+}
+
 export async function retryExecution(id: string): Promise<{ id: string; status: N8nStatus }> {
   const run = await call<EngineRun>(`/runs/${encodeURIComponent(id)}`);
   const inputs = inputsOf(run);

@@ -4064,3 +4064,122 @@ body:has(.bulkbar) main {
   padding: 8px 12px;
   font-size: 13px;
 }
+
+/* ------------------------------------------------------------ website editor
+
+   Pages down the left, the one being edited beside them. Same shape as the
+   tabbed application sheet, at page width rather than dialog width. */
+.editor-split {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.editor-pages {
+  flex: 0 0 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.editor-page {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 8px 11px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.editor-page:hover {
+  background: var(--panel-2);
+}
+
+.editor-page.is-on {
+  background: var(--panel-2);
+  border-color: var(--line-2);
+}
+
+.editor-page-title {
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--ink);
+}
+
+.editor-page-slug {
+  font-size: 11px;
+  color: var(--ink-3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.editor-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Monospace, because it is markup. Tall, because it is a whole page of it. */
+.editor-body {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+/* A label above a field, where the field is not inside a form row. */
+.field-label {
+  display: block;
+  margin: 12px 0 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.field-label:first-child {
+  margin-top: 0;
+}
+
+/* Character counts. Over the limit is a nudge, not an error: Google truncates
+   rather than refusing, so this warns and never blocks. */
+.count-ok {
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+.count-over {
+  font-weight: 600;
+  color: var(--warn);
+}
+
+/* Two or three fields across, stacking on a narrow screen. */
+.site-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.site-row > * {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.site-row-wide {
+  flex: 2 1 300px;
+}
+
+@media (max-width: 760px) {
+  .editor-split {
+    flex-direction: column;
+  }
+
+  .editor-pages {
+    flex: none;
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}

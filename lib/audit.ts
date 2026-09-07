@@ -54,6 +54,16 @@ export type AuditAction =
   /** A copy of a site, which is a second site. Worth knowing where the
       extra tenant on a busy server came from. */
   | "app-cloned"
+  /**
+   * A website written, edited or thrown away.
+   *
+   * Nothing is hosted at this stage, so none of these touches a live site.
+   * The deletion is logged anyway, because it destroys writing nobody can
+   * get back and this line is the only record it existed.
+   */
+  | "website-created"
+  | "website-edited"
+  | "website-deleted"
   /** A step frozen so it stops running. Logged: it changes what a run does. */
   | "step-pinned"
   | "step-unpinned";
