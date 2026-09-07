@@ -235,6 +235,36 @@ export default function AppDomain({
         </div>
 
         <div className="sheet-split">
+          {/* Before the panel in the markup as well as on screen. Tabbing
+              through a dialog should follow what the eye does, and a tab list
+              that reads second while sitting first is a trap for anyone not
+              using a mouse. */}
+          <nav
+            className="sheet-tabs"
+            role="tablist"
+            aria-orientation="vertical"
+            aria-label="What to do with this application"
+            onKeyDown={onTabKey}
+          >
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.id}
+                tabIndex={tab === t.id ? 0 : -1}
+                className={
+                  "sheet-tab" +
+                  (tab === t.id ? " is-on" : "") +
+                  (t.id === "delete" ? " is-danger" : "")
+                }
+                onClick={() => setTab(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+
           <div className="sheet-body sheet-panel" role="tabpanel">
             {error ? (
               <div className="sheet-section">
@@ -578,34 +608,6 @@ export default function AppDomain({
               )
             ) : null}
           </div>
-
-          {/* On the right, because the panel is what you came to read and the
-              left edge is where reading starts. */}
-          <nav
-            className="sheet-tabs"
-            role="tablist"
-            aria-orientation="vertical"
-            aria-label="What to do with this application"
-            onKeyDown={onTabKey}
-          >
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                aria-selected={tab === t.id}
-                tabIndex={tab === t.id ? 0 : -1}
-                className={
-                  "sheet-tab" +
-                  (tab === t.id ? " is-on" : "") +
-                  (t.id === "delete" ? " is-danger" : "")
-                }
-                onClick={() => setTab(t.id)}
-              >
-                {t.label}
-              </button>
-            ))}
-          </nav>
         </div>
       </div>
     </dialog>

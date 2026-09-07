@@ -3885,9 +3885,9 @@ body:has(.bulkbar) main {
 
 /* ------------------------------------------------------- tabbed sheet
 
-   Panel on the left, tabs down the right. The three jobs in this sheet are not
-   steps and are not related, so stacking them made it long and put the
-   irreversible one directly under the routine one. */
+   Tabs down the left, panel beside them. The jobs in this sheet are not steps
+   and are not related, so stacking them made it long and put the irreversible
+   one directly under the routine ones. */
 .sheet-split {
   display: flex;
   align-items: stretch;
@@ -3905,7 +3905,7 @@ body:has(.bulkbar) main {
   flex-direction: column;
   gap: 2px;
   padding: 12px;
-  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
   background: var(--panel-2);
 }
 
@@ -3943,14 +3943,14 @@ body:has(.bulkbar) main {
    above it as a row. */
 @media (max-width: 720px) {
   .sheet-split {
-    flex-direction: column-reverse;
+    flex-direction: column;
   }
 
   .sheet-tabs {
     flex: none;
     flex-direction: row;
     flex-wrap: wrap;
-    border-left: 0;
+    border-right: 0;
     border-bottom: 1px solid var(--line);
   }
 }
