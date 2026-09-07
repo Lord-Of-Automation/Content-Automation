@@ -256,7 +256,7 @@ export default function DomainProviders() {
 
         {error ? <div className="alert alert-warn">{error}</div> : null}
         {message ? <div className="alert alert-ok">{message}</div> : null}
-        {!specs.length ? <p className="stage-hint">Reading…</p> : null}
+        {!specs.length ? <div className="empty">Reading…</div> : null}
 
         {specs.map((spec) => {
           const status = statuses[spec.id];

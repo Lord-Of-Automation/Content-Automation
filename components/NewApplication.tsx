@@ -136,7 +136,7 @@ export default function NewApplication({
         <div className="sheet-body">
           {error ? <div className="notice bad">{error}</div> : null}
 
-          {loading ? <p className="quiet">Reading the catalogue…</p> : null}
+          {loading ? <div className="empty">Reading the catalogue…</div> : null}
 
           {created ? (
             <section className="sheet-section">

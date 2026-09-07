@@ -356,7 +356,7 @@ export default function AppsView() {
             </div>
           ))}
 
-          {loading && !data ? <p className="quiet">Reading the hosts…</p> : null}
+          {loading && !data ? <div className="empty">Reading the hosts…</div> : null}
 
           {data && !data.apps.length && !error ? (
             <div className="notice warn">
