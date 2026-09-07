@@ -4,8 +4,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import AppCredential from "@/components/AppCredential";
 import { Select } from "@/components/Select";
+import { HOSTS, type HostId } from "@/lib/hosts";
 
-type Server = { id: string; label: string; apps: number };
+/** Somewhere a copy could go: a Cloudways server, in practice. */
+type Place = { id: string; label: string; host: HostId; apps: number };
 
 type App = {
   id: string;
@@ -17,8 +19,10 @@ type App = {
   adminPath: string;
   adminUser: string;
   adminPassword: string;
-  serverId: string;
-  serverLabel: string;
+  host: HostId;
+  placeId: string;
+  placeLabel: string;
+  accountIndex: number;
 };
 
 type Result = {
@@ -120,11 +124,27 @@ export default function AppDomain({
 }: {
   app: App;
   /** Where a copy could go. Handed down rather than fetched again. */
-  servers: Server[];
+  servers: Place[];
   onClose: () => void;
   onDone: () => void;
 }) {
+  /**
+   * Which jobs this host can actually do.
+   *
+   * Cloudways does all four. Hostinger's hosting API lists, creates and
+   * deletes, and nothing else — so the tabs it cannot support are absent rather
+   * than present and broken, and Access explains itself instead of showing two
+   * empty boxes.
+   */
+  const can = HOSTS[app.host];
+  const tabs = TABS.filter((t) =>
+    t.id === "domain" ? can.changeDomain : t.id === "clone" ? can.clone : true,
+  );
+
   const [tab, setTab] = useState<Tab>("access");
+
+  /** The host's own id for the place, without the prefix the merge adds. */
+  const serverId = app.placeId.split(":")[1] ?? "";
 
   const [domain, setDomain] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -136,7 +156,7 @@ export default function AppDomain({
   const [deleted, setDeleted] = useState<{ label: string; gone: boolean } | null>(null);
 
   const [cloneName, setCloneName] = useState("");
-  const [cloneTo, setCloneTo] = useState(app.serverId);
+  const [cloneTo, setCloneTo] = useState(serverId);
   const [cloned, setCloned] = useState<{
     label: string;
     serverLabel: string;
@@ -180,7 +200,7 @@ export default function AppDomain({
       const response = await fetch("/api/apps/domain", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ serverId: app.serverId, appId: app.id, domain: wanted }),
+        body: JSON.stringify({ serverId, appId: app.id, domain: wanted }),
       });
       if (response.status === 401) {
         window.location.href = "/login";
@@ -206,7 +226,7 @@ export default function AppDomain({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          serverId: app.serverId,
+          serverId,
           appId: app.id,
           label: cloneName,
           destinationServerId: cloneTo,
@@ -234,9 +254,11 @@ export default function AppDomain({
         method: "DELETE",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          serverId: app.serverId,
+          host: app.host,
+          serverId,
           appId: app.id,
           confirm: confirmName,
+          accountIndex: app.accountIndex,
         }),
       });
       if (response.status === 401) {
@@ -257,9 +279,9 @@ export default function AppDomain({
   function onTabKey(e: React.KeyboardEvent) {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
     e.preventDefault();
-    const at = TABS.findIndex((t) => t.id === tab);
-    const next = (at + (e.key === "ArrowDown" ? 1 : TABS.length - 1)) % TABS.length;
-    setTab(TABS[next].id);
+    const at = tabs.findIndex((t) => t.id === tab);
+    const next = (at + (e.key === "ArrowDown" ? 1 : tabs.length - 1)) % tabs.length;
+    setTab(tabs[next].id);
   }
 
   return (
@@ -269,7 +291,7 @@ export default function AppDomain({
           <div>
             <h2>{app.domain || app.label}</h2>
             <p>
-              {app.platformLabel} on {app.serverLabel}
+              {app.platformLabel} on {app.placeLabel} · {HOSTS[app.host].label}
             </p>
           </div>
           <button
@@ -293,7 +315,7 @@ export default function AppDomain({
             aria-label="What to do with this application"
             onKeyDown={onTabKey}
           >
-            {TABS.map((t) => (
+            {tabs.map((t) => (
               <button
                 key={t.id}
                 type="button"
@@ -323,17 +345,29 @@ export default function AppDomain({
             {tab === "access" ? (
               <section className="sheet-section">
                 <h3>Admin login</h3>
-                <p className="stage-hint">
-                  What Cloudways set when it installed this application, which is
-                  not always what works. Change the password inside the site and
-                  Cloudways goes on reporting the old one, because nothing tells
-                  it. Treat a refusal as somebody having changed it.
-                </p>
-                <AppCredential
-                  user={app.adminUser}
-                  password={app.adminPassword}
-                  boxed
-                />
+                {can.credentials ? (
+                  <>
+                    <p className="stage-hint">
+                      What {HOSTS[app.host].label} set when it installed this
+                      application, which is not always what works. Change the
+                      password inside the site and the host goes on reporting the
+                      old one, because nothing tells it. Treat a refusal as
+                      somebody having changed it.
+                    </p>
+                    <AppCredential
+                      user={app.adminUser}
+                      password={app.adminPassword}
+                      boxed
+                    />
+                  </>
+                ) : (
+                  <p className="stage-hint">
+                    {HOSTS[app.host].label} does not hand back a site&rsquo;s
+                    admin password through its API, so there is nothing stored
+                    here to show. The link below opens the admin page, where the
+                    login is whatever was set when the site was built.
+                  </p>
+                )}
 
                 <div className="sheet-actions">
                   {app.adminPath ? (
@@ -369,7 +403,7 @@ export default function AppDomain({
                         The certificate is issued per domain, so{" "}
                         <strong>{result.now}</strong> needs a new one once its
                         DNS points at{" "}
-                        <span className="rr-value">{app.serverLabel}</span>.
+                        <span className="rr-value">{app.placeLabel}</span>.
                         Install it from the Cloudways SSL panel.
                       </p>
                       {app.platform.startsWith("wordpress") ? (
@@ -547,12 +581,16 @@ export default function AppDomain({
                         id="clone-server"
                         value={cloneTo}
                         onChange={setCloneTo}
-                        options={servers.map((s) => ({
-                          value: s.id,
-                          label:
-                            s.id === app.serverId ? `${s.label} (same server)` : s.label,
-                          hint: `${s.apps} app${s.apps === 1 ? "" : "s"}`,
-                        }))}
+                        options={servers
+                          // Only where this host can put a copy. Cloudways
+                          // cannot clone onto a Hostinger account.
+                          .filter((s) => s.host === app.host)
+                          .map((s) => ({
+                            value: s.id.split(":")[1] ?? s.id,
+                            label:
+                              s.id === app.placeId ? `${s.label} (same server)` : s.label,
+                            hint: `${s.apps} app${s.apps === 1 ? "" : "s"}`,
+                          }))}
                       />
                     ) : null}
 

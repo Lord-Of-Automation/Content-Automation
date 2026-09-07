@@ -7,6 +7,8 @@ import {
   CloudwaysConfigError, createApplication, deleteApplication, listApplications,
   listInstallable,
 } from "@/lib/cloudways";
+import { HostingerConfigError, deleteHostingerSite } from "@/lib/hostinger";
+import { listAllApplications } from "@/lib/hosting";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,11 +32,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ installable, servers: estate.servers });
     }
 
-    return NextResponse.json(await listApplications());
+    // Every host, merged. One failing leaves a row in `sources` saying so
+    // rather than emptying a page that is mostly about the other.
+    return NextResponse.json(await listAllApplications());
   } catch (error) {
     // A missing or rejected token is something to fix on the Keys page rather
     // than an upstream wobble worth retrying.
-    if (error instanceof CloudwaysConfigError) {
+    if (error instanceof CloudwaysConfigError || error instanceof HostingerConfigError) {
       return NextResponse.json({ error: error.message, kind: "config" }, { status: 500 });
     }
     return errorResponse(error);
@@ -112,20 +116,45 @@ export async function DELETE(request: Request) {
   const session = await auth();
   const actor = session?.user?.name ?? "unknown";
 
-  let body: { serverId?: string; appId?: string; confirm?: string };
+  let body: {
+    host?: string;
+    serverId?: string;
+    appId?: string;
+    confirm?: string;
+    accountIndex?: number;
+  };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const serverId = String(body.serverId ?? "").trim();
+  const host = String(body.host ?? "cloudways");
   const appId = String(body.appId ?? "").trim();
-  if (!serverId || !appId) {
+  if (!appId) {
     return NextResponse.json({ error: "Which application?" }, { status: 400 });
   }
 
   try {
+    // Hostinger addresses a site by its domain and offers no read of one, so
+    // there is nothing to compare a typed name against beyond the domain
+    // itself. The check still happens, in lib/hostinger.ts, where calling this
+    // route directly cannot skip it.
+    if (host === "hostinger") {
+      await deleteHostingerSite(
+        Number(body.accountIndex ?? 0),
+        appId,
+        String(body.confirm ?? ""),
+      );
+      await record(actor, "app-deleted", `${appId} from Hostinger`);
+      return NextResponse.json({ label: appId, serverLabel: "Hostinger", gone: true });
+    }
+
+    const serverId = String(body.serverId ?? "").trim();
+    if (!serverId) {
+      return NextResponse.json({ error: "Which server?" }, { status: 400 });
+    }
+
     const result = await deleteApplication(serverId, appId, String(body.confirm ?? ""));
 
     // The only record that this site ever existed, once the files are gone.
@@ -139,11 +168,11 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
-    if (error instanceof CloudwaysConfigError) {
+    if (error instanceof CloudwaysConfigError || error instanceof HostingerConfigError) {
       return NextResponse.json({ error: error.message, kind: "config" }, { status: 500 });
     }
     const message = error instanceof Error ? error.message : "";
-    if (/No such application|exactly to confirm/i.test(message)) {
+    if (/No such application|exactly to confirm|no longer configured/i.test(message)) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
     return errorResponse(error);

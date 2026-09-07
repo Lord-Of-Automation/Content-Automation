@@ -31,7 +31,8 @@ export type ProviderId =
   | "godaddy" | "gandi" | "namecheap" | "spaceship"
   | "cloudflare"
   | "searchconsole"
-  | "cloudways";
+  | "cloudways"
+  | "hostinger";
 
 export interface ProviderField {
   name: string;
@@ -209,6 +210,29 @@ export const PROVIDERS: ProviderSpec[] = [
           "A Cloudways Access Token starts with cw_ and has no spaces. If what " +
           "you have is an email and an API key, create an Access Token instead " +
           "under Account, API Access.",
+      },
+    ],
+  },
+  {
+    id: "hostinger",
+    label: "Hostinger",
+    wired: true,
+    blurb:
+      "The second host the Applications page reads. An API token from hPanel, " +
+      "under Account, API. One per line if you have more than one account: a " +
+      "token only sees the account it was issued for, so an estate spread over " +
+      "two of them needs two lines or half of it stays invisible. Hostinger's " +
+      "hosting API lists, creates and deletes websites and does no more than " +
+      "that, so cloning, domain changes, cache and stored logins are Cloudways " +
+      "only and simply do not appear on a Hostinger row.",
+    fields: [
+      {
+        name: "apiToken",
+        label: "API tokens",
+        secret: true,
+        multiline: true,
+        placeholder: "one token per line",
+        hint: "From hPanel, Account, API. Each line is one Hostinger account.",
       },
     ],
   },
@@ -563,6 +587,10 @@ function fromEnvironment(id: ProviderId): Record<string, string> | null {
   // Keys page in, which is otherwise a chicken and egg on a fresh checkout.
   if (id === "cloudways") {
     const apiToken = process.env.CLOUDWAYS_API_TOKEN?.trim();
+    return apiToken ? { apiToken } : null;
+  }
+  if (id === "hostinger") {
+    const apiToken = process.env.HOSTINGER_API_TOKEN?.trim();
     return apiToken ? { apiToken } : null;
   }
   return null;

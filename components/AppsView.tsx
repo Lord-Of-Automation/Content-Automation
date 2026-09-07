@@ -7,8 +7,11 @@ import AppDomain from "@/components/AppDomain";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import NewApplication from "@/components/NewApplication";
 import { Select } from "@/components/Select";
+import { HOSTS, type HostId } from "@/lib/hosts";
 
 type App = {
+  host: HostId;
+  key: string;
   id: string;
   label: string;
   domain: string;
@@ -18,27 +21,40 @@ type App = {
   stagingUrl: string;
   adminPath: string;
   staging: boolean;
-  ssl: "installed" | "pending" | "none";
+  ssl: "installed" | "pending" | "none" | "unknown";
   adminUser: string;
   adminPassword: string;
   createdAt: string;
-  serverId: string;
-  serverLabel: string;
-  serverIp: string;
+  enabled: boolean;
+  placeId: string;
+  placeLabel: string;
+  placeAddress: string;
+  accountIndex: number;
 };
 
-type Server = {
+/** A server on Cloudways, a hosting account on Hostinger. */
+type Place = {
   id: string;
   label: string;
-  status: string;
-  ip: string;
-  cloud: string;
-  region: string;
-  size: string;
+  host: HostId;
+  hostLabel: string;
   apps: number;
 };
 
-type Payload = { servers: Server[]; apps: App[]; ok: boolean; note: string };
+type Source = {
+  host: HostId;
+  label: string;
+  ok: boolean;
+  count: number;
+  note: string;
+};
+
+type Payload = {
+  apps: App[];
+  places: Place[];
+  sources: Source[];
+  connected: HostId[];
+};
 
 type SortKey = "name" | "platform" | "server" | "admin";
 
@@ -146,7 +162,9 @@ export default function AppsView() {
       const response = await fetch("/api/apps/cache", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ serverId: flushing.serverId }),
+        // The place id carries its host as a prefix; the API wants the
+        // server's own id back.
+        body: JSON.stringify({ serverId: flushing.placeId.split(":")[1] }),
       });
       if (response.status === 401) {
         window.location.href = "/login";
@@ -210,7 +228,7 @@ export default function AppsView() {
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const rows = (data?.apps ?? []).filter((a) => {
-      if (server && a.serverId !== server) return false;
+      if (server && a.placeId !== server) return false;
       if (!needle) return true;
       // The label and the domain routinely differ, and people search for
       // whichever one they happen to remember.
@@ -232,7 +250,7 @@ export default function AppsView() {
         );
       }
       if (sortKey === "server") {
-        return a.serverLabel.localeCompare(b.serverLabel) * flip || name(a).localeCompare(name(b));
+        return a.placeLabel.localeCompare(b.placeLabel) * flip || name(a).localeCompare(name(b));
       }
       return a.adminUser.localeCompare(b.adminUser) * flip || name(a).localeCompare(name(b));
     });
@@ -244,7 +262,7 @@ export default function AppsView() {
     const rows = data?.apps ?? [];
     return {
       apps: rows.length,
-      servers: data?.servers.length ?? 0,
+      servers: data?.places.length ?? 0,
       // The one worth opening this page for. An application nobody pointed a
       // domain at is either unfinished or forgotten, and both are money.
       homeless: rows.filter((a) => !a.domain && !a.staging).length,
@@ -252,15 +270,32 @@ export default function AppsView() {
     };
   }, [data]);
 
-  const serverOptions = useMemo(
-    () => [
-      { value: "", label: "All servers" },
-      ...(data?.servers ?? []).map((s) => ({
-        value: s.id,
-        label: s.label,
-        hint: `${s.apps}`,
+  /**
+   * Everywhere a site can live, across every connected host.
+   *
+   * One control rather than a host picker and a server picker. "Which host" and
+   * "which server" are the same question asked at two depths, and the answer is
+   * always one place — so the list names the place and hints at the host it
+   * belongs to.
+   */
+  const serverOptions = useMemo(() => {
+    const places = data?.places ?? [];
+    const hosts = new Set(places.map((p) => p.host));
+    return [
+      { value: "", label: hosts.size > 1 ? "All hosts" : "All servers" },
+      ...places.map((p) => ({
+        value: p.id,
+        label: p.label,
+        // The host, once there is more than one. With a single host it is the
+        // same word on every line and tells nobody anything.
+        hint: hosts.size > 1 ? p.hostLabel : `${p.apps}`,
       })),
-    ],
+    ];
+  }, [data]);
+
+  /** Hosts that answered badly, named so an empty list is not a mystery. */
+  const broken = useMemo(
+    () => (data?.sources ?? []).filter((s) => !s.ok && data?.connected.includes(s.host)),
     [data],
   );
 
@@ -313,13 +348,21 @@ export default function AppsView() {
             </div>
           ) : null}
 
-          {loading && !data ? <p className="quiet">Reading Cloudways…</p> : null}
+          {broken.map((s) => (
+            <div className="notice warn" key={s.host}>
+              <strong>{s.label} could not be read.</strong> {s.note} Everything
+              below is what the other hosts returned, so this list is short
+              rather than wrong.
+            </div>
+          ))}
+
+          {loading && !data ? <p className="quiet">Reading the hosts…</p> : null}
 
           {data && !data.apps.length && !error ? (
             <div className="notice warn">
-              <strong>This Cloudways account hosts no applications.</strong> The
-              token worked and the account came back empty, so there is nothing
-              to show rather than something we could not read.
+              <strong>No applications on any connected host.</strong> The
+              tokens worked and the accounts came back empty, so there is
+              nothing to show rather than something we could not read.
             </div>
           ) : null}
 
@@ -411,7 +454,7 @@ export default function AppsView() {
                 </thead>
                 <tbody>
                   {shown.slice(0, visible).map((a) => (
-                    <tr key={a.id}>
+                    <tr key={a.key}>
                       <td>
                         <div className="app-name">
                           <a
@@ -436,8 +479,14 @@ export default function AppsView() {
                         {a.version ? <span className="app-sub-inline">{a.version}</span> : null}
                       </td>
                       <td className="mid">
-                        <span className="registrar">{a.serverLabel}</span>
-                        <div className="app-sub">{a.serverIp}</div>
+                        <span className="registrar">{a.placeLabel}</span>
+                        <div className="app-sub">
+                          {/* The host, once there is more than one connected.
+                              With one it is the same word on every row. */}
+                          {(data?.connected.length ?? 0) > 1
+                            ? HOSTS[a.host].label
+                            : a.placeAddress}
+                        </div>
                       </td>
                       <td className="mid cred-cell">
                         <AppCredential user={a.adminUser} password={a.adminPassword} />
@@ -454,6 +503,14 @@ export default function AppsView() {
                               normal state of a site behind Cloudflare, and a
                               red badge on nine rows in ten would train everyone
                               to ignore the column. */}
+                          {!a.enabled ? (
+                            <span
+                              className="pill pill-bad"
+                              title="This site is switched off at the host."
+                            >
+                              disabled
+                            </span>
+                          ) : null}
                           {a.ssl === "installed" ? (
                             <span
                               className="registrar"
@@ -485,14 +542,16 @@ export default function AppsView() {
                           >
                             Modify
                           </button>
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            title={`Clear the Varnish cache on ${a.serverLabel}`}
-                            onClick={() => setFlushing(a)}
-                          >
-                            Flush cache
-                          </button>
+                          {HOSTS[a.host].flushCache ? (
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              title={`Clear the Varnish cache on ${a.placeLabel}`}
+                              onClick={() => setFlushing(a)}
+                            >
+                              Flush cache
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -513,17 +572,18 @@ export default function AppsView() {
               ) : null}
 
               <p className="domain-note">
-                Every application on every server this Cloudways token can see.
-                The name links to the domain when one is pointed at it, and to
-                the cloudwaysapps.com address otherwise. An{" "}
-                <strong>SSL</strong> mark means Cloudways holds a certificate
-                for that application; most of these sit behind Cloudflare, which
-                does its own, so no mark does not mean no padlock. Cloudways
-                returns four passwords per application; only the admin login
-                is kept, and the server, database and Redis passwords are
-                dropped before anything reaches your browser. The admin
-                password is what Cloudways set at install, so it will be out
-                of date if someone has changed it inside the site since.
+                Every site on every connected host. The name links to the
+                domain when one is pointed at it, and to the host&rsquo;s own
+                address otherwise. An <strong>SSL</strong> mark means Cloudways
+                holds a certificate; most of these sit behind Cloudflare, which
+                does its own, so no mark does not mean no padlock, and Hostinger
+                does not report certificates at all. Cloudways returns four
+                passwords per application and only the admin login is kept, the
+                rest dropped before anything reaches your browser; it is what
+                was set at install, so it will be out of date if someone has
+                changed it since. Hostinger returns no passwords, and supports
+                neither cloning, domain changes nor a cache this can clear, so
+                those controls do not appear on its rows.
               </p>
             </>
           ) : null}
@@ -535,12 +595,14 @@ export default function AppsView() {
         title="Clear every cache"
         body={
           <>
-            Clears Varnish on all{" "}
-            <strong>{data?.servers.length ?? 0}</strong> servers, covering every
-            one of the <strong>{data?.apps.length ?? 0}</strong> applications on
-            this account. Each of them serves from the origin until its cache
-            refills, so the servers work harder for a minute afterwards. Nothing
-            is lost and there is nothing to undo.
+            Clears Varnish on every Cloudways server, covering all{" "}
+            <strong>
+              {(data?.apps ?? []).filter((a) => a.host === "cloudways").length}
+            </strong>{" "}
+            applications hosted there. Each serves from the origin until its
+            cache refills, so the servers work harder for a minute afterwards.
+            Nothing is lost and there is nothing to undo. Sites on other hosts
+            are untouched: only Cloudways has a cache this can reach.
           </>
         }
         confirmLabel="Clear them all"
@@ -561,9 +623,9 @@ export default function AppsView() {
                 it, and nobody should find that out afterwards. */}
             Cloudways clears Varnish for a whole server, so this affects all{" "}
             <strong>
-              {data?.servers.find((s) => s.id === flushing?.serverId)?.apps ?? 0}
+              {data?.places.find((s) => s.id === flushing?.placeId)?.apps ?? 0}
             </strong>{" "}
-            applications on <strong>{flushing?.serverLabel}</strong>, not just{" "}
+            applications on <strong>{flushing?.placeLabel}</strong>, not just{" "}
             {flushing?.domain || flushing?.label}. They will serve from the
             origin until the cache refills, which costs a minute of slower
             pages and nothing else.
@@ -592,7 +654,7 @@ export default function AppsView() {
       {managing ? (
         <AppDomain
           app={managing}
-          servers={data?.servers ?? []}
+          servers={data?.places ?? []}
           onClose={() => setManaging(null)}
           onDone={() => {
             setManaging(null);
