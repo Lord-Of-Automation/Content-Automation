@@ -259,8 +259,8 @@ export default function AppsView() {
                     {(
                       [
                         ["name", "Application", ""],
-                        ["platform", "Platform", ""],
-                        ["server", "Server", ""],
+                        ["platform", "Platform", "mid"],
+                        ["server", "Server", "mid"],
                         ["created", "Added", "mid"],
                       ] as Array<[SortKey, string, string]>
                     ).map(([key, label, align]) => (
@@ -296,11 +296,11 @@ export default function AppsView() {
                           <div className="app-sub">{a.label}</div>
                         ) : null}
                       </td>
-                      <td>
+                      <td className="mid">
                         {a.platformLabel}
                         {a.version ? <span className="app-sub-inline">{a.version}</span> : null}
                       </td>
-                      <td>
+                      <td className="mid">
                         <span className="registrar">{a.serverLabel}</span>
                         <div className="app-sub">{a.serverIp}</div>
                       </td>
