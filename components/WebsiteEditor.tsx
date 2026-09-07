@@ -323,7 +323,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
             </p>
           </div>
           <div className="app-head-actions">
-            <Link className="btn btn-ghost btn-sm" href="/websites">
+            <Link className="btn btn-ghost bar-btn" href="/websites">
               All websites
             </Link>
             {pages.length ? (

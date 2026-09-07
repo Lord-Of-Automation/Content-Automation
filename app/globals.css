@@ -270,6 +270,11 @@ input[type="number"],
    own, which in Safari is a rounded pill with an inset shadow and nothing like
    the rest of the form. */
 input[type="search"],
+/* A textarea is a text box that happens to be tall, and was never in this
+   list. Without it a browser falls back to the intrinsic width of its cols
+   attribute, roughly twenty characters, which is why the HTML editor and the
+   meta description sat narrow beside the inputs above them. */
+textarea,
 select {
   width: 100%;
   padding: 8px 10px;
@@ -280,6 +285,13 @@ select {
   border: 1px solid var(--line-2);
   border-radius: 7px;
   outline: none;
+}
+
+/* Taller when dragged, never wider: a textarea that can grow sideways breaks
+   whatever it sits in. */
+textarea {
+  resize: vertical;
+  display: block;
 }
 
 select {
@@ -4457,4 +4469,101 @@ body:has(.bulkbar) main {
   font-weight: 600;
   font-size: 13.5px;
   text-decoration: none;
+}
+
+/* ---------------------------------------------------------- preview, expanded
+
+   A preview at a third of the window is a preview of a layout, not of a page.
+   Full screen is a class rather than the Fullscreen API: it needs no
+   permission, works the same in every browser, and keeps a visible way out. */
+.preview-shell {
+  position: relative;
+}
+
+.preview-shell.is-full {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  padding: 12px;
+  background: var(--bg);
+}
+
+.preview-shell.is-full .site-preview {
+  height: 100%;
+  min-height: 0;
+}
+
+.preview-expand {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  /* Solid, not translucent: it sits over a page whose colours are the site's
+     own, and a see-through control disappears against half of them. */
+  background: var(--panel);
+  color: var(--ink-2);
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity .15s ease, color .15s ease;
+}
+
+.preview-expand:hover {
+  opacity: 1;
+  color: var(--ink);
+}
+
+.preview-expand svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* The width control above the frame, and the stage the frame stands on. */
+.preview-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Room on the right for the expand button, which floats over this corner. */
+  padding: 0 42px 8px 0;
+}
+
+.preview-size {
+  font-size: 11.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink-3);
+}
+
+.preview-stage {
+  display: flex;
+  justify-content: center;
+}
+
+/* Scrolls rather than shrinks. A laptop width squeezed into a side pane would
+   report the layout of a pane, which is the one answer this must never give. */
+.preview-stage.is-sized {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.preview-stage .site-preview {
+  /* Centred when narrower than the stage, and given a little lift so a phone
+     width reads as a device rather than as a column of leftover space. */
+  box-shadow: var(--shadow);
+}
+
+.preview-shell.is-full {
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-shell.is-full .preview-stage {
+  flex: 1;
+  min-height: 0;
 }
