@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import AppCredential from "@/components/AppCredential";
 import { Select } from "@/components/Select";
@@ -37,6 +37,53 @@ type Tab = "access" | "domain" | "clone" | "delete";
  * Access reads and changes nothing, which also makes it the right thing to open
  * on: the sheet lands on a tab that cannot do anything.
  */
+/**
+ * One shape each, drawn rather than pulled in.
+ *
+ * Four inline paths cost nothing and an icon font costs a request and a flash
+ * of the wrong glyph. They take their colour from the tab, so the delete icon
+ * turns red with its label when that tab is the one selected.
+ */
+const ICONS: Record<Tab, ReactNode> = {
+  // A padlock. What is behind this tab is a way in.
+  access: (
+    <>
+      <rect x="4" y="10" width="16" height="11" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </>
+  ),
+  // A globe, matching the one the nav uses for anything domain shaped.
+  domain: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18Z" />
+    </>
+  ),
+  // One sheet behind another, which is what a clone is.
+  clone: (
+    <>
+      <rect x="8" y="8" width="13" height="13" rx="2" />
+      <path d="M4 16a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2" />
+    </>
+  ),
+  // A bin, and no ambiguity about it.
+  delete: (
+    <>
+      <path d="M3 6h18M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
+      <path d="M18 6v13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6" />
+      <path d="M10 11v6M14 11v6" />
+    </>
+  ),
+};
+
+function TabIcon({ tab }: { tab: Tab }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      {ICONS[tab]}
+    </svg>
+  );
+}
+
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "access", label: "Access" },
   { id: "domain", label: "Domain Management" },
@@ -260,6 +307,7 @@ export default function AppDomain({
                 }
                 onClick={() => setTab(t.id)}
               >
+                <TabIcon tab={t.id} />
                 {t.label}
               </button>
             ))}

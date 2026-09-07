@@ -4045,3 +4045,12 @@ body:has(.bulkbar) main {
   flex-direction: column;
   gap: 10px;
 }
+
+/* The tab icons. Fixed size and never shrinking, so a long label wraps or
+   truncates before the shape it belongs to does. The gap comes from the base
+   button rule, which every button here already shares. */
+.sheet-tab svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
