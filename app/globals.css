@@ -4054,3 +4054,12 @@ body:has(.bulkbar) main {
   height: 15px;
   flex: none;
 }
+
+/* Go To Admin, matched to the credential fields it sits under rather than to
+   the small buttons used elsewhere. Same padding, font size and border as the
+   boxes above it, which is what Show and Copy end up at by stretching. A
+   shorter button under two taller ones reads as an afterthought. */
+.cred-link {
+  padding: 8px 12px;
+  font-size: 13px;
+}

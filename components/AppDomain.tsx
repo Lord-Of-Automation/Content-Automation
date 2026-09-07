@@ -338,7 +338,7 @@ export default function AppDomain({
                 <div className="sheet-actions">
                   {app.adminPath ? (
                     <a
-                      className="btn btn-ghost btn-sm"
+                      className="btn btn-ghost cred-link"
                       href={`${
                         app.domain ? `https://${app.domain}` : app.stagingUrl
                       }${app.adminPath}`}
