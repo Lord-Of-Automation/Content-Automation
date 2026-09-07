@@ -30,6 +30,15 @@ export type AuditAction =
    * what it was before are worth more than for anything else on this list.
    */
   | "dns-changed"
+  /**
+   * An application's primary domain, changed on the host.
+   *
+   * Kept apart from dns-changed because it breaks differently. DNS decides
+   * where a name points; this decides what the server answers to, and getting
+   * it wrong leaves a site that resolves perfectly and serves the wrong thing
+   * or nothing. What it was before is the only way back.
+   */
+  | "app-domain-changed"
   /** A step frozen so it stops running. Logged: it changes what a run does. */
   | "step-pinned"
   | "step-unpinned";

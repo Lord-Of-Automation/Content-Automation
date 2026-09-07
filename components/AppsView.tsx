@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import AppDomain from "@/components/AppDomain";
 import { Select } from "@/components/Select";
 
 type App = {
@@ -78,6 +79,8 @@ export default function AppsView() {
   const [server, setServer] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [direction, setDirection] = useState<"asc" | "desc">("asc");
+  /** The application whose domain is being changed, if any. */
+  const [managing, setManaging] = useState<App | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -334,6 +337,13 @@ export default function AppsView() {
                               admin
                             </a>
                           ) : null}
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setManaging(a)}
+                          >
+                            Modify
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -356,6 +366,18 @@ export default function AppsView() {
           ) : null}
         </div>
       </div>
+
+      {managing ? (
+        <AppDomain
+          app={managing}
+          onClose={() => setManaging(null)}
+          onDone={() => {
+            setManaging(null);
+            // The domain moved, and it is the first column on this page.
+            void load();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

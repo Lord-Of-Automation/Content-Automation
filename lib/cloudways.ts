@@ -191,6 +191,49 @@ async function get(path: string): Promise<unknown> {
 }
 
 /**
+ * A write.
+ *
+ * Cloudways takes form encoding rather than JSON, and answers most writes with
+ * an operation id instead of a result: the change is queued on the server and
+ * happens a moment later. So a 200 here means "accepted", never "done".
+ */
+async function post(
+  path: string,
+  fields: Record<string, string>,
+): Promise<Record<string, unknown>> {
+  const response = await fetch(`${API}${path}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${await token()}`,
+      accept: "application/json",
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams(fields).toString(),
+    cache: "no-store",
+    signal: AbortSignal.timeout(45_000),
+  });
+
+  const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+
+  if (response.status === 401 || response.status === 403) {
+    // Worth separating from a bad token, because the commonest cause is a
+    // token that reads perfectly well and was never granted anything else.
+    throw new CloudwaysConfigError(
+      "Cloudways refused this change. A read-only Access Token can list " +
+        "applications but not modify them — check the token's permissions in " +
+        "Account, API Access.",
+    );
+  }
+
+  if (!response.ok) {
+    const said = typeof body.message === "string" ? body.message : `HTTP ${response.status}`;
+    throw new Error(`Cloudways refused the change: ${said}`);
+  }
+
+  return body;
+}
+
+/**
  * The domain this application answers on.
  *
  * `cname` is the obvious field, and it is empty on more applications than you
@@ -296,5 +339,112 @@ export async function listApplications(): Promise<CloudwaysEstate> {
     apps,
     ok: true,
     note: "",
+  };
+}
+
+/** What a primary domain is allowed to look like. */
+const HOSTNAME = /^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+/** There is no per-application read, so one is picked out of the estate. */
+async function findApp(serverId: string, appId: string): Promise<CloudwaysApp | null> {
+  const { apps } = await listApplications();
+  return apps.find((a) => a.id === appId && a.serverId === serverId) ?? null;
+}
+
+/**
+ * Wait for a queued operation, as far as it can be waited for.
+ *
+ * Best effort on purpose. The operation endpoint answers only for operations
+ * this token started, and its response shape is not something to build on. The
+ * read-back below is what actually decides whether the change happened, so
+ * giving up here costs a few seconds and nothing else.
+ */
+async function settle(operationId: string): Promise<void> {
+  if (!operationId) return;
+
+  const until = Date.now() + 20_000;
+  while (Date.now() < until) {
+    try {
+      const body = (await get(`/operation/${encodeURIComponent(operationId)}`)) as {
+        operation?: { is_completed?: string | boolean };
+      };
+      const done = body.operation?.is_completed;
+      if (done === "1" || done === true) return;
+    } catch {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+  }
+}
+
+export interface DomainChange {
+  /** What was asked for. */
+  requested: string;
+  /** What the application answers with now, read back rather than assumed. */
+  now: string;
+  /** Whether the read-back agrees with the request. */
+  changed: boolean;
+  /** What it was before, which is what the audit trail needs. */
+  before: string;
+  operationId: string;
+}
+
+/**
+ * Change an application's primary domain.
+ *
+ * The result is read back from Cloudways rather than inferred from the reply,
+ * and that is not belt and braces. Cloudways answers this write with a queued
+ * operation, so a 200 only means the request was accepted; and the parameter
+ * name comes from a community wrapper rather than from anything Cloudways
+ * publishes, so a silently ignored field would look exactly like success. The
+ * only honest way to report this is to ask the application what its domain is
+ * afterwards and say what came back.
+ *
+ * Two things this deliberately does not do. It does not touch the WordPress
+ * database — the dashboard's "Set as Primary" runs a search and replace so the
+ * site URL follows, and whether this endpoint does the same is undocumented, so
+ * the caller is told to check rather than reassured. And it does not reissue
+ * the certificate, which is per-domain and will need reissuing once DNS points
+ * at the server.
+ */
+export async function setPrimaryDomain(
+  serverId: string,
+  appId: string,
+  domain: string,
+): Promise<DomainChange> {
+  const wanted = domain.trim().toLowerCase();
+  if (!HOSTNAME.test(wanted)) throw new Error("That is not a domain name.");
+
+  // Read first, so a wrong id fails before anything is sent and so the "before"
+  // in the audit line is the real one rather than whatever the browser thought.
+  const app = await findApp(serverId, appId);
+  if (!app) throw new Error("No such application on that server.");
+  if (app.domain === wanted) {
+    throw new Error(`${wanted} is already the primary domain for this application.`);
+  }
+
+  const body = await post("/app/manage/cname", {
+    server_id: serverId,
+    app_id: appId,
+    cname: wanted,
+  });
+
+  const operationId = String(body.operation_id ?? "");
+  await settle(operationId);
+
+  let now = "";
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    now = (await findApp(serverId, appId))?.domain ?? "";
+    if (now === wanted) break;
+    // Queued work that has not landed yet reads exactly like work that failed.
+    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 2500));
+  }
+
+  return {
+    requested: wanted,
+    now,
+    changed: now === wanted,
+    before: app.domain,
+    operationId,
   };
 }
