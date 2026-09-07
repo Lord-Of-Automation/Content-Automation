@@ -3814,3 +3814,55 @@ body:has(.bulkbar) main {
   flex: 0 0 auto;
   min-width: 180px;
 }
+
+/* ------------------------------------------------- application credentials
+
+   Two short lines in one cell: the login on top, the password under it.
+   Monospace, because these are strings to be copied exactly and a proportional
+   font makes l, 1 and I the same shape. */
+.cred {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.cred-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cred-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--ink-2);
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The dots keep the row the same height whether or not it is revealed, so a
+   table full of these does not jump about as you show one. */
+.cred-secret {
+  letter-spacing: 0.5px;
+  color: var(--ink);
+}
+
+.cred-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cred-btn:hover {
+  color: var(--accent);
+}

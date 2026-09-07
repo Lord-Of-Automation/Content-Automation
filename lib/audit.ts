@@ -42,6 +42,9 @@ export type AuditAction =
   /** A site installed on a host. Nothing existing changes, but a server
       gains a tenant, and on a full one that is worth being able to trace. */
   | "app-created"
+  /** Varnish cleared. Harmless, but every site on that server serves cold
+      for a minute afterwards, which is worth being able to explain. */
+  | "app-cache-purged"
   /** A step frozen so it stops running. Logged: it changes what a run does. */
   | "step-pinned"
   | "step-unpinned";

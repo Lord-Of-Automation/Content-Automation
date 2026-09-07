@@ -13,11 +13,14 @@
  *
  * A word on what comes back. The server's reply includes the master password,
  * the application password, the MySQL password and the Redis password, all in
- * clear text. That is Cloudways' choice, not ours, and none of it has any
- * business reaching a browser: the console renders a list of sites, and a list
- * of sites does not need the credentials to log into them. Everything secret is
- * dropped here, in the reader, rather than filtered in the component — a filter
- * at the edge is one careless `{...app}` away from shipping the lot.
+ * clear text. That is Cloudways' choice, not ours, and the reader decides what
+ * travels: the application login is kept, because the console shows it on
+ * request the way the Cloudways dashboard does, and the server, database and
+ * Redis passwords are dropped. Nothing needs them to render a list of sites,
+ * and a credential that is never sent cannot leak from the browser.
+ *
+ * The filtering lives here rather than in the component on purpose. A filter at
+ * the edge is one careless `{...app}` away from shipping the lot.
  */
 
 import { credentialFor } from "./providers";
@@ -55,6 +58,17 @@ export interface CloudwaysApp {
    * "none" is the normal state of a perfectly padlocked site.
    */
   ssl: "installed" | "pending" | "none";
+  /**
+   * The application login Cloudways generated when it installed this.
+   *
+   * The same pair its own dashboard shows under Access Details. Worth knowing
+   * that it is what Cloudways set, not necessarily what works: change the
+   * password inside WordPress and Cloudways goes on reporting the old one,
+   * because nothing tells it. Treat a refusal as "somebody changed it" rather
+   * than as a bug here.
+   */
+  adminUser: string;
+  adminPassword: string;
   createdAt: string;
   serverId: string;
   serverLabel: string;
@@ -86,8 +100,8 @@ export interface CloudwaysEstate {
  * The raw shapes, named only as far as they are read.
  *
  * Deliberately partial: the reply carries roughly forty fields per application
- * and this uses eleven of them. Typing the rest would be typing out the
- * passwords, which is the opposite of the point.
+ * and this uses a dozen. Most of what is left is the server, database and Redis
+ * passwords, and naming them here is the first step towards sending them.
  */
 interface RawApp {
   id?: string;
@@ -100,6 +114,8 @@ interface RawApp {
   created_at?: string;
   backend_url?: string;
   aliases?: string[];
+  app_user?: string;
+  app_password?: string;
   own_ssl?: unknown;
   lets_encrypt?: { is_installed?: boolean; is_verified?: boolean } | null;
 }
@@ -297,6 +313,10 @@ function readApp(raw: RawApp, server: RawServer): CloudwaysApp {
     adminPath: raw.backend_url?.trim() ?? "",
     staging: isTrue(raw.is_staging),
     ssl,
+    adminUser: raw.app_user?.trim() ?? "",
+    // Not trimmed. A password is bytes, and helpfully tidying them is how you
+    // hand somebody a credential that does not work.
+    adminPassword: raw.app_password ?? "",
     createdAt: raw.created_at?.trim() ?? "",
     serverId: server.id?.trim() ?? "",
     serverLabel: server.label?.trim() ?? "",
@@ -466,6 +486,35 @@ export async function createApplication(
   }
 
   return { operationId, app, label: name, serverLabel: server.label };
+}
+
+export interface CachePurge {
+  serverLabel: string;
+  /** How many applications share the cache that was just cleared. */
+  apps: number;
+}
+
+/**
+ * Clear the Varnish cache.
+ *
+ * Server-wide, and that is not a choice made here. Cloudways exposes exactly
+ * one purge route and it takes a server: sending an application id alongside
+ * changes nothing, which was checked by sending one that does not exist and
+ * getting the same cheerful `{"status":true}` back. So the caller is told how
+ * many applications share the cache rather than being left to assume the button
+ * only touched the row it sat on.
+ *
+ * Harmless as writes go. Varnish refills from the origin on the next request,
+ * so the cost is a brief spike in traffic to the server and nothing else. There
+ * is no undo because none is needed.
+ */
+export async function purgeVarnish(serverId: string): Promise<CachePurge> {
+  const { servers } = await listApplications();
+  const server = servers.find((s) => s.id === serverId);
+  if (!server) throw new Error("No such server on this account.");
+
+  await post("/service/varnish", { server_id: serverId, action: "purge" });
+  return { serverLabel: server.label, apps: server.apps };
 }
 
 /** What a primary domain is allowed to look like. */

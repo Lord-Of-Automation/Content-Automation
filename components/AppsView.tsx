@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import AppCredential from "@/components/AppCredential";
 import AppDomain from "@/components/AppDomain";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import NewApplication from "@/components/NewApplication";
 import { Select } from "@/components/Select";
 
@@ -17,6 +19,8 @@ type App = {
   adminPath: string;
   staging: boolean;
   ssl: "installed" | "pending" | "none";
+  adminUser: string;
+  adminPassword: string;
   createdAt: string;
   serverId: string;
   serverLabel: string;
@@ -36,13 +40,14 @@ type Server = {
 
 type Payload = { servers: Server[]; apps: App[]; ok: boolean; note: string };
 
-type SortKey = "name" | "platform" | "server" | "created";
+type SortKey = "name" | "platform" | "server" | "admin" | "created";
 
 /** Which end of each column is the interesting one. Newest first for dates. */
 const FIRST: Record<SortKey, "asc" | "desc"> = {
   name: "asc",
   platform: "asc",
   server: "asc",
+  admin: "asc",
   created: "desc",
 };
 
@@ -83,6 +88,15 @@ export default function AppsView() {
   /** The application whose domain is being changed, if any. */
   const [managing, setManaging] = useState<App | null>(null);
   const [creating, setCreating] = useState(false);
+  /**
+   * The server whose cache is about to be cleared.
+   *
+   * Held as the application that was clicked, because the confirm has to
+   * name how many other sites share that cache before anyone agrees to it.
+   */
+  const [flushing, setFlushing] = useState<App | null>(null);
+  const [flushBusy, setFlushBusy] = useState(false);
+  const [flushed, setFlushed] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,6 +124,32 @@ export default function AppsView() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function flush() {
+    if (!flushing) return;
+    setFlushBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/apps/cache", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ serverId: flushing.serverId }),
+      });
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? `The purge returned ${response.status}.`);
+      setFlushed(`Varnish cleared on ${payload.serverLabel}.`);
+      setFlushing(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The cache could not be cleared.");
+      setFlushing(null);
+    } finally {
+      setFlushBusy(false);
+    }
+  }
 
   function sortBy(key: SortKey) {
     if (key === sortKey) setDirection((d) => (d === "asc" ? "desc" : "asc"));
@@ -145,6 +185,9 @@ export default function AppsView() {
       }
       if (sortKey === "server") {
         return a.serverLabel.localeCompare(b.serverLabel) * flip || name(a).localeCompare(name(b));
+      }
+      if (sortKey === "admin") {
+        return a.adminUser.localeCompare(b.adminUser) * flip || name(a).localeCompare(name(b));
       }
       return a.createdAt.localeCompare(b.createdAt) * flip || name(a).localeCompare(name(b));
     });
@@ -215,6 +258,16 @@ export default function AppsView() {
             </div>
           ) : null}
 
+          {flushed ? (
+            <div className="notice ok">
+              {flushed} Every site on it serves from the origin until the
+              cache refills.{" "}
+              <button type="button" className="btn-link" onClick={() => setFlushed(null)}>
+                Dismiss
+              </button>
+            </div>
+          ) : null}
+
           {loading && !data ? <p className="quiet">Reading Cloudways…</p> : null}
 
           {data && !data.apps.length && !error ? (
@@ -277,6 +330,7 @@ export default function AppsView() {
                         ["name", "Application", ""],
                         ["platform", "Platform", "mid"],
                         ["server", "Server", "mid"],
+                        ["admin", "Admin login", "mid"],
                         ["created", "Added", "mid"],
                       ] as Array<[SortKey, string, string]>
                     ).map(([key, label, align]) => (
@@ -319,6 +373,9 @@ export default function AppsView() {
                       <td className="mid">
                         <span className="registrar">{a.serverLabel}</span>
                         <div className="app-sub">{a.serverIp}</div>
+                      </td>
+                      <td className="mid">
+                        <AppCredential user={a.adminUser} password={a.adminPassword} />
                       </td>
                       <td className="mid">
                         {a.createdAt ? day(a.createdAt) : <span className="quiet">—</span>}
@@ -366,6 +423,14 @@ export default function AppsView() {
                           >
                             Modify
                           </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            title={`Clear the Varnish cache on ${a.serverLabel}`}
+                            onClick={() => setFlushing(a)}
+                          >
+                            Flush cache
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -380,14 +445,42 @@ export default function AppsView() {
                 <strong>SSL</strong> mark means Cloudways holds a certificate
                 for that application; most of these sit behind Cloudflare, which
                 does its own, so no mark does not mean no padlock. Cloudways
-                returns the application, database and server passwords alongside
-                this list &mdash; they are dropped on the server and never sent
-                to your browser.
+                returns four passwords per application; only the admin login
+                is kept, and the server, database and Redis passwords are
+                dropped before anything reaches your browser. The admin
+                password is what Cloudways set at install, so it will be out
+                of date if someone has changed it inside the site since.
               </p>
             </>
           ) : null}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!flushing}
+        title="Clear the Varnish cache"
+        body={
+          <>
+            {/* The count is the point. Cloudways purges by server, so a
+                button on one row clears the cache for every site beside
+                it, and nobody should find that out afterwards. */}
+            Cloudways clears Varnish for a whole server, so this affects all{" "}
+            <strong>
+              {data?.servers.find((s) => s.id === flushing?.serverId)?.apps ?? 0}
+            </strong>{" "}
+            applications on <strong>{flushing?.serverLabel}</strong>, not just{" "}
+            {flushing?.domain || flushing?.label}. They will serve from the
+            origin until the cache refills, which costs a minute of slower
+            pages and nothing else.
+          </>
+        }
+        confirmLabel="Clear it"
+        busyLabel="Clearing…"
+        cancelLabel="Cancel"
+        busy={flushBusy}
+        onConfirm={() => void flush()}
+        onDismiss={() => setFlushing(null)}
+      />
 
       {creating ? (
         <NewApplication
