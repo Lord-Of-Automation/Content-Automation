@@ -365,7 +365,7 @@ export default function AppsView() {
                     servers, whichever one the table happens to be showing. */}
                 <button
                   type="button"
-                  className="btn btn-ghost btn-sm"
+                  className="btn btn-ghost bar-btn"
                   onClick={() => setFlushingAll(true)}
                   disabled={flushBusy}
                 >

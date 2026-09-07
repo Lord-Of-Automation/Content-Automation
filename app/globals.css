@@ -4014,3 +4014,14 @@ body:has(.bulkbar) main {
 .cred-box-secret {
   letter-spacing: 1px;
 }
+
+/* A button that stands in a row of form controls.
+
+   The search box and the server dropdown are both 8px of vertical padding at
+   14px, so a ghost button at its own smaller size sat visibly short between
+   them. Same padding, same font size, same border: the three line up. Declared
+   after .btn-ghost and .btn-sm so it wins over both. */
+.bar-btn {
+  padding: 8px 12px;
+  font-size: 14px;
+}
