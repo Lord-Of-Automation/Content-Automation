@@ -67,28 +67,27 @@ export default function PageCanvas({
   const host = useRef<HTMLDivElement>(null);
 
   /**
-   * Written imperatively, and only when the page underneath changes.
+   * Written imperatively, on different terms depending on who is typing.
    *
-   * React must not own this subtree. Re-rendering an element that somebody is
-   * typing into replaces the nodes their cursor is in, and the caret jumps to
-   * the top on every keystroke — which is the classic way a contenteditable
-   * bound to state becomes unusable.
+   * React must not own this subtree while it is editable. Re-rendering an
+   * element somebody is typing into replaces the nodes their caret sits in, so
+   * the cursor jumps to the top on every keystroke, which is the classic way a
+   * contenteditable bound to state becomes unusable. Once editable it is filled
+   * on mount and then left alone; the parent gives it a key per page, so moving
+   * to another page is a fresh mount rather than a rewrite.
+   *
+   * Read-only is the opposite. There is no cursor to lose, and the content does
+   * change underneath while a build is still writing, so it tracks and pages
+   * appear as they land.
    */
   useEffect(() => {
     const el = host.current;
     if (!el) return;
+    if (editable && el.innerHTML !== "") return;
+
     const cleaned = cleanHtml(html);
     if (el.innerHTML !== cleaned) el.innerHTML = cleaned;
-    // Only on a genuine page change. `html` changing because of a keystroke in
-    // this very element must not write it back.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editable, host.current === null]);
-
-  useEffect(() => {
-    const el = host.current;
-    if (el) el.innerHTML = cleanHtml(html);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [html.length === 0]);
+  }, [html, editable]);
 
   return (
     <div
