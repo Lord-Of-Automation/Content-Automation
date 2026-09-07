@@ -363,6 +363,9 @@ export async function startBuild(input: {
   page_count: number;
   site_name: string;
   language: string;
+  primary_keyword: string;
+  site_market: string;
+  house_rules: string;
 }): Promise<{ executionId: string; note: string | null }> {
   const result = await call<{ id: string; note?: string }>(
     "/runs",

@@ -51,6 +51,17 @@ export default function WebsitesView() {
   const [name, setName] = useState("");
   const [format, setFormat] = useState<"wordpress" | "static">("wordpress");
   const [pageCount, setPageCount] = useState("5");
+  const [primaryKeyword, setPrimaryKeyword] = useState("");
+  const [market, setMarket] = useState("gb");
+  /**
+   * Standing instructions for every page of this site.
+   *
+   * Remembered in the browser, because a house style is written once and used
+   * on every site after it. Not on the server: it is a preference of whoever
+   * is building, not a fact about the estate.
+   */
+  const [houseRules, setHouseRules] = useState("");
+  const [showRules, setShowRules] = useState(false);
   const [busy, setBusy] = useState(false);
   /** The site a row action is working on, so only its buttons go quiet. */
   const [acting, setActing] = useState<string | null>(null);
@@ -77,6 +88,15 @@ export default function WebsitesView() {
     void load();
   }, [load]);
 
+  // Read once on mount. A blocked or empty store just means an empty box.
+  useEffect(() => {
+    try {
+      setHouseRules(localStorage.getItem("ca:houseRules") ?? "");
+    } catch {
+      /* private windows throw here, and an empty box is a fine answer */
+    }
+  }, []);
+
   const building = useMemo(
     () => (sites ?? []).some((s) => s.status === "building"),
     [sites],
@@ -102,6 +122,9 @@ export default function WebsitesView() {
           name,
           format,
           pageCount: Number(pageCount) || 5,
+          primaryKeyword,
+          market,
+          houseRules,
         }),
       });
       if (response.status === 401) {
@@ -110,6 +133,13 @@ export default function WebsitesView() {
       }
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? `The build returned ${response.status}.`);
+
+      // Kept for the next site, since a house style is written once.
+      try {
+        localStorage.setItem("ca:houseRules", houseRules);
+      } catch {
+        /* it just will not be remembered */
+      }
 
       setOpen(false);
       setBrief("");
@@ -214,8 +244,24 @@ export default function WebsitesView() {
                 onChange={(e) => setTopic(e.target.value)}
               />
 
+              <label className="field-label" htmlFor="site-primary">
+                The one keyword it is built around
+              </label>
+              <input
+                id="site-primary"
+                type="text"
+                value={primaryKeyword}
+                placeholder="unscented candles uk"
+                onChange={(e) => setPrimaryKeyword(e.target.value)}
+              />
+              <p className="provider-hint">
+                The front page is built for this one. Left blank, the plan picks
+                one out of the list below, which is a different keyword every
+                run.
+              </p>
+
               <label className="field-label" htmlFor="site-keywords">
-                Keywords to rank for
+                Other keywords to rank for
               </label>
               <textarea
                 id="site-keywords"
@@ -257,6 +303,18 @@ export default function WebsitesView() {
                   />
                 </div>
                 <div>
+                  <label className="field-label" htmlFor="site-market">
+                    Market
+                  </label>
+                  <input
+                    id="site-market"
+                    type="text"
+                    value={market}
+                    placeholder="gb"
+                    onChange={(e) => setMarket(e.target.value)}
+                  />
+                </div>
+                <div>
                   <label className="field-label" htmlFor="site-pages">
                     Pages
                   </label>
@@ -277,6 +335,50 @@ export default function WebsitesView() {
                 WordPress theme supplies the header, navigation and footer, so
                 those are left out; a static site has to carry its own.
               </p>
+
+              <div className="editor-body-head">
+                <span className="field-label">House rules</span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setShowRules((v) => !v)}
+                >
+                  {showRules ? "Hide" : houseRules ? "Edit" : "Add"}
+                </button>
+              </div>
+              {showRules ? (
+                <>
+                  <textarea
+                    rows={8}
+                    value={houseRules}
+                    placeholder={
+                      "Standing instructions for every page. What must always be said, " +
+                      "what must never be claimed, the house style.\n\n" +
+                      "Example: state the 18+ age restriction wherever the page discusses " +
+                      "signing up. Link a gambling help service at most once on the whole " +
+                      "page. Never promise guaranteed wins or risk free bets. Point every " +
+                      "call to action at AFF_LINK."
+                    }
+                    onChange={(e) => setHouseRules(e.target.value)}
+                  />
+                  <p className="provider-hint">
+                    These sit above the brief and override it. Remembered in
+                    this browser for the next site, because a house style is
+                    written once and used every time.
+                  </p>
+                </>
+              ) : houseRules ? (
+                <p className="provider-hint">
+                  {houseRules.length} characters of standing instructions will
+                  be applied.
+                </p>
+              ) : (
+                <p className="provider-hint">
+                  Nothing standing. Add rules here for anything that must be
+                  true of every page: a regulated niche&rsquo;s wording, an
+                  affiliate link placeholder, your house style.
+                </p>
+              )}
 
               <div className="sheet-actions">
                 <button

@@ -74,6 +74,9 @@ export async function POST(request: Request) {
     pageCount?: number;
     name?: string;
     language?: string;
+    primaryKeyword?: string;
+    market?: string;
+    houseRules?: string;
   };
   try {
     body = await request.json();
@@ -111,6 +114,9 @@ export async function POST(request: Request) {
       page_count: pageCount,
       site_name: name,
       language,
+      primary_keyword: String(body.primaryKeyword ?? "").trim().slice(0, 120),
+      site_market: String(body.market ?? "gb").trim().toLowerCase().slice(0, 8),
+      house_rules: String(body.houseRules ?? "").trim().slice(0, 6000),
     });
 
     const now = new Date().toISOString();
