@@ -40,15 +40,14 @@ type Server = {
 
 type Payload = { servers: Server[]; apps: App[]; ok: boolean; note: string };
 
-type SortKey = "name" | "platform" | "server" | "admin" | "created";
+type SortKey = "name" | "platform" | "server" | "admin";
 
-/** Which end of each column is the interesting one. Newest first for dates. */
+/** Which end of each column is the interesting one. */
 const FIRST: Record<SortKey, "asc" | "desc"> = {
   name: "asc",
   platform: "asc",
   server: "asc",
   admin: "asc",
-  created: "desc",
 };
 
 /**
@@ -60,11 +59,6 @@ const FIRST: Record<SortKey, "asc" | "desc"> = {
  */
 function home(app: App): string {
   return app.domain ? `https://${app.domain}` : app.stagingUrl;
-}
-
-/** "2024-03-19 11:37:47" is a date and a time nobody asked for. */
-function day(stamp: string): string {
-  return stamp.slice(0, 10);
 }
 
 function Chevrons({ state }: { state: "none" | "asc" | "desc" }) {
@@ -186,10 +180,7 @@ export default function AppsView() {
       if (sortKey === "server") {
         return a.serverLabel.localeCompare(b.serverLabel) * flip || name(a).localeCompare(name(b));
       }
-      if (sortKey === "admin") {
-        return a.adminUser.localeCompare(b.adminUser) * flip || name(a).localeCompare(name(b));
-      }
-      return a.createdAt.localeCompare(b.createdAt) * flip || name(a).localeCompare(name(b));
+      return a.adminUser.localeCompare(b.adminUser) * flip || name(a).localeCompare(name(b));
     });
   }, [data, query, server, sortKey, direction]);
 
@@ -331,7 +322,6 @@ export default function AppsView() {
                         ["platform", "Platform", "mid"],
                         ["server", "Server", "mid"],
                         ["admin", "Admin login", "mid"],
-                        ["created", "Added", "mid"],
                       ] as Array<[SortKey, string, string]>
                     ).map(([key, label, align]) => (
                       <th key={key} className={align ? `${align} sortable` : "sortable"}>
@@ -376,9 +366,6 @@ export default function AppsView() {
                       </td>
                       <td className="mid">
                         <AppCredential user={a.adminUser} password={a.adminPassword} />
-                      </td>
-                      <td className="mid">
-                        {a.createdAt ? day(a.createdAt) : <span className="quiet">—</span>}
                       </td>
                       <td className="detail">
                         <div className="app-links">
