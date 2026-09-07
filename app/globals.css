@@ -207,6 +207,16 @@ main.wide {
   display: flex;
   align-items: center;
   gap: 10px;
+  /* The heading and its buttons go on separate lines before either is
+     squeezed. Four controls beside a title is more than one row holds on a
+     laptop, and the alternative is buttons narrower than their labels. */
+  flex-wrap: wrap;
+}
+
+/* The title takes what it needs; the buttons take what is left. */
+.card-head > div:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .card-head h2 {
@@ -476,6 +486,10 @@ button,
   justify-content: center;
   gap: 7px;
   text-decoration: none;
+  /* A label belongs on one line. Squeezed, a button should wrap as a whole
+     button, which is what the rows below arrange; it should never break its
+     own words across two lines inside its border. */
+  white-space: nowrap;
 }
 
 .btn-primary {
@@ -3819,6 +3833,8 @@ body:has(.bulkbar) main {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 /* A dropdown standing in a filter bar. Narrower than a market picker: these
