@@ -300,21 +300,7 @@ export default function AppDomain({
                       Go To Admin
                     </a>
                   ) : null}
-                </div>
-
-                <p className="stage-hint">
-                  It always answers on{" "}
-                  <span className="rr-value">
-                    {app.stagingUrl.replace("https://", "")}
-                  </span>
-                  , with or without a domain pointed at it.
-                </p>
-                <p className="stage-hint">
-                  The server, database and Redis passwords Cloudways returns
-                  beside this one are dropped before anything reaches your
-                  browser. They are in the Cloudways dashboard if you need them.
-                </p>
-              </section>
+                </div>              </section>
             ) : null}
 
             {tab === "domain" ? (
