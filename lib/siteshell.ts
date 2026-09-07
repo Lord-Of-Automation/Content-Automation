@@ -217,7 +217,35 @@ blockquote p:last-child { margin-bottom: 0; }
 
 figure { margin: 0 0 22px; }
 figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; }
-img { max-width: 100%; height: auto; border-radius: 12px; display: block; }
+
+/* Nothing may push the page wider than the window. */
+img, video, iframe, table, pre { max-width: 100%; }
+img, video { height: auto; }
+img { border-radius: 12px; display: block; }
+
+/*
+ * An icon with no size on it is an icon, not a banner.
+ *
+ * An inline SVG carrying only a viewBox has no intrinsic size, so a browser
+ * gives it the full width of whatever it sits in: a twenty-four unit tick
+ * becomes a full-width illustration and the page falls apart. This is the
+ * single most common way generated markup looks broken, and it is one
+ * forgotten attribute every time.
+ *
+ * Sized here rather than hoped for. Anything carrying its own width, height or
+ * class is left alone, because those are the three ways something says it meant
+ * to be a different size.
+ */
+svg { vertical-align: middle; max-width: 100%; }
+svg:not([width]):not([height]):not([class]) {
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+
+/* An icon beside text sits with the text, not above it. */
+:is(p, li, h2, h3, h4, a, .btn) > svg { flex: none; }
+.btn > svg { width: 18px; height: 18px; }
 
 table { width: 100%; border-collapse: collapse; margin: 0 0 22px; font-size: 16px; }
 th, td { padding: 12px 14px; border-bottom: 1px solid var(--hair); text-align: left; }

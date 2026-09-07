@@ -4385,42 +4385,65 @@ body:has(.bulkbar) main {
    Pages, the page, and the site as it will look, all at once. The preview is a
    pane rather than a mode: seeing the result and changing it should not be two
    things you switch between. */
+/*
+ * Preview across the top, the page being edited under it.
+ *
+ * It was a column beside the editor, which gave the site a third of the width
+ * to be judged in. A website is a wide thing; a form is not. So the preview
+ * takes the full width of the card and the fields sit below it, where being
+ * narrower costs nothing.
+ *
+ * A grid rather than reordered flex, because it needs three regions in two
+ * rows and the markup order stays as it reads: pages, fields, preview.
+ */
 .editor-split.has-preview {
-  align-items: stretch;
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  grid-template-areas:
+    "preview preview"
+    "pages   panel";
+  gap: 18px;
+  align-items: start;
+}
+
+.editor-split.has-preview .editor-pages {
+  grid-area: pages;
+  flex: none;
 }
 
 .editor-split.has-preview .editor-panel {
-  flex: 1 1 380px;
+  grid-area: panel;
   min-width: 0;
 }
 
 .editor-preview {
-  flex: 1 1 460px;
+  grid-area: preview;
   min-width: 0;
-  position: sticky;
-  top: 14px;
-  align-self: flex-start;
 }
 
 .editor-preview .site-preview {
-  height: 58vh;
-  min-height: 360px;
+  height: 62vh;
+  min-height: 380px;
 }
 
 .editor-preview .editor-body-head {
   margin-top: 0;
 }
 
-/* Three columns is too many below this. The preview goes underneath, where it
-   is still live and still useful, rather than being squeezed out. */
-@media (max-width: 1200px) {
+/* Everything in one column once there is no room for the page list beside the
+   fields. The preview stays on top, which is where it is wanted. */
+@media (max-width: 860px) {
   .editor-split.has-preview {
-    flex-wrap: wrap;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "preview"
+      "pages"
+      "panel";
   }
 
-  .editor-preview {
-    flex: 1 1 100%;
-    position: static;
+  .editor-split.has-preview .editor-pages {
+    flex-direction: row;
+    flex-wrap: wrap;
   }
 }
 
@@ -4566,4 +4589,22 @@ body:has(.bulkbar) main {
 .preview-shell.is-full .preview-stage {
   flex: 1;
   min-height: 0;
+}
+
+/* The same icon sizing the rendered site uses, so the editing canvas does not
+   show a wall of full-width shapes where the preview shows icons. */
+.canvas svg {
+  vertical-align: middle;
+  max-width: 100%;
+}
+
+.canvas svg:not([width]):not([height]):not([class]) {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+
+.canvas .btn > svg {
+  width: 16px;
+  height: 16px;
 }
