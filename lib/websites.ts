@@ -140,6 +140,8 @@ export interface Website {
   status: "building" | "ready" | "failed";
   /** The engine run that wrote it, so its log is one click away. */
   runId: string;
+  /** How many pages were asked for, so progress can be read as a fraction. */
+  wanted: number;
   note: string;
   pages: WebsitePage[];
   header: SiteHeader;

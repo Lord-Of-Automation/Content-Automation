@@ -133,6 +133,7 @@ export async function POST(request: Request) {
       language,
       status: "building",
       runId: started.executionId,
+      wanted: pageCount,
       note: started.note ?? "",
       pages: [],
       header: DEFAULT_HEADER,

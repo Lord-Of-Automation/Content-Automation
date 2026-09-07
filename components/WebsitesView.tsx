@@ -16,6 +16,7 @@ type Website = {
   language: string;
   status: "building" | "ready" | "failed";
   runId: string;
+  wanted: number;
   note: string;
   pages: Array<{ slug: string; title: string }>;
   createdAt: string;
@@ -450,7 +451,13 @@ export default function WebsitesView() {
                         {s.format === "wordpress" ? "WordPress" : "Static HTML"}
                       </span>
                     </td>
-                    <td className="mid">{s.pages.length}</td>
+                    <td className="mid">
+                      {/* A fraction while it is being written, because the
+                          number alone cannot tell working from stuck. */}
+                      {s.status === "building" && s.wanted
+                        ? `${s.pages.length} of ${s.wanted}`
+                        : s.pages.length}
+                    </td>
                     <td className="mid">
                       <span
                         className={`pill pill-${STATUS[s.status].tone}`}
