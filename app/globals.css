@@ -3838,10 +3838,19 @@ body:has(.bulkbar) main {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
   color: var(--ink-2);
-  max-width: 22ch;
+  /* Wide enough for a full email address, which is what most of these are.
+     Truncating one to an ellipsis hides the part that distinguishes it. */
+  max-width: 34ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The column reserves its width instead of collapsing to the shortest login on
+   the page and shuffling every time a password is revealed. */
+.logs td.cred-cell,
+.logs th.cred-cell {
+  min-width: 260px;
 }
 
 /* The dots keep the row the same height whether or not it is revealed, so a
@@ -3865,4 +3874,16 @@ body:has(.bulkbar) main {
 
 .cred-btn:hover {
   color: var(--accent);
+}
+
+/* The delete half of the application sheet, set apart from the domain half
+   above it. A rule and a heading in the warning colour, so nobody scrolls into
+   it thinking they are still in the part that can be undone. */
+.sheet-danger {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.sheet-danger h3 {
+  color: var(--bad);
 }

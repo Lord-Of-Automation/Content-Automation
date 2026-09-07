@@ -321,7 +321,7 @@ export default function AppsView() {
                         ["name", "Application", ""],
                         ["platform", "Platform", "mid"],
                         ["server", "Server", "mid"],
-                        ["admin", "Admin login", "mid"],
+                        ["admin", "Admin login", "mid cred-cell"],
                       ] as Array<[SortKey, string, string]>
                     ).map(([key, label, align]) => (
                       <th key={key} className={align ? `${align} sortable` : "sortable"}>
@@ -364,7 +364,7 @@ export default function AppsView() {
                         <span className="registrar">{a.serverLabel}</span>
                         <div className="app-sub">{a.serverIp}</div>
                       </td>
-                      <td className="mid">
+                      <td className="mid cred-cell">
                         <AppCredential user={a.adminUser} password={a.adminPassword} />
                       </td>
                       <td className="detail">

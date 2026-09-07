@@ -45,6 +45,12 @@ export type AuditAction =
   /** Varnish cleared. Harmless, but every site on that server serves cold
       for a minute afterwards, which is worth being able to explain. */
   | "app-cache-purged"
+  /**
+   * A site destroyed. The only entry on this list with nothing behind it:
+   * the files and the database are gone and Cloudways keeps no copy, so
+   * this line is the whole record that it ever existed.
+   */
+  | "app-deleted"
   /** A step frozen so it stops running. Logged: it changes what a run does. */
   | "step-pinned"
   | "step-unpinned";

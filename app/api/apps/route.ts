@@ -4,7 +4,8 @@ import { auth } from "@/auth";
 import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
 import {
-  CloudwaysConfigError, createApplication, listApplications, listInstallable,
+  CloudwaysConfigError, createApplication, deleteApplication, listApplications,
+  listInstallable,
 } from "@/lib/cloudways";
 
 export const runtime = "nodejs";
@@ -89,6 +90,60 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "";
     // A rejected value belongs in the form, not in a retry.
     if (/needs a name|too long|can hold letters|does not offer|No such server/i.test(message)) {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+    return errorResponse(error);
+  }
+}
+
+/**
+ * Destroy an application.
+ *
+ * The name is sent with the request and checked again in lib/cloudways.ts
+ * against what that application is actually called, so a page left open while
+ * the estate changed underneath it cannot delete a different site than the one
+ * on screen. The guard lives there rather than here because it must not be
+ * skippable by calling this route directly.
+ */
+export async function DELETE(request: Request) {
+  const denied = await requireSession();
+  if (denied) return denied;
+
+  const session = await auth();
+  const actor = session?.user?.name ?? "unknown";
+
+  let body: { serverId?: string; appId?: string; confirm?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const serverId = String(body.serverId ?? "").trim();
+  const appId = String(body.appId ?? "").trim();
+  if (!serverId || !appId) {
+    return NextResponse.json({ error: "Which application?" }, { status: 400 });
+  }
+
+  try {
+    const result = await deleteApplication(serverId, appId, String(body.confirm ?? ""));
+
+    // The only record that this site ever existed, once the files are gone.
+    await record(
+      actor,
+      "app-deleted",
+      result.gone
+        ? `${result.label} (id ${appId}) from ${result.serverLabel}`
+        : `${result.label} (id ${appId}) from ${result.serverLabel}, still removing`,
+    );
+
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof CloudwaysConfigError) {
+      return NextResponse.json({ error: error.message, kind: "config" }, { status: 500 });
+    }
+    const message = error instanceof Error ? error.message : "";
+    if (/No such application|exactly to confirm/i.test(message)) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
     return errorResponse(error);

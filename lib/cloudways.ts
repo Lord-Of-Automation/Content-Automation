@@ -488,6 +488,95 @@ export async function createApplication(
   return { operationId, app, label: name, serverLabel: server.label };
 }
 
+/**
+ * A delete. Cloudways takes the server as a query parameter and answers with a
+ * queued operation, like the writes above.
+ */
+async function del(path: string): Promise<Record<string, unknown>> {
+  const response = await fetch(`${API}${path}`, {
+    method: "DELETE",
+    headers: {
+      authorization: `Bearer ${await token()}`,
+      accept: "application/json",
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(45_000),
+  });
+
+  const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+
+  if (response.status === 401 || response.status === 403) {
+    throw new CloudwaysConfigError(
+      "Cloudways refused this deletion. Either the token is not allowed to " +
+        "write, or that application does not belong to this account.",
+    );
+  }
+
+  if (!response.ok) {
+    const said = typeof body.message === "string" ? body.message : `HTTP ${response.status}`;
+    throw new Error(`Cloudways refused the deletion: ${said}`);
+  }
+
+  return body;
+}
+
+export interface AppDeletion {
+  label: string;
+  serverLabel: string;
+  /** Whether it is actually gone, read back rather than assumed. */
+  gone: boolean;
+  operationId: string;
+}
+
+/**
+ * Delete an application, its files and its database.
+ *
+ * The only thing this console does that destroys data, and the only one that
+ * cannot be walked back: Cloudways keeps no copy this can restore from, so a
+ * mistake here is a site rebuilt from whatever backup exists elsewhere.
+ *
+ * The name is typed out by the caller and checked here rather than only in the
+ * browser. An application id is not something anyone can sanity-check by eye,
+ * and a page left open while the estate changed underneath it would otherwise
+ * be a plausible way to delete the wrong site. Matching the name means the
+ * thing being destroyed is the thing that was read.
+ */
+export async function deleteApplication(
+  serverId: string,
+  appId: string,
+  confirm: string,
+): Promise<AppDeletion> {
+  const app = await findApp(serverId, appId);
+  if (!app) throw new Error("No such application on that server.");
+
+  const expected = (app.domain || app.label).trim().toLowerCase();
+  if (confirm.trim().toLowerCase() !== expected) {
+    throw new Error(`Type ${expected} exactly to confirm the deletion.`);
+  }
+
+  const body = await del(
+    `/app/${encodeURIComponent(appId)}?server_id=${encodeURIComponent(serverId)}`,
+  );
+
+  const operationId = String(body.operation_id ?? "");
+  await settle(operationId);
+
+  // Gone means gone from the estate, not that the request was accepted.
+  let gone = false;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    gone = !(await findApp(serverId, appId));
+    if (gone) break;
+    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+
+  return {
+    label: app.domain || app.label,
+    serverLabel: app.serverLabel,
+    gone,
+    operationId,
+  };
+}
+
 export interface CachePurge {
   serverLabel: string;
   /** How many applications share the cache that was just cleared. */

@@ -22,17 +22,18 @@ type Result = {
 };
 
 /**
- * Changing an application's primary domain.
+ * Managing one application: its primary domain, or its existence.
  *
- * Two clicks rather than one, and the second one shows the change written out
- * in full. This is not a form where a typo costs a correction: the primary
- * domain is what the web server answers to, and pointing a live site at a name
- * that does not resolve takes it off the internet until somebody notices.
+ * Both actions ask twice and they ask differently, in proportion to what they
+ * cost. A domain change is confirmed by reading the change written out in full,
+ * because the mistake it invites is a typo and seeing it spelled out catches
+ * one. A deletion is confirmed by typing the application's name, because the
+ * mistake it invites is acting on the wrong row and only naming the thing
+ * catches that.
  *
- * It does not close on success. Two things follow a domain change that this
- * cannot do — the certificate has to be reissued for the new name, and the
- * WordPress database may still hold the old one — and closing the dialog on a
- * green tick is how both get forgotten.
+ * Neither closes on success. A domain change leaves a certificate to reissue
+ * and possibly a WordPress database still holding the old address, and closing
+ * on a green tick is how both get forgotten.
  */
 export default function AppDomain({
   app,
@@ -47,6 +48,9 @@ export default function AppDomain({
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
+  /** Typed out by hand, and checked again on the server before anything goes. */
+  const [confirmName, setConfirmName] = useState("");
+  const [deleted, setDeleted] = useState<{ label: string; gone: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const shell = useRef<HTMLDialogElement>(null);
@@ -93,30 +97,81 @@ export default function AppDomain({
     }
   }
 
+  async function remove() {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/apps", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          serverId: app.serverId,
+          appId: app.id,
+          confirm: confirmName,
+        }),
+      });
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? `The delete returned ${response.status}.`);
+      setDeleted({ label: payload.label, gone: payload.gone });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The application could not be deleted.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // What has to be typed to arm the delete. The domain when there is one,
+  // because that is what the row is called and what anyone would recognise.
+  const fullName = (app.domain || app.label).trim().toLowerCase();
+  const armed = confirmName.trim().toLowerCase() === fullName;
+
   return (
     <dialog className="sheet sheet-narrow" ref={shell}>
       <div className="sheet-card">
         <div className="sheet-head">
           <div>
-            <h2>Primary domain</h2>
-            <p>{app.domain || app.label}</p>
+            <h2>{app.domain || app.label}</h2>
+            <p>
+              {app.platformLabel} on {app.serverLabel}
+            </p>
           </div>
           <button
             type="button"
             className="btn btn-ghost"
             onClick={() => {
-              if (result?.changed) onDone();
+              if (result?.changed || deleted) onDone();
               else onClose();
             }}
           >
-            {result?.changed ? "Done" : "Cancel"}
+            {result?.changed || deleted ? "Done" : "Cancel"}
           </button>
         </div>
 
         <div className="sheet-body">
           {error ? <div className="notice bad">{error}</div> : null}
 
-          {result ? (
+          {deleted ? (
+            <section className="sheet-section">
+              {deleted.gone ? (
+                <div className="notice ok">
+                  <strong>{deleted.label} is gone.</strong> Its files and its
+                  database went with it, and this console has no way to bring
+                  any of it back.
+                </div>
+              ) : (
+                <div className="notice warn">
+                  <strong>Cloudways is still removing {deleted.label}.</strong>{" "}
+                  The request was accepted and the application was still listed
+                  when this stopped waiting. It should disappear from the list
+                  shortly.
+                </div>
+              )}
+            </section>
+          ) : result ? (
             <section className="sheet-section">
               {result.changed ? (
                 <>
@@ -254,6 +309,39 @@ export default function AppDomain({
                       Change primary domain
                     </button>
                   )}
+                </div>
+              </section>
+
+              <section className="sheet-section sheet-danger">
+                <h3>Delete this application</h3>
+                <p className="stage-hint">
+                  Permanent. The site, its files and its database go together,
+                  and Cloudways keeps nothing this console could restore from.
+                  Whatever you want to keep has to come off it first.
+                </p>
+                <p className="stage-hint">
+                  Type <strong>{fullName}</strong> to confirm. The name is
+                  checked again on the server against what this application is
+                  actually called, so a page left open while things changed
+                  underneath it cannot delete something else.
+                </p>
+                <input
+                  type="text"
+                  value={confirmName}
+                  placeholder={fullName}
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(e) => setConfirmName(e.target.value)}
+                />
+                <div className="sheet-actions">
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={() => void remove()}
+                    disabled={!armed || busy}
+                  >
+                    {busy ? "Deleting…" : "Delete permanently"}
+                  </button>
                 </div>
               </section>
             </>
