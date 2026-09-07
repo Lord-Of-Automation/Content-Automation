@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import PageCanvas from "@/components/PageCanvas";
+
 type Page = {
   slug: string;
   title: string;
@@ -33,12 +35,15 @@ const DESC_LIMIT = 155;
 /**
  * Editing a website that has not been hosted yet.
  *
- * Pages down the left, the one being edited on the right. The body is plain
- * HTML in a textarea rather than a rich editor, and that is a deliberate
- * choice for this stage: what the AI wrote is HTML, what WordPress will take is
- * HTML, and a rich editor in between would silently rewrite markup on every
- * load. When this becomes something non-technical people use daily it wants a
- * proper editor; it does not want one that quietly mangles what it opens.
+ * Pages down the left, the one being edited beside them, and two ways to work
+ * on it. Visual renders the page and lets you type into it, which is what
+ * anyone opening this actually wants and what the first version of it could not
+ * do at all. HTML is the same page as markup, still there because a rendered
+ * page cannot show you a stray tag and someone occasionally needs to fix one.
+ *
+ * The markup is read back only when you click away from the page, not on every
+ * keystroke. Browsers normalise contenteditable markup as they go, so writing
+ * it back mid-word would shift the text under the cursor.
  *
  * Nothing saves by itself. A site being edited is a draft of a draft, and an
  * autosave that fired mid-sentence would make the undo history useless.
@@ -56,6 +61,14 @@ export default function WebsiteEditor({ id }: { id: string }) {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stopping, setStopping] = useState(false);
+  /**
+   * Which way the page is being worked on.
+   *
+   * Visual is the default because it is the one that answers "what does this
+   * look like", and until now nothing in the console did. Code is still here,
+   * and still the only way to reach markup a rendered page cannot show you.
+   */
+  const [view, setView] = useState<"visual" | "code">("visual");
 
   const load = useCallback(async () => {
     try {
@@ -349,22 +362,59 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     reads well beats a short one that does not.
                   </p>
 
-                  <label className="field-label" htmlFor="page-body">
-                    Page content
-                  </label>
-                  <textarea
-                    id="page-body"
-                    className="editor-body"
-                    rows={22}
-                    spellCheck
-                    value={page.bodyHtml}
-                    onChange={(e) => change({ bodyHtml: e.target.value })}
-                  />
-                  <p className="provider-hint">
-                    HTML, because that is what was written and what WordPress
-                    will take. Images go in as ordinary img tags for now; the
-                    picture library comes with hosting.
-                  </p>
+                  <div className="editor-body-head">
+                    <label className="field-label" htmlFor="page-body">
+                      Page content
+                    </label>
+                    <div className="seg seg-sm">
+                      <button
+                        type="button"
+                        className={view === "visual" ? "seg-btn is-on" : "seg-btn"}
+                        onClick={() => setView("visual")}
+                      >
+                        Visual
+                      </button>
+                      <button
+                        type="button"
+                        className={view === "code" ? "seg-btn is-on" : "seg-btn"}
+                        onClick={() => setView("code")}
+                      >
+                        HTML
+                      </button>
+                    </div>
+                  </div>
+
+                  {view === "visual" ? (
+                    <>
+                      <PageCanvas
+                        key={`${site.id}-${at}`}
+                        html={page.bodyHtml}
+                        editable={site.status !== "building"}
+                        onChange={(bodyHtml) => change({ bodyHtml })}
+                      />
+                      <p className="provider-hint">
+                        {site.status === "building"
+                          ? "Read only while the site is still being written: a page that is rewritten under you would lose the edit."
+                          : "Click into the page and type. Changes are kept when you click away, and saved when you press Save changes."}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <textarea
+                        id="page-body"
+                        className="editor-body"
+                        rows={22}
+                        spellCheck
+                        value={page.bodyHtml}
+                        onChange={(e) => change({ bodyHtml: e.target.value })}
+                      />
+                      <p className="provider-hint">
+                        HTML, because that is what was written and what
+                        WordPress will take. Images go in as ordinary img tags
+                        for now; the picture library comes with hosting.
+                      </p>
+                    </>
+                  )}
                 </div>
               ) : null}
             </div>

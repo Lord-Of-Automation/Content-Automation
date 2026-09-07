@@ -4183,3 +4183,117 @@ body:has(.bulkbar) main {
     flex-wrap: wrap;
   }
 }
+
+/* ------------------------------------------------------------- page canvas
+
+   A generated page, rendered and typed into. Styles are scoped under .canvas
+   so a page's own headings and lists look like a web page rather than
+   inheriting the console's form styling. */
+.canvas {
+  padding: 22px 26px;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: var(--panel);
+  min-height: 320px;
+  max-height: 62vh;
+  overflow-y: auto;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.canvas.is-editable:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.canvas > :first-child {
+  margin-top: 0;
+}
+
+.canvas > :last-child {
+  margin-bottom: 0;
+}
+
+.canvas h2 {
+  margin: 26px 0 10px;
+  font-size: 21px;
+  line-height: 1.3;
+}
+
+.canvas h3 {
+  margin: 20px 0 8px;
+  font-size: 17px;
+}
+
+.canvas h4 {
+  margin: 16px 0 6px;
+  font-size: 15px;
+}
+
+.canvas p {
+  margin: 0 0 14px;
+}
+
+.canvas ul,
+.canvas ol {
+  margin: 0 0 14px;
+  padding-left: 22px;
+}
+
+.canvas li {
+  margin-bottom: 6px;
+}
+
+.canvas a {
+  color: var(--accent);
+}
+
+.canvas img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 7px;
+}
+
+.canvas blockquote {
+  margin: 0 0 14px;
+  padding-left: 14px;
+  border-left: 3px solid var(--line-2);
+  color: var(--ink-2);
+}
+
+.canvas table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 14px;
+}
+
+.canvas th,
+.canvas td {
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
+/* An image with nothing behind it still has to be visible, or a broken path
+   looks like a page with a gap in it rather than a picture to fix. */
+.canvas img:not([src]),
+.canvas img[src=""] {
+  min-height: 60px;
+  background: var(--panel-2);
+  border: 1px dashed var(--line-2);
+}
+
+/* The label and the Visual/HTML switch on one line. */
+.editor-body-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 5px;
+}
+
+.editor-body-head .field-label {
+  margin: 0;
+}
