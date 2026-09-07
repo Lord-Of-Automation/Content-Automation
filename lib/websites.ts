@@ -213,6 +213,11 @@ export interface BuiltPayload {
     name?: string;
     tagline?: string;
     language?: string;
+    /** The palette the plan chose for this subject. */
+    accent?: string;
+    background?: string;
+    ink?: string;
+    font?: string;
     pages?: unknown;
   };
 }
@@ -254,11 +259,31 @@ export function settleFrom(site: Website, built: BuiltPayload | null, actor: str
         ? "Stopped before it wrote anything."
         : "The run ended without writing any pages.";
 
+  /**
+   * The palette the plan chose, but only while nobody has chosen otherwise.
+   *
+   * A build picks colours for its subject, which beats arriving blue. Taking
+   * them on every read would be worse than never taking them: a site whose
+   * colours somebody had adjusted would snap back to the model's choice the
+   * next time the page loaded.
+   */
+  const untouched = site.pages.length === 0;
+  const theme = untouched
+    ? cleanTheme({
+        accent: built.site.accent,
+        background: built.site.background,
+        ink: built.site.ink,
+        font: built.site.font,
+        width: site.theme?.width,
+      })
+    : site.theme;
+
   return {
     ...site,
     name: site.name || String(built.site.name ?? ""),
     tagline: String(built.site.tagline ?? "") || site.tagline,
     language: String(built.site.language ?? "") || site.language,
+    theme,
     pages,
     status: !ended ? "building" : pages.length ? "ready" : "failed",
     note,
