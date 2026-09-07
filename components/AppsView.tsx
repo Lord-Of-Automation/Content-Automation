@@ -114,11 +114,20 @@ export default function AppsView() {
    * Held as the application that was clicked, because the confirm has to
    * name how many other sites share that cache before anyone agrees to it.
    */
-  const [flushing, setFlushing] = useState<App | null>(null);
+  /**
+   * Whether a purge is being confirmed, and how far it reaches.
+   *
+   * One state rather than two, because there is one action with two scopes.
+   * There used to be a button on every row as well, which read as "clear this
+   * site" and cleared two hundred and forty-three of them: Cloudways purges
+   * Varnish by server and offers nothing smaller through its API. A control
+   * whose label needs a paragraph of correction is in the wrong place, so it
+   * lives beside the server filter now, where the scope is the thing you just
+   * chose.
+   */
+  const [flushAsking, setFlushAsking] = useState(false);
   const [flushBusy, setFlushBusy] = useState(false);
   const [flushed, setFlushed] = useState<string | null>(null);
-  /** The whole-estate purge, which is a different question from one server. */
-  const [flushingAll, setFlushingAll] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -154,17 +163,21 @@ export default function AppsView() {
     setVisible(PAGE);
   }, [query, server, sortKey, direction]);
 
+  /**
+   * Clear Varnish, as far as the filter says.
+   *
+   * A server when one is chosen, everything when it is not. The API takes a
+   * server or a flag for all of them, and this is only deciding which.
+   */
   async function flush() {
-    if (!flushing) return;
     setFlushBusy(true);
     setError(null);
     try {
+      const server = chosen?.host === "cloudways" ? chosen.id.split(":")[1] : "";
       const response = await fetch("/api/apps/cache", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        // The place id carries its host as a prefix; the API wants the
-        // server's own id back.
-        body: JSON.stringify({ serverId: flushing.placeId.split(":")[1] }),
+        body: JSON.stringify(server ? { serverId: server } : { all: true }),
       });
       if (response.status === 401) {
         window.location.href = "/login";
@@ -172,46 +185,28 @@ export default function AppsView() {
       }
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? `The purge returned ${response.status}.`);
-      setFlushed(`Varnish cleared on ${payload.serverLabel}.`);
-      setFlushing(null);
+
+      if (server) {
+        setFlushed(
+          `Varnish cleared on ${payload.serverLabel}, covering ${payload.apps} application` +
+            `${payload.apps === 1 ? "" : "s"}.`,
+        );
+      } else {
+        // Reported per server. One refusing while the rest go through is a
+        // real outcome, and "done" would be the wrong word for it.
+        const rows = (payload.servers ?? []) as Array<{ ok: boolean; label: string }>;
+        const failed = rows.filter((s) => !s.ok);
+        setFlushed(
+          failed.length
+            ? `Varnish cleared on ${rows.length - failed.length} of ${rows.length} servers. ` +
+              `${failed.map((s) => s.label).join(", ")} refused.`
+            : `Varnish cleared on every server, covering ${payload.apps} applications.`,
+        );
+      }
+      setFlushAsking(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "The cache could not be cleared.");
-      setFlushing(null);
-    } finally {
-      setFlushBusy(false);
-    }
-  }
-
-  async function flushEverything() {
-    setFlushBusy(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/apps/cache", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ all: true }),
-      });
-      if (response.status === 401) {
-        window.location.href = "/login";
-        return;
-      }
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? `The purge returned ${response.status}.`);
-
-      // Reported per server. One refusing while the rest go through is a real
-      // outcome, and "done" would be the wrong word for it.
-      const done = (payload.servers ?? []).filter((s: { ok: boolean }) => s.ok);
-      const failed = (payload.servers ?? []).filter((s: { ok: boolean }) => !s.ok);
-      setFlushed(
-        failed.length
-          ? `Varnish cleared on ${done.length} of ${payload.servers.length} servers. ` +
-            `${failed.map((s: { label: string }) => s.label).join(", ")} refused.`
-          : `Varnish cleared on every server, covering ${payload.apps} applications.`,
-      );
-      setFlushingAll(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "The caches could not be cleared.");
-      setFlushingAll(false);
+      setFlushAsking(false);
     } finally {
       setFlushBusy(false);
     }
@@ -292,6 +287,12 @@ export default function AppsView() {
       })),
     ];
   }, [data]);
+
+  /** The place the filter is on, or nothing when it is showing everything. */
+  const chosen = useMemo(
+    () => (data?.places ?? []).find((p) => p.id === server) ?? null,
+    [data, server],
+  );
 
   /** Hosts that answered badly, named so an empty list is not a mystery. */
   const broken = useMemo(
@@ -403,17 +404,29 @@ export default function AppsView() {
                     onChange={setServer}
                   />
                 </div>
-                {/* Deliberately not tied to the filter beside it. The label
-                    says every website and it means every website, on all
-                    servers, whichever one the table happens to be showing. */}
-                <button
-                  type="button"
-                  className="btn btn-ghost bar-btn"
-                  onClick={() => setFlushingAll(true)}
-                  disabled={flushBusy}
-                >
-                  {flushBusy ? "Clearing…" : "Flush Cache On Every Website"}
-                </button>
+                {/* Beside the filter, and scoped by it. Cloudways purges
+                    Varnish per server and offers nothing smaller, so this is
+                    the smallest honest control: it clears what you have just
+                    selected, and says which that is. */}
+                {(data?.connected ?? []).includes("cloudways") ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost bar-btn"
+                    onClick={() => setFlushAsking(true)}
+                    disabled={flushBusy || (!!chosen && chosen.host !== "cloudways")}
+                    title={
+                      chosen && chosen.host !== "cloudways"
+                        ? `${chosen.hostLabel} has no cache this can clear.`
+                        : undefined
+                    }
+                  >
+                    {flushBusy
+                      ? "Clearing…"
+                      : chosen
+                        ? `Flush cache on ${chosen.label}`
+                        : "Flush cache on every server"}
+                  </button>
+                ) : null}
                 <span className="domain-counts">
                   <span className="domain-count">
                     {shown.length > visible ? (
@@ -542,16 +555,6 @@ export default function AppsView() {
                           >
                             Modify
                           </button>
-                          {HOSTS[a.host].flushCache ? (
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-sm"
-                              title={`Clear the Varnish cache on ${a.placeLabel}`}
-                              onClick={() => setFlushing(a)}
-                            >
-                              Flush cache
-                            </button>
-                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -591,44 +594,29 @@ export default function AppsView() {
       </div>
 
       <ConfirmDialog
-        open={flushingAll}
-        title="Clear every cache"
+        open={flushAsking}
+        title={chosen ? `Clear the cache on ${chosen.label}` : "Clear every cache"}
         body={
           <>
-            Clears Varnish on every Cloudways server, covering all{" "}
-            <strong>
-              {(data?.apps ?? []).filter((a) => a.host === "cloudways").length}
-            </strong>{" "}
-            applications hosted there. Each serves from the origin until its
-            cache refills, so the servers work harder for a minute afterwards.
-            Nothing is lost and there is nothing to undo. Sites on other hosts
-            are untouched: only Cloudways has a cache this can reach.
-          </>
-        }
-        confirmLabel="Clear them all"
-        busyLabel="Clearing…"
-        cancelLabel="Cancel"
-        busy={flushBusy}
-        onConfirm={() => void flushEverything()}
-        onDismiss={() => setFlushingAll(false)}
-      />
-
-      <ConfirmDialog
-        open={!!flushing}
-        title="Clear the Varnish cache"
-        body={
-          <>
-            {/* The count is the point. Cloudways purges by server, so a
-                button on one row clears the cache for every site beside
-                it, and nobody should find that out afterwards. */}
-            Cloudways clears Varnish for a whole server, so this affects all{" "}
-            <strong>
-              {data?.places.find((s) => s.id === flushing?.placeId)?.apps ?? 0}
-            </strong>{" "}
-            applications on <strong>{flushing?.placeLabel}</strong>, not just{" "}
-            {flushing?.domain || flushing?.label}. They will serve from the
-            origin until the cache refills, which costs a minute of slower
-            pages and nothing else.
+            Cloudways purges Varnish by server and offers nothing smaller
+            through its API, so this clears every application on{" "}
+            {chosen ? (
+              <>
+                <strong>{chosen.label}</strong>, all{" "}
+                <strong>{chosen.apps}</strong> of them
+              </>
+            ) : (
+              <>
+                all{" "}
+                <strong>
+                  {(data?.places ?? []).filter((p) => p.host === "cloudways").length}
+                </strong>{" "}
+                Cloudways servers
+              </>
+            )}
+            . Each serves from the origin until its cache refills, so the
+            servers work harder for a minute afterwards. Nothing is lost and
+            there is nothing to undo.
           </>
         }
         confirmLabel="Clear it"
@@ -636,7 +624,7 @@ export default function AppsView() {
         cancelLabel="Cancel"
         busy={flushBusy}
         onConfirm={() => void flush()}
-        onDismiss={() => setFlushing(null)}
+        onDismiss={() => setFlushAsking(false)}
       />
 
       {creating ? (
