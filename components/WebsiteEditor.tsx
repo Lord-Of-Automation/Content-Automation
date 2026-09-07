@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import PageCanvas from "@/components/PageCanvas";
+import SitePreview from "@/components/SitePreview";
 
 type Page = {
   slug: string;
@@ -22,6 +23,7 @@ type Website = {
   description: string;
   topic: string;
   format: "wordpress" | "static";
+  language: string;
   status: "building" | "ready" | "failed";
   runId: string;
   note: string;
@@ -35,11 +37,12 @@ const DESC_LIMIT = 155;
 /**
  * Editing a website that has not been hosted yet.
  *
- * Pages down the left, the one being edited beside them, and two ways to work
- * on it. Visual renders the page and lets you type into it, which is what
- * anyone opening this actually wants and what the first version of it could not
- * do at all. HTML is the same page as markup, still there because a rendered
- * page cannot show you a stray tag and someone occasionally needs to fix one.
+ * Pages down the left, the one being worked on beside them, and three ways to
+ * work on it. Preview is the whole site with its header, navigation and footer,
+ * which is the only view that answers "what does this look like". Edit renders
+ * the page body alone and lets you type into it, because editing wants the
+ * writing and not the furniture around it. HTML is the same page as markup,
+ * still there because a rendered page cannot show you a stray tag.
  *
  * The markup is read back only when you click away from the page, not on every
  * keystroke. Browsers normalise contenteditable markup as they go, so writing
@@ -68,7 +71,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
    * look like", and until now nothing in the console did. Code is still here,
    * and still the only way to reach markup a rendered page cannot show you.
    */
-  const [view, setView] = useState<"visual" | "code">("visual");
+  const [view, setView] = useState<"preview" | "visual" | "code">("visual");
 
   const load = useCallback(async () => {
     try {
@@ -369,10 +372,17 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     <div className="seg seg-sm">
                       <button
                         type="button"
+                        className={view === "preview" ? "seg-btn is-on" : "seg-btn"}
+                        onClick={() => setView("preview")}
+                      >
+                        Preview
+                      </button>
+                      <button
+                        type="button"
                         className={view === "visual" ? "seg-btn is-on" : "seg-btn"}
                         onClick={() => setView("visual")}
                       >
-                        Visual
+                        Edit
                       </button>
                       <button
                         type="button"
@@ -384,7 +394,26 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     </div>
                   </div>
 
-                  {view === "visual" ? (
+                  {view === "preview" ? (
+                    <>
+                      <SitePreview
+                        site={{ name, tagline, language: site.language ?? "en" }}
+                        pages={pages}
+                        current={page.slug}
+                        onNavigate={(slug) => {
+                          const to = pages.findIndex((p) => p.slug === slug);
+                          if (to >= 0) setAt(to);
+                        }}
+                      />
+                      <p className="provider-hint">
+                        The whole site, header and footer included, and the
+                        navigation works. This is the document static hosting
+                        writes to a file; a WordPress theme supplies its own
+                        header and footer, so there the shell is a stand-in for
+                        whatever the theme does.
+                      </p>
+                    </>
+                  ) : view === "visual" ? (
                     <>
                       <PageCanvas
                         key={`${site.id}-${at}`}

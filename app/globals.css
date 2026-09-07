@@ -4297,3 +4297,15 @@ body:has(.bulkbar) main {
 .editor-body-head .field-label {
   margin: 0;
 }
+
+/* The whole site in a frame. Tall, because a preview you have to scroll a
+   window inside a window to read is not showing you the page. */
+.site-preview {
+  width: 100%;
+  height: 66vh;
+  min-height: 420px;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: #fff;
+  display: block;
+}
