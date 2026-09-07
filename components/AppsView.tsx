@@ -395,7 +395,7 @@ export default function AppsView() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
-                <div className="app-server-filter">
+                <div className="bar-filter">
                   <Select
                     id="apps-server"
                     value={server}

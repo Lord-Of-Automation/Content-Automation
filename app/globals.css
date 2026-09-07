@@ -3809,8 +3809,9 @@ body:has(.bulkbar) main {
   gap: 8px;
 }
 
-/* Narrower than a market picker: it holds server names, which are short. */
-.app-server-filter {
+/* A dropdown standing in a filter bar. Narrower than a market picker: these
+   hold server names and property kinds, which are short. */
+.bar-filter {
   flex: 0 0 auto;
   min-width: 180px;
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import DatePicker from "@/components/DatePicker";
+import { Select } from "@/components/Select";
 
 type Site = {
   siteUrl: string;
@@ -93,6 +94,16 @@ export default function PerformanceView() {
   const [error, setError] = useState<string | null>(null);
   const [configError, setConfigError] = useState(false);
   const [query, setQuery] = useState("");
+  /**
+   * Which kind of property to show.
+   *
+   * Google treats these as different things and so should this page. A
+   * domain property covers every subdomain and both protocols; a URL prefix
+   * covers one address and nothing under it. An estate holding both counts
+   * some traffic twice, and being able to look at one kind at a time is the
+   * only way to see which.
+   */
+  const [kind, setKind] = useState<"" | "domain" | "prefix">("");
   const [sortKey, setSortKey] = useState<SortKey>("clicks");
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
   const [visible, setVisible] = useState(PAGE);
@@ -143,7 +154,7 @@ export default function PerformanceView() {
   // longer there, or at nothing at all.
   useEffect(() => {
     setVisible(PAGE);
-  }, [query, sortKey, direction, data]);
+  }, [query, kind, sortKey, direction, data]);
 
   function sortBy(key: SortKey) {
     if (key === sortKey) setDirection((d) => (d === "asc" ? "desc" : "asc"));
@@ -155,9 +166,10 @@ export default function PerformanceView() {
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    const rows = (data?.sites ?? []).filter(
-      (s) => !needle || s.site.toLowerCase().includes(needle),
-    );
+    const rows = (data?.sites ?? []).filter((s) => {
+      if (kind && s.kind !== kind) return false;
+      return !needle || s.site.toLowerCase().includes(needle);
+    });
     const flip = direction === "asc" ? 1 : -1;
 
     return [...rows].sort((a, b) => {
@@ -172,7 +184,7 @@ export default function PerformanceView() {
       return ((a[sortKey] as number) - (b[sortKey] as number)) * flip ||
         a.site.localeCompare(b.site);
     });
-  }, [data, query, sortKey, direction]);
+  }, [data, query, kind, sortKey, direction]);
 
   // Over everything, not over what the search box left: these are facts about
   // the account and should not move as you type.
@@ -191,6 +203,15 @@ export default function PerformanceView() {
       broken: rows.filter((s) => s.error).length,
       unverified: rows.filter((s) => s.errorKind === "unverified").length,
       limited: rows.filter((s) => s.errorKind === "rate-limited").length,
+    };
+  }, [data]);
+
+  const kinds = useMemo(() => {
+    const rows = data?.sites ?? [];
+    return {
+      all: rows.length,
+      domain: rows.filter((s) => s.kind === "domain").length,
+      prefix: rows.filter((s) => s.kind !== "domain").length,
     };
   }, [data]);
 
@@ -334,6 +355,18 @@ export default function PerformanceView() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
+                <div className="bar-filter">
+                  <Select
+                    id="perf-kind"
+                    value={kind}
+                    onChange={(v) => setKind(v as "" | "domain" | "prefix")}
+                    options={[
+                      { value: "", label: "All properties", hint: `${kinds.all}` },
+                      { value: "domain", label: "Domain properties", hint: `${kinds.domain}` },
+                      { value: "prefix", label: "URL prefixes", hint: `${kinds.prefix}` },
+                    ]}
+                  />
+                </div>
                 <span className="domain-counts">
                   <span className="domain-count">
                     <strong>{data.startDate}</strong> to {data.endDate}
@@ -410,6 +443,18 @@ export default function PerformanceView() {
                   ))}
                 </tbody>
               </table>
+
+              {/* A filter that matches nothing should say so. An empty table
+                  under a full set of headings reads as a failed load. */}
+              {!shown.length ? (
+                <div className="empty">
+                  {query.trim()
+                    ? `No property matches “${query}”${kind ? " in this kind" : ""}.`
+                    : kind === "domain"
+                      ? "No domain properties on this account."
+                      : "No URL prefix properties on this account."}
+                </div>
+              ) : null}
 
               {shown.length > visible ? (
                 <div className="more">
