@@ -3789,11 +3789,15 @@ body:has(.bulkbar) main {
   color: var(--ink-3);
 }
 
+/* Right, not centred like the data columns beside it. These are controls
+   rather than values: sitting them against the edge gives them one straight
+   line to aim down, which centring takes away as soon as one row has a badge
+   and the next does not. */
 .app-links {
   display: flex;
   align-items: center;
   gap: 8px;
-  justify-content: center;
+  justify-content: flex-end;
 }
 
 /* Refresh and New application, side by side in the card heading. Refresh used
