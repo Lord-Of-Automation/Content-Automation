@@ -3985,10 +3985,21 @@ body:has(.bulkbar) main {
   color: var(--ink-2);
 }
 
+/* Stretch, not centre. Show and Copy then take their height from the field
+   beside them rather than from their own padding, which matches exactly
+   whatever the box turns out to be — including if its font or padding is ever
+   changed. Their own vertical padding goes to zero so nothing fights the
+   stretch; the label stays centred because a button is already a flex box. */
 .cred-row {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 8px;
+}
+
+.cred-row .btn {
+  font-size: 13px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 /* The same box as input[type="text"] beside it, minus the caret. */
@@ -4024,4 +4035,13 @@ body:has(.bulkbar) main {
 .bar-btn {
   padding: 8px 12px;
   font-size: 14px;
+}
+
+/* The two fields in the clone tab. A gap rather than a margin on one of them,
+   so the spacing survives the dropdown being absent — it only appears when the
+   account has more than one server. */
+.clone-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }

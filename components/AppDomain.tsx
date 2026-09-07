@@ -504,29 +504,34 @@ export default function AppDomain({
                     copy starts with no domain, on an address of its own.
                   </p>
 
-                  {servers.length > 1 ? (
-                    <Select
-                      id="clone-server"
-                      value={cloneTo}
-                      onChange={setCloneTo}
-                      options={servers.map((s) => ({
-                        value: s.id,
-                        label:
-                          s.id === app.serverId ? `${s.label} (same server)` : s.label,
-                        hint: `${s.apps} app${s.apps === 1 ? "" : "s"}`,
-                      }))}
-                    />
-                  ) : null}
+                  {/* Two separate answers — where it goes and what it is
+                      called — so they are spaced as two fields rather than
+                      stacked into one block. */}
+                  <div className="clone-fields">
+                    {servers.length > 1 ? (
+                      <Select
+                        id="clone-server"
+                        value={cloneTo}
+                        onChange={setCloneTo}
+                        options={servers.map((s) => ({
+                          value: s.id,
+                          label:
+                            s.id === app.serverId ? `${s.label} (same server)` : s.label,
+                          hint: `${s.apps} app${s.apps === 1 ? "" : "s"}`,
+                        }))}
+                      />
+                    ) : null}
 
-                  <input
-                    type="text"
-                    value={cloneName}
-                    placeholder={`Copy of ${app.domain || app.label}`}
-                    autoComplete="off"
-                    spellCheck={false}
-                    maxLength={50}
-                    onChange={(e) => setCloneName(e.target.value)}
-                  />
+                    <input
+                      type="text"
+                      value={cloneName}
+                      placeholder={`Copy of ${app.domain || app.label}`}
+                      autoComplete="off"
+                      spellCheck={false}
+                      maxLength={50}
+                      onChange={(e) => setCloneName(e.target.value)}
+                    />
+                  </div>
 
                   <div className="sheet-actions">
                     <button
