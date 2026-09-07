@@ -202,11 +202,6 @@ strong { font-weight: 650; }
 hr { border: 0; height: 1px; background: var(--hair); margin: 44px 0; }
 small { color: var(--muted); }
 
-/* The opening paragraph, whether or not it was labelled one. */
-.lead, main.wrap > p:first-of-type {
-  font-size: 20px; line-height: 1.6; color: var(--muted);
-  margin-bottom: 26px;
-}
 
 blockquote {
   margin: 0 0 22px; padding: 18px 22px;
@@ -217,35 +212,6 @@ blockquote p:last-child { margin-bottom: 0; }
 
 figure { margin: 0 0 22px; }
 figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; }
-
-/* Nothing may push the page wider than the window. */
-img, video, iframe, table, pre { max-width: 100%; }
-img, video { height: auto; }
-img { border-radius: 12px; display: block; }
-
-/*
- * An icon with no size on it is an icon, not a banner.
- *
- * An inline SVG carrying only a viewBox has no intrinsic size, so a browser
- * gives it the full width of whatever it sits in: a twenty-four unit tick
- * becomes a full-width illustration and the page falls apart. This is the
- * single most common way generated markup looks broken, and it is one
- * forgotten attribute every time.
- *
- * Sized here rather than hoped for. Anything carrying its own width, height or
- * class is left alone, because those are the three ways something says it meant
- * to be a different size.
- */
-svg { vertical-align: middle; max-width: 100%; }
-svg:not([width]):not([height]):not([class]) {
-  width: 26px;
-  height: 26px;
-  flex: none;
-}
-
-/* An icon beside text sits with the text, not above it. */
-:is(p, li, h2, h3, h4, a, .btn) > svg { flex: none; }
-.btn > svg { width: 18px; height: 18px; }
 
 table { width: 100%; border-collapse: collapse; margin: 0 0 22px; font-size: 16px; }
 th, td { padding: 12px 14px; border-bottom: 1px solid var(--hair); text-align: left; }
@@ -260,6 +226,31 @@ code {
 pre { background: var(--panel); padding: 16px 18px; border-radius: 10px; overflow-x: auto; }
 pre code { background: none; padding: 0; }
 
+`;
+}
+
+/**
+ * The half a designed header must not be able to reach.
+ *
+ * Emitted after the shell's own CSS, so a header design can style its own
+ * markup and the header and footer it replaces, and cannot reach .btn, .card,
+ * .grid, .hero, .cta or .lead. Those belong to the pages, which were written
+ * separately and are not its to change.
+ *
+ * This was one stylesheet, all of it before the design, which meant a header
+ * that wrote a broad selector restyled every page on the site.
+ */
+function guards(): string {
+  return `
+/* ------------------------------------------------------ the page vocabulary
+
+   Emitted after any header design, so a header cannot restyle the pages. A
+   designed shell is given the run of its own markup and none of this. */
+/* The opening paragraph, whether or not it was labelled one. */
+.lead, main.wrap > p:first-of-type {
+  font-size: 20px; line-height: 1.6; color: var(--muted);
+  margin-bottom: 26px;
+}
 /* -------------------------------------------------- the class vocabulary */
 
 /* A block at the top of a page, set apart from what follows. */
@@ -351,6 +342,39 @@ img:not([src]), img[src=""] {
   header.site .wrap { min-height: 60px; gap: 14px; }
   .cta { padding: 26px 20px; }
 }
+
+/* -------------------------------------------------------------- last resort
+
+   Nothing may push the page wider than the window. */
+img, video, iframe, table, pre { max-width: 100%; }
+img, video { height: auto; }
+
+/*
+ * An unsized icon, sized, and only where an icon belongs.
+ *
+ * An inline SVG carrying only a viewBox has no size of its own, so a browser
+ * gives it the full width of whatever it sits in, and a small tick becomes a
+ * full-width illustration. The first version of this rule sized every unsized
+ * SVG on the page, which fixed the ticks and shrank the decorative shapes
+ * behind the heroes to the size of a tick, which was worse.
+ *
+ * So: sized where icons live, which is with text, in a link, in a button or at
+ * the top of a card. Anywhere else an unsized SVG is left able to fill its box,
+ * because a shape behind a hero is meant to, and only capped so it cannot run
+ * away with the page.
+ *
+ * Anything carrying its own width, height or class is untouched throughout.
+ * Those are the three ways a thing says it meant to be another size.
+ */
+svg { vertical-align: middle; max-width: 100%; }
+svg:not([width]):not([height]):not([class]) { max-height: 420px; }
+:is(p, li, a, .btn, .card, h2, h3, h4, summary, td, th)
+  svg:not([width]):not([height]):not([class]) {
+  width: 1.5em;
+  height: 1.5em;
+  flex: none;
+}
+.btn svg:not([width]):not([height]):not([class]) { width: 1.15em; height: 1.15em; }
 `;
 }
 
@@ -555,6 +579,7 @@ ${fill(design.footerHtml, site, options, parts)}
 ${page.metaDescription ? `<meta name="description" content="${escapeText(page.metaDescription)}">` : ""}
 <style>${styles(site)}</style>
 ${design?.css ? `<style>${design.css}</style>` : ""}
+<style>${guards()}</style>
 </head>
 <body>
 ${header}
