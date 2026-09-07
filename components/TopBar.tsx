@@ -10,7 +10,7 @@ export default async function TopBar({
 }: {
   current:
     | "runs" | "loop" | "logs"
-    | "domains" | "generator" | "performance"
+    | "domains" | "generator" | "apps" | "performance"
     | "accounts" | "keys";
 }) {
   const session = await auth();
@@ -61,6 +61,14 @@ export default async function TopBar({
               },
             ]}
           />
+          {/* Between Domains and Performance on purpose: what is registered,
+              what is running on it, what it earns. */}
+          <Link
+            href="/apps"
+            className={current === "apps" ? "topnav-link is-current" : "topnav-link"}
+          >
+            Applications
+          </Link>
           <Link
             href="/performance"
             className={current === "performance" ? "topnav-link is-current" : "topnav-link"}

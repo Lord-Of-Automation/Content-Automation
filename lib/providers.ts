@@ -30,7 +30,8 @@ const FILE = path.join(DIR, "providers.json");
 export type ProviderId =
   | "godaddy" | "gandi" | "namecheap" | "spaceship"
   | "cloudflare"
-  | "searchconsole";
+  | "searchconsole"
+  | "cloudways";
 
 export interface ProviderField {
   name: string;
@@ -182,6 +183,32 @@ export const PROVIDERS: ProviderSpec[] = [
         hint:
           "Only needed without a Google sign-in. A service account sees a " +
           "property only after being added to it as a user, one at a time.",
+      },
+    ],
+  },
+  {
+    id: "cloudways",
+    label: "Cloudways",
+    wired: true,
+    blurb:
+      "Where the sites actually run, which is the Applications page. An Access " +
+      "Token from Account, API Access — not the older API key, which needed an " +
+      "email beside it and is refused by this. Read-only permissions are enough: " +
+      "nothing here starts, stops or deploys anything. Worth knowing that " +
+      "Cloudways returns the application, database and server passwords in the " +
+      "same reply as the site list; they are dropped on arrival and never " +
+      "reach the browser.",
+    fields: [
+      {
+        name: "apiToken",
+        label: "Access Token",
+        secret: true,
+        placeholder: "cw_…",
+        pattern: /^cw_[A-Za-z0-9]{32,}$/,
+        patternNote:
+          "A Cloudways Access Token starts with cw_ and has no spaces. If what " +
+          "you have is an email and an API key, create an Access Token instead " +
+          "under Account, API Access.",
       },
     ],
   },
@@ -528,9 +555,17 @@ export async function clearGoogleSignIn(user: string): Promise<void> {
 
 /** Only GoDaddy has one, from when the token lived in the deployment. */
 function fromEnvironment(id: ProviderId): Record<string, string> | null {
-  if (id !== "godaddy") return null;
-  const token = process.env.GODADDY_API_KEY?.trim();
-  return token ? { token } : null;
+  if (id === "godaddy") {
+    const token = process.env.GODADDY_API_KEY?.trim();
+    return token ? { token } : null;
+  }
+  // So the Applications page works on a laptop before anyone has filled the
+  // Keys page in, which is otherwise a chicken and egg on a fresh checkout.
+  if (id === "cloudways") {
+    const apiToken = process.env.CLOUDWAYS_API_TOKEN?.trim();
+    return apiToken ? { apiToken } : null;
+  }
+  return null;
 }
 
 function statusOf(spec: ProviderSpec, store: Store): ProviderStatus {
