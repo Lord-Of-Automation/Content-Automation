@@ -61,6 +61,9 @@ const WINDOWS: Array<[number, string]> = [
   [90, "90 days"],
 ];
 
+/** Fifty at a time, matching the Domains and Logs tables. */
+const PAGE = 50;
+
 function whole(n: number): string {
   return new Intl.NumberFormat().format(Math.round(n));
 }
@@ -92,6 +95,7 @@ export default function PerformanceView() {
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("clicks");
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
+  const [visible, setVisible] = useState(PAGE);
 
   // Named "span", not "window": a parameter called window shadows the global
   // one, and the redirect below then reads as nonsense rather than as a
@@ -132,6 +136,14 @@ export default function PerformanceView() {
     }
     void load(days);
   }, [load, days, custom, from, to]);
+
+
+  // Back to the first page whenever the list underneath changes. Holding
+  // position while the filter narrows leaves you looking at rows that are no
+  // longer there, or at nothing at all.
+  useEffect(() => {
+    setVisible(PAGE);
+  }, [query, sortKey, direction, data]);
 
   function sortBy(key: SortKey) {
     if (key === sortKey) setDirection((d) => (d === "asc" ? "desc" : "asc"));
@@ -352,7 +364,7 @@ export default function PerformanceView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {shown.map((s) => (
+                  {shown.slice(0, visible).map((s) => (
                     <tr key={s.siteUrl}>
                       <td>
                         <a
@@ -398,6 +410,18 @@ export default function PerformanceView() {
                   ))}
                 </tbody>
               </table>
+
+              {shown.length > visible ? (
+                <div className="more">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => setVisible((v) => v + PAGE)}
+                  >
+                    Show {Math.min(PAGE, shown.length - visible)} more
+                  </button>
+                </div>
+              ) : null}
 
               <p className="domain-note">
                 Whole days in each property&rsquo;s own time zone, ending

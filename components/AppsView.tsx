@@ -61,6 +61,15 @@ function home(app: App): string {
   return app.domain ? `https://${app.domain}` : app.stagingUrl;
 }
 
+/**
+ * How many rows to draw before asking.
+ *
+ * Fifty, matching the Domains and Logs tables. The cost here is not the markup
+ * so much as what hangs off each row: a credential with state of its own and
+ * three controls, times every application on the account.
+ */
+const PAGE = 50;
+
 function Chevrons({ state }: { state: "none" | "asc" | "desc" }) {
   return (
     <svg className={`sortmark is-${state}`} viewBox="0 0 10 14" aria-hidden>
@@ -79,6 +88,7 @@ export default function AppsView() {
   const [server, setServer] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [direction, setDirection] = useState<"asc" | "desc">("asc");
+  const [visible, setVisible] = useState(PAGE);
   /** The application whose domain is being changed, if any. */
   const [managing, setManaging] = useState<App | null>(null);
   const [creating, setCreating] = useState(false);
@@ -118,6 +128,13 @@ export default function AppsView() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Back to the first page whenever the list underneath changes. Holding
+  // position while the filter narrows leaves you looking at rows that are no
+  // longer there, or at nothing at all.
+  useEffect(() => {
+    setVisible(PAGE);
+  }, [query, server, sortKey, direction]);
 
   async function flush() {
     if (!flushing) return;
@@ -308,7 +325,15 @@ export default function AppsView() {
                 </div>
                 <span className="domain-counts">
                   <span className="domain-count">
-                    <strong>{shown.length}</strong> shown
+                    {shown.length > visible ? (
+                      <>
+                        <strong>{visible}</strong> of {shown.length}
+                      </>
+                    ) : (
+                      <>
+                        <strong>{shown.length}</strong> shown
+                      </>
+                    )}
                   </span>
                 </span>
               </div>
@@ -337,7 +362,7 @@ export default function AppsView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {shown.map((a) => (
+                  {shown.slice(0, visible).map((a) => (
                     <tr key={a.id}>
                       <td>
                         <div className="app-name">
@@ -426,6 +451,18 @@ export default function AppsView() {
                   ))}
                 </tbody>
               </table>
+
+              {shown.length > visible ? (
+                <div className="more">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => setVisible((v) => v + PAGE)}
+                  >
+                    Show {Math.min(PAGE, shown.length - visible)} more
+                  </button>
+                </div>
+              ) : null}
 
               <p className="domain-note">
                 Every application on every server this Cloudways token can see.
