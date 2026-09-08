@@ -873,6 +873,13 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     editable={editing}
                     onChange={(bodyHtml) => change({ bodyHtml })}
                     onTitle={(title) => change({ title })}
+                    onSetting={(field, value) => {
+                      // The header is drawn from these, so they are the site's
+                      // settings wherever they are typed.
+                      if (field === "name") setName(value);
+                      else setTagline(value);
+                      touch();
+                    }}
                     onNavigate={(slug) => {
                       const to = pages.findIndex((p) => p.slug === slug);
                       if (to >= 0) setAt(to);
@@ -882,7 +889,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     {site.status === "building"
                       ? "Read only while the site is still being written: a page that is rewritten under you would lose the edit."
                       : editing
-                        ? "Click anything in the page to select it, then change its type, colour, spacing or size on the right. Typing works wherever the cursor is. The header and footer have their own tab. Save changes writes it down."
+                        ? "Click anything in the page to select it, then change its type, colour, spacing or size on the right. Typing works wherever the cursor is, including the site's name and tagline in the header. The rest of the header and footer have their own tab. Save changes writes it down."
                         : "The whole site, header and footer included. The navigation works, and anything the page does for itself runs here. This is the document the download writes to a file."}
                   </p>
                   {editing && hasBehaviour(page.bodyHtml) ? (

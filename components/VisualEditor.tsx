@@ -108,6 +108,7 @@ export default function VisualEditor({
   editable,
   onChange,
   onTitle,
+  onSetting,
   onNavigate,
 }: {
   site: Omit<ShellSite, "pages">;
@@ -118,6 +119,8 @@ export default function VisualEditor({
   onChange: (html: string) => void;
   /** The heading is the title field, so typing in it lands here. */
   onTitle: (title: string) => void;
+  /** So are the name and tagline in the header. */
+  onSetting: (field: "name" | "tagline", value: string) => void;
   onNavigate: (slug: string) => void;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
@@ -156,8 +159,9 @@ export default function VisualEditor({
   const signature = JSON.stringify([
     current,
     editable,
-    site.name,
-    site.tagline,
+    // The name and the tagline are absent for the same reason titles are: they
+    // can be typed into the page, and rebuilding the frame under somebody
+    // mid-word would take the cursor with it.
     site.language,
     site.design,
     site.header,
@@ -197,6 +201,12 @@ export default function VisualEditor({
         return;
       }
 
+      if (data.preview === "site") {
+        const field = data.field === "name" ? "name" : "tagline";
+        onSetting(field, String(data.text ?? "").trim());
+        return;
+      }
+
       if (data.preview === "html") {
         // The page's own scripts went in with a type nothing executes, so what
         // comes back is the markup as written rather than as it ran. Undo that
@@ -228,7 +238,7 @@ export default function VisualEditor({
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [onChange, onNavigate, onTitle, page?.bodyHtml, pages]);
+  }, [onChange, onNavigate, onSetting, onTitle, page?.bodyHtml, pages]);
 
   useEffect(() => {
     if (!full) return;

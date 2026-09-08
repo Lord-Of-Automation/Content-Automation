@@ -532,6 +532,35 @@ const EDIT_SCRIPT = `
     if (el && el !== chosen && main.contains(el)) pick(el);
   });
 
+  /*
+   * The site's name and tagline, editable where they are read.
+   *
+   * They live in the header, which is otherwise not editable here: what is in
+   * it comes from settings and from the shell the build designed, so typing
+   * into it would put changes somewhere nothing reads back. These two are the
+   * exception, because they are settings, and the place a person wants to
+   * change a site's name is the place the name is written.
+   *
+   * Only these two elements are made editable, not the header around them.
+   */
+  var settings = document.querySelectorAll("[data-site-name],[data-site-tagline]");
+  for (var s = 0; s < settings.length; s++) {
+    (function (el) {
+      var field = el.hasAttribute("data-site-name") ? "name" : "tagline";
+      var was = el.textContent;
+      el.setAttribute("contenteditable", "true");
+      el.addEventListener("input", function () {
+        if (el.textContent === was) return;
+        was = el.textContent;
+        parent.postMessage({ preview: "site", field: field, text: was }, "*");
+      });
+      // A line break in a site's name is not something anybody means.
+      el.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); el.blur(); }
+      });
+    })(settings[s]);
+  }
+
   var titleEl = main.querySelector("h1[data-title]");
   var titleWas = titleEl ? titleEl.textContent : "";
 
@@ -594,7 +623,15 @@ const EDIT_SCRIPT = `
   var style = document.createElement("style");
   style.textContent =
     "[data-chosen]{outline:2px solid #2f6df6;outline-offset:1px}" +
-    "main [contenteditable],main{cursor:text}";
+    "main [contenteditable],main{cursor:text}" +
+    // The two settings in the header, marked as editable and given something
+    // to show when they are empty. Drawn rather than written, so a prompt
+    // cannot be mistaken for a value and saved.
+    "[data-site-name],[data-site-tagline]{cursor:text;outline-offset:2px}" +
+    "[data-site-name]:hover,[data-site-tagline]:hover{outline:1px dashed rgba(127,127,127,.6)}" +
+    "[data-site-name]:focus,[data-site-tagline]:focus{outline:2px solid #2f6df6}" +
+    "[data-site-name]:empty::before,[data-site-tagline]:empty::before" +
+    "{content:attr(data-placeholder);opacity:.45}";
   document.head.appendChild(style);
 
   parent.postMessage({ preview: "ready" }, "*");
@@ -686,6 +723,43 @@ function linkTo(page: ShellPage, options: ShellOptions): string {
  * Every placeholder is replaced whether or not it was used, so a design that
  * forgot one does not leave "{{NAV}}" on the page for a visitor to read.
  */
+/**
+ * Whether a placeholder in a designed shell sits in text or in an attribute.
+ *
+ * A design writes {{NAME}} wherever it wants the site called by name, and that
+ * is usually between tags but is sometimes inside one — an alt, a title, an
+ * aria-label. Wrapping the second kind in a span would put markup inside a
+ * quoted attribute value and break the tag around it.
+ *
+ * Decided by walking back to the nearest angle bracket: an unclosed "<" before
+ * it means the placeholder is inside a tag.
+ */
+function inTag(whole: string, at: number): boolean {
+  const open = whole.lastIndexOf("<", at);
+  const close = whole.lastIndexOf(">", at);
+  return open > close;
+}
+
+/**
+ * The site's name or tagline, marked so the editor can find it.
+ *
+ * Only while editing, and only where it is text rather than an attribute. Left
+ * exactly as it was in every other case, so what gets published carries no
+ * trace of having been editable.
+ */
+function mark(
+  value: string,
+  attribute: string,
+  editing: boolean | undefined,
+  whole: string,
+  at: number,
+): string {
+  if (!editing || inTag(whole, at)) return value;
+  return `<span ${attribute} data-placeholder="${
+    attribute === "data-site-name" ? "Name the site" : "Add a tagline"
+  }">${value}</span>`;
+}
+
 function fill(
   markup: string,
   site: ShellSite,
@@ -698,12 +772,15 @@ function fill(
     .replace(/\{\{\s*PAGES\s*\}\}/g, parts.pages)
     .replace(/\{\{\s*LINKS\s*\}\}/g, parts.links)
     .replace(/\{\{\s*COPYRIGHT\s*\}\}/g, parts.copyright)
-    .replace(/\{\{\s*NAME\s*\}\}/g, escapeText(site.name))
+    .replace(/\{\{\s*NAME\s*\}\}/g, (_m, at: number, whole: string) =>
+      mark(escapeText(site.name), "data-site-name", options.editing, whole, at),
+    )
     // Empty when the header says not to show it, so a design cannot put back
     // what the setting just took away.
-    .replace(
-      /\{\{\s*TAGLINE\s*\}\}/g,
-      site.header.showTagline ? escapeText(site.tagline) : "",
+    .replace(/\{\{\s*TAGLINE\s*\}\}/g, (_m, at: number, whole: string) =>
+      site.header.showTagline
+        ? mark(escapeText(site.tagline), "data-site-tagline", options.editing, whole, at)
+        : "",
     )
     .replace(/\{\{\s*YEAR\s*\}\}/g, String(options.year ?? ""))
     // Anything else it invented. Better an empty space than a curly brace.
@@ -779,7 +856,11 @@ export function renderChrome(
     h.logoUrl
       ? `<img class="brand-logo" src="${escapeText(h.logoUrl)}" alt="${escapeText(site.name)}">`
       : "",
-    h.showName ? `<span class="brand-name">${escapeText(site.name)}</span>` : "",
+    h.showName
+      ? `<span class="brand-name"${
+          options.editing ? ' data-site-name data-placeholder="Name the site"' : ""
+        }>${escapeText(site.name)}</span>`
+      : "",
   ]
     .filter(Boolean)
     .join("");
@@ -787,7 +868,17 @@ export function renderChrome(
   const brand = brandInner
     ? `<a class="brand" href="${escapeText(home ? linkTo(home, options) : "/")}">
           ${brandInner}
-          ${h.showTagline && site.tagline ? `<p class="brand-tagline">${escapeText(site.tagline)}</p>` : ""}
+          ${
+            // Shown while editing even when empty, so there is something to
+            // click. A placeholder drawn by CSS rather than written into the
+            // element, since text put there to be helpful would be saved as
+            // though somebody had meant it.
+            h.showTagline && (site.tagline || options.editing)
+              ? `<p class="brand-tagline"${
+                  options.editing ? ' data-site-tagline data-placeholder="Add a tagline"' : ""
+                }>${escapeText(site.tagline)}</p>`
+              : ""
+          }
         </a>`
     : "";
 
