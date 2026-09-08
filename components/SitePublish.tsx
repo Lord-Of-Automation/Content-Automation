@@ -346,6 +346,9 @@ export default function SitePublish({
             withDesign,
             fullWidth,
             fit: fit === "canvas" ? "canvas" : "inside",
+            // The navigation in the site's own header needs to know whether
+            // the first page will answer at the root or at its own slug.
+            asFront,
           },
           found.home,
         );

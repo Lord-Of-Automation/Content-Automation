@@ -34,6 +34,9 @@
  */
 
 import { scopeCss } from "./cssscope";
+import {
+  contentStyles, renderChrome, type ShellOptions, type ShellSite, type ShellTheme,
+} from "./siteshell";
 import type { SiteDesign, WebsitePage } from "./websites";
 
 /** The class the published content sits inside, and what its CSS is confined to. */
@@ -380,20 +383,85 @@ export interface PageResult {
 export function pageContent(
   page: WebsitePage,
   design: SiteDesign | null,
-  options: { fullWidth?: boolean; fit?: ThemeFit; background?: string } = {},
+  options: {
+    fullWidth?: boolean;
+    fit?: ThemeFit;
+    background?: string;
+    /** The site's palette and column width. Without it, only the design travels. */
+    theme?: ShellTheme;
+    /**
+     * The site itself, when its own header and footer should travel with it.
+     *
+     * Only for a page taking over from the theme. A page sitting inside one
+     * already has a header above it, and giving it a second is how a published
+     * page ends up with two of everything.
+     */
+    site?: ShellSite;
+    chrome?: ShellOptions;
+  } = {},
 ): string {
-  const body = `<div class="${WRAP_CLASS}">\n${page.bodyHtml}\n</div>`;
-  if (!design?.css?.trim()) return body;
+  /*
+   * Everything the page is styled by, not just the part the build wrote.
+   *
+   * A generated page's look is the base stylesheet, the design and the guards
+   * together. Sending only the design sends the site's own decisions about
+   * headings and heroes while leaving out the palette, the type and the width
+   * those decisions were made against, and what arrives is recognisably not the
+   * site that was previewed.
+   */
+  const sheet = options.theme
+    ? contentStyles(options.theme, design)
+    : design?.css ?? "";
+
+  /*
+   * The site's own header and footer, when the page is the site rather than a
+   * page in somebody else's.
+   *
+   * Taking the page over hides the theme's chrome, which would leave the page
+   * with no header at all unless it brings one. Rendered by the function the
+   * preview uses, so what is published is the markup that was looked at and not
+   * a second opinion about it.
+   */
+  const chrome =
+    options.fit === "canvas" && options.site
+      ? renderChrome(options.site, options.chrome ?? { current: page.slug })
+      : { header: "", footer: "" };
+
+  /*
+   * The column, when there is a stylesheet that mentions it.
+   *
+   * `.wrap` is where the base stylesheet keeps the site's width — nothing else
+   * sets one — so a page carrying that stylesheet needs the element to hang it
+   * on, and a page published without it has no width at all, which is how a
+   * design meant for a seven-hundred-pixel column ends up filling a screen.
+   *
+   * A page publishing words alone is joining somebody else's design and should
+   * arrive as words, not as words inside a container of ours that their theme
+   * will then have opinions about.
+   */
+  const inner = sheet.trim()
+    ? `<main class="wrap">\n${page.bodyHtml}\n</main>`
+    : page.bodyHtml;
+
+  const body = [`<div class="${WRAP_CLASS}">`, chrome.header, inner, chrome.footer, "</div>"]
+    .filter(Boolean)
+    .join("\n");
+
+  if (!sheet.trim()) return body;
 
   const takeover = options.fit === "canvas";
-  // Taking the page over means it already runs the full width; asking for both
-  // would push the content off its own left edge.
+  /*
+   * Taking the page over frees the wrapper, not the content.
+   *
+   * The wrapper runs the whole width because that is what `body` does in the
+   * generated site; the column inside it is what holds the content in, exactly
+   * as it does there.
+   */
   const frame = takeover
     ? canvas(options.background ?? "") + `${SCOPE}{max-width:none;width:auto;margin:0;padding:0}`
     : normalise(Boolean(options.fullWidth));
 
-  const css = scopeCss(design.css, SCOPE);
-  return `<style>\n${frame}\n${css}\n</style>\n${body}`;
+  return `<style>\n${frame}\n${scopeCss(sheet, SCOPE)}\n</style>\n${body}`;
 }
 
 /** WordPress needs a slug; the front page's is empty here. */
@@ -425,6 +493,11 @@ export interface PublishOne {
   fit?: ThemeFit;
   /** The site's own background, for when the theme's is hidden with the rest. */
   background?: string;
+  /** The site's palette and column width, so the whole stylesheet travels. */
+  theme?: ShellTheme;
+  /** The site, when its own header and footer should travel with the page. */
+  site?: ShellSite;
+  chrome?: ShellOptions;
   /** A page id from a previous publish, tried before searching by slug. */
   knownId?: number;
 }
@@ -480,6 +553,9 @@ export async function publishPage(options: PublishOne): Promise<PageResult> {
       fullWidth: options.fullWidth,
       fit: options.fit,
       background: options.background,
+      theme: options.theme,
+      site: options.site,
+      chrome: options.chrome,
     }),
     excerpt: options.page.metaDescription,
     status: options.status,

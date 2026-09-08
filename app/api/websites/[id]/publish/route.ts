@@ -6,7 +6,7 @@ import { errorResponse, requireSession } from "@/lib/api-guard";
 import { listAllApplications } from "@/lib/hosting";
 import { credentialsFor, normaliseDomain } from "@/lib/sites";
 import {
-  apiBase, checkSite, publishPage, setFrontPage, WordPressError,
+  apiBase, checkSite, publishPage, setFrontPage, slugFor, WordPressError,
 } from "@/lib/wordpress";
 import { getWebsite, saveWebsite, type PublishedTo, type Website } from "@/lib/websites";
 
@@ -117,6 +117,7 @@ export async function POST(
     withDesign?: boolean;
     fullWidth?: boolean;
     fit?: string;
+    asFront?: boolean;
     frontPageId?: number;
     host?: string;
     label?: string;
@@ -172,6 +173,22 @@ export async function POST(
       const page = site.pages.find((p) => p.slug === String(body.slug ?? ""));
       if (!page) return NextResponse.json({ error: "No such page." }, { status: 404 });
 
+      /*
+       * The pages as WordPress will address them, for the navigation.
+       *
+       * A generated site links its pages by the slugs it gave them, and the
+       * front page has none at all. WordPress serves a page at its own slug,
+       * and serves the front page at the root only if it has been told which
+       * page that is. So the navigation is built against what will actually be
+       * there rather than against what the preview used.
+       */
+      const front = site.pages[0];
+      const chromePages = site.pages.map((p) => ({
+        ...p,
+        slug:
+          body.asFront && p === front ? "" : slugFor(p, site.name),
+      }));
+
       const result = await publishPage({
         address,
         user: login.username,
@@ -182,6 +199,25 @@ export async function POST(
         fallbackSlug: site.name,
         fullWidth: Boolean(body.fullWidth),
         fit: body.fit === "canvas" ? "canvas" : "inside",
+        // The palette and the column width, which is most of what makes a
+        // published page look like the one that was previewed.
+        theme: body.withDesign ? site.theme : undefined,
+        /*
+         * The site, so a page taking over from the theme brings the header and
+         * footer it had in the preview.
+         *
+         * Its links are rewritten to the addresses WordPress will serve the
+         * pages at, since the generated site addresses its pages by file and
+         * WordPress addresses them by slug.
+         */
+        site:
+          body.fit === "canvas" && body.withDesign
+            ? { ...site, pages: chromePages }
+            : undefined,
+        chrome:
+          body.fit === "canvas"
+            ? { current: slugFor(page, site.name), year: new Date().getFullYear() }
+            : undefined,
         // The site's own background, needed only when the theme's is hidden
         // along with everything else it draws.
         background: site.theme?.background ?? "",

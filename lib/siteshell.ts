@@ -52,6 +52,15 @@ export interface ShellDesign {
   css: string;
 }
 
+/** A site's palette, type and column width. */
+export interface ShellTheme {
+  accent: string;
+  background: string;
+  ink: string;
+  font: "sans" | "serif";
+  width: number;
+}
+
 export interface ShellSite {
   name: string;
   tagline: string;
@@ -71,13 +80,7 @@ export interface ShellSite {
     links: ShellLink[];
     showCopyright: boolean;
   };
-  theme: {
-    accent: string;
-    background: string;
-    ink: string;
-    font: "sans" | "serif";
-    width: number;
-  };
+  theme: ShellTheme;
 }
 
 /** Text going into markup. Everything a person typed is text, not markup. */
@@ -116,8 +119,7 @@ const FONTS = {
  * page rather than a document. It is deliberately short: a writer given thirty
  * class names uses none of them correctly.
  */
-function styles(site: ShellSite): string {
-  const t = site.theme;
+function styles(t: ShellTheme): string {
   return `
 :root {
   --ink: ${t.ink};
@@ -708,7 +710,38 @@ function fill(
     .replace(/\{\{[^}]{0,40}\}\}/g, "");
 }
 
-export function renderPage(site: ShellSite, page: ShellPage, options: ShellOptions): string {
+/**
+ * Everything that styles a page's own content, in the order it is applied.
+ *
+ * The look of a generated page is three stylesheets, not one. The base sets the
+ * palette, the type and the width of the column the content sits in; the
+ * design is what the build wrote for this particular site; the guards give the
+ * page vocabulary — the cards, the grids, the buttons — shapes to fall back on.
+ *
+ * Anywhere a page is shown outside this renderer needs all three, or it gets a
+ * site wearing a third of its own design and no idea which third. Exported so
+ * that publishing sends the same stylesheet the preview draws, rather than
+ * assembling a second opinion about what the site looks like.
+ */
+export function contentStyles(theme: ShellTheme, design: ShellDesign | null): string {
+  return [styles(theme), design?.css ?? "", guards()].filter(Boolean).join("\n");
+}
+
+/**
+ * The header and footer a site wears, without a document around them.
+ *
+ * Split out of the renderer so that anywhere else showing a page can show the
+ * same chrome rather than growing its own idea of one. Publishing is the caller
+ * that made this necessary: a page put on somebody's WordPress with the theme
+ * stepped aside has no header at all unless it brings the site's own.
+ *
+ * Takes no page, because none of this ever depended on one. Which page is being
+ * shown reaches it through `options.current`, and only to mark the link.
+ */
+export function renderChrome(
+  site: ShellSite,
+  options: ShellOptions,
+): { header: string; footer: string } {
   const ordered = [...site.pages].sort((a, b) => a.order - b.order);
   const home = ordered[0];
   const h = site.header;
@@ -848,6 +881,13 @@ ${fill(design.footerHtml, site, options, parts)}
     </footer>`
       : "";
 
+  return { header, footer };
+}
+
+export function renderPage(site: ShellSite, page: ShellPage, options: ShellOptions): string {
+  const design = site.design;
+  const { header, footer } = renderChrome(site, options);
+
   const title = page.metaTitle || `${page.title} — ${site.name}`;
 
   return `<!doctype html>
@@ -857,7 +897,7 @@ ${fill(design.footerHtml, site, options, parts)}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeText(title)}</title>
 ${page.metaDescription ? `<meta name="description" content="${escapeText(page.metaDescription)}">` : ""}
-<style>${styles(site)}</style>
+<style>${styles(site.theme)}</style>
 ${design?.css ? `<style>${design.css}</style>` : ""}
 <style>${guards()}</style>
 </head>
