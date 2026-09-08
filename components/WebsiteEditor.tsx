@@ -116,6 +116,20 @@ export default function WebsiteEditor({ id }: { id: string }) {
   const [theme, setTheme] = useState<Theme | null>(null);
   /** Which page, or the site furniture that surrounds all of them. */
   const [section, setSection] = useState<"pages" | "design" | "versions" | "publish">("pages");
+
+  /*
+   * The tab the address asks for.
+   *
+   * WordPress sends somebody back here after they authorise the console on
+   * their own site, and they should land on the tab they left from rather than
+   * at the top of a page they then have to find their way through again.
+   */
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get("tab");
+    if (wanted === "publish" || wanted === "versions" || wanted === "design") {
+      setSection(wanted);
+    }
+  }, []);
   /**
    * Bumped whenever the site is written to, so the version list reloads.
    *

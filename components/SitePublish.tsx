@@ -57,6 +57,15 @@ interface Done {
   warnings: string[];
 }
 
+/**
+ * This console, as WordPress will record it.
+ *
+ * Fixed rather than generated per install: WordPress shows it beside every
+ * password it issues, and one stable name means a site's list reads as "the
+ * console" rather than as a row of unrelated strangers.
+ */
+const APP_ID = "6f2a1c74-9d3e-4b58-8c21-0a7e5f1d9b40";
+
 const HOST_LABEL: Record<string, string> = {
   cloudways: "Cloudways",
   hostinger: "Hostinger",
@@ -83,6 +92,12 @@ export default function SitePublish({
   const [done, setDone] = useState<Done[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
+  /** The manual way in, for a site where the one-click flow will not run. */
+  const [byHand, setByHand] = useState(false);
+  const [user, setUser] = useState("");
+  const [password, setPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -105,6 +120,34 @@ export default function SitePublish({
     void load();
   }, [load]);
 
+  /*
+   * What WordPress said when it sent the browser back.
+   *
+   * Read once and then wiped from the address, so a reload does not repeat a
+   * message about something that happened before it.
+   */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const came = params.get("connected");
+    if (!came) return;
+
+    setNote(
+      came === "declined"
+        ? "That site was not authorised, so nothing was saved."
+        : came === "incomplete" || came === "nodomain" || came === "failed"
+          ? "WordPress sent the browser back without a usable password. Add the login by hand instead."
+          : `Connected to ${came}. It can be published to now.`,
+    );
+
+    params.delete("connected");
+    const rest = params.toString();
+    window.history.replaceState(
+      {},
+      "",
+      window.location.pathname + (rest ? `?${rest}` : ""),
+    );
+  }, []);
+
   const target = useMemo(
     () => targets?.find((t) => t.key === chosen) ?? null,
     [targets, chosen],
@@ -114,10 +157,21 @@ export default function SitePublish({
   const previous: PublishedTo | null = site.published;
 
   async function step(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+    /*
+     * Where the site says it lives, once it has been asked.
+     *
+     * An application reached on its staging address may believe it lives on a
+     * custom domain, and answer a request to the staging address with a
+     * redirect to that domain. Redirects across origins drop the Authorization
+     * header, so the pages would arrive unauthenticated. Asking first and then
+     * addressing the site by its own name avoids the redirect entirely.
+     */
+    const address = check?.home || target?.address;
+
     const response = await fetch(`/api/websites/${site.id}/publish`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ address: target?.address, ...body }),
+      body: JSON.stringify({ address, ...body }),
     });
     if (response.status === 401 && !response.headers.get("content-type")?.includes("json")) {
       window.location.href = "/login";
@@ -134,12 +188,81 @@ export default function SitePublish({
     setError(null);
     setCheck(null);
     try {
-      const payload = await step({ step: "check" });
+      const response = await fetch(`/api/websites/${site.id}/publish`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ address: target.address, step: "check" }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? `The check returned ${response.status}.`);
       setCheck(payload.check as Check);
     } catch (e) {
       setError(e instanceof Error ? e.message : "That site could not be reached.");
     } finally {
       setChecking(false);
+    }
+  }
+
+  /**
+   * Ask WordPress for a password, on the site itself.
+   *
+   * Sends the browser to that site's own authorisation screen, where somebody
+   * signed in there approves this console by name and WordPress mints an
+   * application password. It comes back to a callback that saves it. The
+   * alternative is asking a person to open an admin screen on each of three
+   * hundred applications and copy a string, which nobody is going to do.
+   */
+  function connect() {
+    if (!target) return;
+
+    const origin = window.location.origin;
+    if (!origin.startsWith("https://")) {
+      setError(
+        "WordPress only sends an application password back to an https address, " +
+          "so this works on the deployed console rather than a local one. Add the " +
+          "login by hand here instead.",
+      );
+      setByHand(true);
+      return;
+    }
+
+    const back = new URL("/api/sites/authorize", origin);
+    back.searchParams.set("back", site.id);
+    back.searchParams.set("asked", target.domain || target.address);
+
+    const to = new URL("/wp-admin/authorize-application.php", `https://${target.address.replace(/^https?:\/\//, "")}`);
+    to.searchParams.set("app_name", "Content Automation console");
+    to.searchParams.set("app_id", APP_ID);
+    to.searchParams.set("success_url", back.toString());
+
+    window.location.href = to.toString();
+  }
+
+  /** The way in for a site where that flow will not run. */
+  async function saveByHand() {
+    if (!target) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/sites", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          domain: target.domain || target.address,
+          username: user,
+          password,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? `Saving returned ${response.status}.`);
+      setPassword("");
+      setByHand(false);
+      setNote(`Saved the login for ${target.domain || target.address}.`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That login could not be saved.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -196,6 +319,7 @@ export default function SitePublish({
   return (
     <div className="publish">
       {error ? <p className="notice bad">{error}</p> : null}
+      {note ? <p className="notice ok">{note}</p> : null}
 
       {previous ? (
         <p className="notice ok">
@@ -243,11 +367,66 @@ export default function SitePublish({
           )}
 
           {target && !target.ready ? (
-            <p className="notice warn">
-              No WordPress login is saved for <strong>{target.domain}</strong>.
-              Add one on the Sites page, using an application password from that
-              site&apos;s Users screen rather than the login password.
-            </p>
+            <div className="publish-connect">
+              <p className="notice warn">
+                This console cannot write to <strong>{target.domain || target.address}</strong> yet.
+                WordPress will not accept a login password over its API, so it
+                needs an application password of its own.
+              </p>
+              <button type="button" className="btn btn-primary" onClick={connect}>
+                Get one from WordPress
+              </button>
+              <p className="provider-hint">
+                Opens that site&apos;s own authorisation screen. Approve this
+                console there and it comes straight back, connected. You will
+                need to be signed in to that site as an administrator.
+              </p>
+
+              {byHand ? (
+                <div className="publish-byhand">
+                  <label className="field-label" htmlFor="publish-user">
+                    WordPress username
+                  </label>
+                  <input
+                    id="publish-user"
+                    type="text"
+                    value={user}
+                    autoComplete="off"
+                    onChange={(e) => setUser(e.target.value)}
+                  />
+                  <label className="field-label" htmlFor="publish-password">
+                    Application password
+                  </label>
+                  <input
+                    id="publish-password"
+                    type="password"
+                    value={password}
+                    autoComplete="new-password"
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={saving || !user.trim() || !password.trim()}
+                    onClick={() => void saveByHand()}
+                  >
+                    {saving ? "Saving..." : "Save the login"}
+                  </button>
+                  <p className="provider-hint">
+                    From Users, then your profile, then Application Passwords on
+                    that site. Not the password you sign in with.
+                  </p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setByHand(true)}
+                >
+                  Or paste one instead
+                </button>
+              )}
+            </div>
           ) : null}
 
           {target && target.ready && !target.readable ? (

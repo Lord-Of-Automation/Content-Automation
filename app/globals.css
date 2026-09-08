@@ -4909,3 +4909,41 @@ body:has(.bulkbar) main {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Connecting a site, where the publish would otherwise stop.
+
+   A dead end said "add a login on another page" and left somebody to find it,
+   open an admin screen on the target site, and copy a string back. Across
+   hundreds of applications that is not a thing anybody does, so the console
+   asks WordPress for the password itself and this is where that starts. */
+.publish-connect {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.publish-connect .btn-primary {
+  align-self: stretch;
+}
+
+.publish-byhand {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  margin-top: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+.publish-byhand .field-label {
+  margin: 6px 0 0;
+}
+
+.publish-byhand .btn {
+  margin-top: 10px;
+}
