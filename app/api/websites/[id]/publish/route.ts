@@ -115,6 +115,7 @@ export async function POST(
     slug?: string;
     status?: string;
     withDesign?: boolean;
+    fullWidth?: boolean;
     frontPageId?: number;
     host?: string;
     label?: string;
@@ -178,6 +179,7 @@ export async function POST(
         design: body.withDesign ? site.design : null,
         status: body.status === "publish" ? "publish" : "draft",
         fallbackSlug: site.name,
+        fullWidth: Boolean(body.fullWidth),
         // Only when publishing to the same place as last time. An id from
         // another site is another site's page.
         knownId:

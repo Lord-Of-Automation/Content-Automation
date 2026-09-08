@@ -39,6 +39,70 @@ import type { SiteDesign, WebsitePage } from "./websites";
 /** The class the published content sits inside, and what its CSS is confined to. */
 export const WRAP_CLASS = "ca-site";
 
+/**
+ * How many times the wrapper is repeated in every selector.
+ *
+ * `.ca-site.ca-site.ca-site h2` matches exactly what `.ca-site h2` matches — an
+ * element only has to carry the class once — but it counts as three classes
+ * when the browser decides which rule wins.
+ *
+ * That is the whole problem with publishing a design into somebody's theme. The
+ * generated stylesheet loads after the theme's, so on a tie it wins; but a
+ * theme does not write `h2`, it writes `.entry-content h2` or
+ * `.wp-site-blocks .entry-content h2`, and specificity is settled before order
+ * is ever consulted. One class against three loses every time, and the page
+ * arrives wearing the theme's headings.
+ *
+ * Three is enough to clear the selectors themes actually use, and ties still
+ * fall our way on order. It is also reversible in a way `!important` is not: a
+ * person editing the page in WordPress afterwards can still override any of it
+ * from the theme's own customiser, which is not true once every declaration
+ * shouts.
+ */
+const WEIGHT = 3;
+
+/** `.ca-site.ca-site.ca-site` — the selector every scoped rule is built on. */
+export const SCOPE = `.${WRAP_CLASS}`.repeat(WEIGHT);
+
+/**
+ * Undo what a theme does to the box our content lands in.
+ *
+ * A theme wraps post content in something of its own — `.entry-content`, or a
+ * block theme's constrained layout — and that box carries a width, a padding
+ * and often a margin. A generated design brings its own idea of how wide it
+ * should be, and cannot express it from inside a box already narrowed to
+ * something else.
+ *
+ * Emitted before the design's own rules and at the same weight, so anything the
+ * design says about the same properties wins on order, and everything the theme
+ * says loses on specificity.
+ */
+function normalise(fullWidth: boolean): string {
+  const base =
+    `${SCOPE}{max-width:none;width:auto;float:none;clear:both;` +
+    `margin-left:auto;margin-right:auto;padding-left:0;padding-right:0}`;
+
+  if (!fullWidth) return base;
+
+  /*
+   * Escaping the theme's column entirely.
+   *
+   * Some designs are built to run edge to edge — a full-bleed hero, a footer
+   * band in a colour. Inside a theme's seven-hundred-pixel column they read as
+   * a narrow strip of something that was meant to be a page.
+   *
+   * The margin trick rather than a transform: a transform makes the wrapper a
+   * containing block, which quietly breaks anything positioned fixed inside it.
+   * `clip` rather than `hidden` so the page can still be scrolled to the side
+   * on a narrow screen without the browser inventing a scrollbar for it.
+   */
+  return (
+    `${SCOPE}{max-width:none;float:none;clear:both;` +
+    `width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw);` +
+    `padding-left:0;padding-right:0;overflow-x:clip}`
+  );
+}
+
 export class WordPressError extends Error {
   readonly status: number;
   constructor(message: string, status = 0) {
@@ -225,15 +289,26 @@ export interface PageResult {
  * to a wrapper the content sits in. It cannot be a theme, and it must not be
  * allowed to reach the theme, so it is neither.
  *
+ * Confined, but not thereby weaker than the theme it is landing beside. Every
+ * selector is weighted so it outranks what a theme writes about the same
+ * elements — see SCOPE — because a design that loses every argument with the
+ * theme is not a design that was published.
+ *
  * Passing `design` as null publishes the words alone, so the pages take on the
  * look of the site they are joining. That is the right answer when the pages
  * are being added to somewhere that already exists, and the wrong one when the
  * generated site is the point.
  */
-export function pageContent(page: WebsitePage, design: SiteDesign | null): string {
+export function pageContent(
+  page: WebsitePage,
+  design: SiteDesign | null,
+  options: { fullWidth?: boolean } = {},
+): string {
   const body = `<div class="${WRAP_CLASS}">\n${page.bodyHtml}\n</div>`;
-  const css = design?.css?.trim() ? scopeCss(design.css, `.${WRAP_CLASS}`) : "";
-  return css ? `<style>\n${css}\n</style>\n${body}` : body;
+  if (!design?.css?.trim()) return body;
+
+  const css = scopeCss(design.css, SCOPE);
+  return `<style>\n${normalise(Boolean(options.fullWidth))}\n${css}\n</style>\n${body}`;
 }
 
 /** WordPress needs a slug; the front page's is empty here. */
@@ -259,6 +334,8 @@ export interface PublishOne {
   status: "publish" | "draft";
   /** The slug to use when the page has none, which is the front page. */
   fallbackSlug: string;
+  /** Whether the design may break out of the theme's content column. */
+  fullWidth?: boolean;
   /** A page id from a previous publish, tried before searching by slug. */
   knownId?: number;
 }
@@ -310,7 +387,7 @@ export async function publishPage(options: PublishOne): Promise<PageResult> {
   const payload: Record<string, unknown> = {
     title: options.page.title,
     slug,
-    content: pageContent(options.page, options.design),
+    content: pageContent(options.page, options.design, { fullWidth: options.fullWidth }),
     excerpt: options.page.metaDescription,
     status: options.status,
     menu_order: options.page.order,

@@ -84,6 +84,8 @@ export default function SitePublish({
   const [live, setLive] = useState(false);
   const [withDesign, setWithDesign] = useState(true);
   const [asFront, setAsFront] = useState(false);
+  /** Whether the design may escape the column the theme puts content in. */
+  const [fullWidth, setFullWidth] = useState(false);
 
   const [check, setCheck] = useState<Check | null>(null);
   const [checking, setChecking] = useState(false);
@@ -331,6 +333,7 @@ export default function SitePublish({
             slug: page.slug,
             status: live ? "publish" : "draft",
             withDesign,
+            fullWidth,
           },
           found.home,
         );
@@ -521,6 +524,16 @@ export default function SitePublish({
                   />
                   <span>Bring the generated design</span>
                 </label>
+                {withDesign ? (
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={fullWidth}
+                      onChange={(e) => setFullWidth(e.target.checked)}
+                    />
+                    <span>Let it run the full width of the page</span>
+                  </label>
+                ) : null}
                 <label className="check">
                   <input
                     type="checkbox"
@@ -533,7 +546,10 @@ export default function SitePublish({
 
               <p className="provider-hint">
                 {withDesign
-                  ? "The design travels as a stylesheet inside each page, confined to the published content so it cannot restyle the rest of the site."
+                  ? "The design travels as a stylesheet inside each page, confined to the published content so it cannot restyle the rest of the site, and weighted so the theme cannot restyle it either." +
+                    (fullWidth
+                      ? " It will break out of the column the theme puts content in, which is what a full-bleed design needs and what a text page does not."
+                      : " It stays inside the column the theme puts content in. Tick the box above if the design is meant to run edge to edge.")
                   : "Without the design, the pages take on the look of the site they are joining, which is usually what you want when adding pages to a site that already exists."}
               </p>
               {asFront ? (
