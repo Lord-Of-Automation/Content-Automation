@@ -245,7 +245,16 @@ main.wide {
   margin-bottom: 0;
 }
 
-.field > label {
+/*
+ * The name above a field, not every label in one.
+ *
+ * A checkbox pill is a label too, and it is its own layout: a box, a gap and
+ * the words, centred on each other. This rule outranks .check, so where one
+ * sat directly in a field it was turned back into a block, the gap stopped
+ * applying because gap needs a flex box, and the words ended up against the
+ * checkbox and off its centre.
+ */
+.field > label:not(.check) {
   display: block;
   font-size: 12.5px;
   font-weight: 560;
