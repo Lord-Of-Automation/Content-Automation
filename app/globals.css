@@ -4240,108 +4240,7 @@ body:has(.bulkbar) main {
   }
 }
 
-/* ------------------------------------------------------------- page canvas
-
-   A generated page, rendered and typed into. Styles are scoped under .canvas
-   so a page's own headings and lists look like a web page rather than
-   inheriting the console's form styling. */
-.canvas {
-  padding: 22px 26px;
-  border: 1px solid var(--line-2);
-  border-radius: 9px;
-  background: var(--panel);
-  min-height: 320px;
-  max-height: 62vh;
-  overflow-y: auto;
-  color: var(--ink);
-  font-size: 15px;
-  line-height: 1.65;
-}
-
-.canvas.is-editable:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-
-.canvas > :first-child {
-  margin-top: 0;
-}
-
-.canvas > :last-child {
-  margin-bottom: 0;
-}
-
-.canvas h2 {
-  margin: 26px 0 10px;
-  font-size: 21px;
-  line-height: 1.3;
-}
-
-.canvas h3 {
-  margin: 20px 0 8px;
-  font-size: 17px;
-}
-
-.canvas h4 {
-  margin: 16px 0 6px;
-  font-size: 15px;
-}
-
-.canvas p {
-  margin: 0 0 14px;
-}
-
-.canvas ul,
-.canvas ol {
-  margin: 0 0 14px;
-  padding-left: 22px;
-}
-
-.canvas li {
-  margin-bottom: 6px;
-}
-
-.canvas a {
-  color: var(--accent);
-}
-
-.canvas img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 7px;
-}
-
-.canvas blockquote {
-  margin: 0 0 14px;
-  padding-left: 14px;
-  border-left: 3px solid var(--line-2);
-  color: var(--ink-2);
-}
-
-.canvas table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 14px;
-}
-
-.canvas th,
-.canvas td {
-  padding: 7px 9px;
-  border: 1px solid var(--line);
-  text-align: left;
-}
-
-/* An image with nothing behind it still has to be visible, or a broken path
-   looks like a page with a gap in it rather than a picture to fix. */
-.canvas img:not([src]),
-.canvas img[src=""] {
-  min-height: 60px;
-  background: var(--panel-2);
-  border: 1px dashed var(--line-2);
-}
-
-/* The label and the Visual/HTML switch on one line. */
+/* The label and the Edit/HTML switch on one line. */
 .editor-body-head {
   display: flex;
   align-items: center;
@@ -4481,53 +4380,6 @@ body:has(.bulkbar) main {
   }
 }
 
-/* The vocabulary the generated pages use, enough that the editing canvas does
-   not look broken beside the preview. Plainer than the real design on purpose:
-   this surface is for the words, and the preview beside it shows the look. */
-.canvas .lead {
-  font-size: 16.5px;
-  color: var(--ink-2);
-}
-
-.canvas .grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  padding: 0;
-  list-style: none;
-}
-
-.canvas .card {
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--panel-2);
-}
-
-.canvas .card > :last-child,
-.canvas .cta > :last-child {
-  margin-bottom: 0;
-}
-
-.canvas .cta {
-  margin-top: 22px;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel-2);
-}
-
-.canvas .btn {
-  display: inline-block;
-  padding: 8px 15px;
-  border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-weight: 600;
-  font-size: 13.5px;
-  text-decoration: none;
-}
-
 /* ---------------------------------------------------------- preview, expanded
 
    A preview at a third of the window is a preview of a layout, not of a page.
@@ -4620,34 +4472,30 @@ body:has(.bulkbar) main {
   flex-direction: column;
 }
 
+.preview-shell.is-full .ve-body {
+  flex: 1;
+  min-height: 0;
+}
+
 .preview-shell.is-full .preview-stage {
   flex: 1;
   min-height: 0;
 }
 
-/* The same icon sizing the rendered site uses, so the editing canvas does not
-   show a wall of full-width shapes where the preview shows icons. */
-.canvas svg {
-  vertical-align: middle;
-  max-width: 100%;
-}
-
-.canvas svg:not([width]):not([height]):not([class]) {
-  width: 24px;
-  height: 24px;
-  flex: none;
-}
-
-.canvas .btn > svg {
-  width: 16px;
-  height: 16px;
+.preview-shell.is-full .ve-body .ve-panel {
+  max-height: none;
+  align-self: stretch;
 }
 
 /* --------------------------------------------------------- visual editor
 
-   The page on the left, what is selected on the right. Two panes rather than a
-   floating panel: a panel that follows the selection covers the thing being
-   changed, which is the one part of the screen that has to stay visible. */
+   The page on the left, what is selected on the right. The page is the preview
+   itself, so a heading is resized against the header above it and the section
+   beside it, which is the only place that decision makes sense.
+
+   Two panes rather than a floating panel: a panel that follows the selection
+   covers the thing being changed, which is the one part of the screen that has
+   to stay visible. */
 .ve-bar {
   display: flex;
   align-items: center;
@@ -4656,7 +4504,7 @@ body:has(.bulkbar) main {
   margin-bottom: 10px;
 }
 
-.ve-bar .btn {
+.ve-widths {
   margin-left: auto;
 }
 
@@ -4666,9 +4514,15 @@ body:has(.bulkbar) main {
   gap: 16px;
 }
 
-.ve-body .canvas {
+.ve-body .preview-stage {
   flex: 1;
   min-width: 0;
+}
+
+/* The panel is as tall as the page beside it, so the two line up rather than
+   one trailing off under the other. */
+.ve-body .ve-panel {
+  max-height: 62vh;
 }
 
 .ve-panel {
@@ -4751,13 +4605,18 @@ body:has(.bulkbar) main {
   border-top: 1px solid var(--line);
 }
 
-/* The selected element, outlined in place.
-   An attribute rather than an overlay: an overlay has to be repositioned on
-   every scroll, resize and keystroke, and is wrong for a moment each time. */
-.canvas [data-chosen] {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-  border-radius: 2px;
+/* Under the page rather than beside it, once a column each leaves neither
+   wide enough to judge a layout in. */
+@media (max-width: 1100px) {
+  .ve-body {
+    flex-direction: column;
+  }
+
+  .ve-body .ve-panel {
+    flex: none;
+    width: 100%;
+    max-height: none;
+  }
 }
 
 @media (max-width: 1100px) {

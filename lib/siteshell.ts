@@ -415,11 +415,247 @@ document.addEventListener("click", function (e) {
 document.addEventListener("submit", function (e) { e.preventDefault(); });
 `;
 
+/**
+ * The editor, living inside the preview.
+ *
+ * Editing used to happen in a bare box under the preview: the words in one
+ * place, the site they belong to in another. Doing it in the page itself means
+ * a heading is resized against the header above it and the section beside it,
+ * which is the only context in which that decision makes sense.
+ *
+ * It has to be a script inside the frame because the frame is sandboxed
+ * without same-origin access, so nothing outside can reach its document. That
+ * is worth keeping: the page carries markup written by a model and may carry
+ * its own script, and neither should be a keystroke away from the console's
+ * session. So this runs in there, alone with the page, and talks to the panel
+ * outside through messages. The panel never touches the document and the
+ * document never reaches the console.
+ *
+ * Only <main> is editable. The header and footer are drawn from settings and
+ * from the shell design, and letting somebody type into them here would put
+ * changes somewhere nothing reads back.
+ */
+const EDIT_SCRIPT = `
+(function () {
+  var main = document.querySelector("main");
+  if (!main) return;
+  main.setAttribute("contenteditable", "true");
+  main.style.outline = "none";
+
+  var chosen = null;
+
+  // Which properties the panel shows. Sent with every selection so it can
+  // display what the element actually looks like rather than what was set.
+  var WATCHED = [
+    "fontSize", "fontWeight", "fontFamily", "color", "lineHeight",
+    "letterSpacing", "textAlign", "width", "height", "maxWidth",
+    "padding", "margin", "backgroundColor", "borderRadius", "border"
+  ];
+
+  function describe(el) {
+    var tag = el.tagName.toLowerCase();
+    var cls = (el.getAttribute("class") || "").trim().split(/\s+/)[0];
+    return cls ? tag + "." + cls : tag;
+  }
+
+  function announce() {
+    if (!chosen || !main.contains(chosen)) {
+      parent.postMessage({ preview: "selected", element: null }, "*");
+      return;
+    }
+
+    var computed = getComputedStyle(chosen);
+    var styles = {};
+    for (var i = 0; i < WATCHED.length; i++) {
+      var key = WATCHED[i];
+      styles[key] = chosen.style[key] || computed[key] || "";
+    }
+
+    var path = [];
+    for (var node = chosen; node && node !== main; node = node.parentElement) {
+      path.unshift(describe(node));
+    }
+
+    parent.postMessage({
+      preview: "selected",
+      element: {
+        label: describe(chosen),
+        path: path,
+        isImage: chosen.tagName === "IMG",
+        isLink: chosen.tagName === "A",
+        src: chosen.getAttribute("src") || "",
+        alt: chosen.getAttribute("alt") || "",
+        href: chosen.getAttribute("href") || "",
+        styles: styles
+      }
+    }, "*");
+  }
+
+  function pick(el) {
+    if (chosen) chosen.removeAttribute("data-chosen");
+    chosen = el && el !== main ? el : null;
+    if (chosen) chosen.setAttribute("data-chosen", "");
+    announce();
+  }
+
+  var timer = null;
+  function report() {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(function () {
+      var copy = main.cloneNode(true);
+      var marked = copy.querySelectorAll("[data-chosen]");
+      for (var i = 0; i < marked.length; i++) marked[i].removeAttribute("data-chosen");
+      // The title is the renderer's, not the body's, so it is not part of
+      // what this hands back. It travels on its own message instead.
+      var h1 = copy.querySelector("h1[data-title]");
+      if (h1) h1.remove();
+      parent.postMessage({ preview: "html", html: copy.innerHTML }, "*");
+    }, 300);
+  }
+
+  document.addEventListener("click", function (e) {
+    // Nothing navigates while editing, including a link being selected.
+    e.preventDefault();
+    var el = e.target;
+    while (el && el !== main && el.nodeType !== 1) el = el.parentElement;
+    if (el && main.contains(el)) pick(el);
+  }, true);
+
+  document.addEventListener("selectionchange", function () {
+    var sel = document.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    var node = sel.anchorNode;
+    if (!node || !main.contains(node)) return;
+    var el = node.nodeType === 1 ? node : node.parentElement;
+    if (el && el !== chosen && main.contains(el)) pick(el);
+  });
+
+  var titleEl = main.querySelector("h1[data-title]");
+  var titleWas = titleEl ? titleEl.textContent : "";
+
+  main.addEventListener("input", function () {
+    // The heading at the top is the page's title, which the console keeps as a
+    // field of its own. Typing into it here has to reach that field, or the
+    // navigation and the meta title would go on saying the old one.
+    if (titleEl && titleEl.textContent !== titleWas) {
+      titleWas = titleEl.textContent;
+      parent.postMessage({ preview: "title", text: titleWas }, "*");
+    }
+    report();
+  });
+
+  main.addEventListener("paste", function (e) {
+    e.preventDefault();
+    document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
+  });
+
+  window.addEventListener("message", function (e) {
+    var m = e.data;
+    if (!m || m.preview !== "edit") return;
+
+    if (m.do === "style" && chosen) {
+      chosen.style[m.key] = m.value;
+    } else if (m.do === "attr" && chosen) {
+      if (m.value) chosen.setAttribute(m.name, m.value);
+      else chosen.removeAttribute(m.name);
+    } else if (m.do === "exec") {
+      main.focus();
+      document.execCommand(m.command, false, m.argument);
+    } else if (m.do === "delete" && chosen) {
+      var going = chosen;
+      pick(null);
+      going.remove();
+    } else if (m.do === "duplicate" && chosen) {
+      var copy = chosen.cloneNode(true);
+      copy.removeAttribute("data-chosen");
+      chosen.after(copy);
+    } else if (m.do === "up" && chosen && chosen.parentElement !== main) {
+      pick(chosen.parentElement);
+      return;
+    } else if (m.do === "replace") {
+      main.innerHTML = m.html;
+      pick(null);
+    }
+
+    announce();
+    report();
+  });
+
+  /*
+   * How the selection looks, written in here because nothing outside the frame
+   * can style what is inside it.
+   *
+   * An outline on an attribute rather than a floating overlay: an overlay has
+   * to be repositioned on every scroll, resize and keystroke, and is wrong for
+   * a moment each time.
+   */
+  var style = document.createElement("style");
+  style.textContent =
+    "[data-chosen]{outline:2px solid #2f6df6;outline-offset:1px}" +
+    "main [contenteditable],main{cursor:text}";
+  document.head.appendChild(style);
+
+  parent.postMessage({ preview: "ready" }, "*");
+})();
+`;
+
+/**
+ * A page's own scripts, parsed but not run.
+ *
+ * The editor reads the page back out of the frame after every keystroke, which
+ * means anything a script did to the page on the way in gets saved as if a
+ * person had written it. A tab strip that hides all but the first panel, a
+ * carousel that stamps positions onto its slides, a script that adds one class
+ * on load: come back tomorrow and the page is frozen in whatever state that
+ * left it, and the script is still there to do it again to the wreckage.
+ *
+ * So while editing they are given a type nothing executes. The browser still
+ * parses them as raw text, so what comes back out is byte for byte what went
+ * in, and the page is the markup that was written rather than the markup after
+ * it ran. Preview mode runs them for real, which is where you want to see them.
+ *
+ * The original type is kept aside rather than dropped, because a module and a
+ * plain script are not interchangeable and the page has to leave here as it
+ * arrived.
+ */
+const INERT_TYPE = "text/x-not-while-editing";
+
+export function inertScripts(html: string): string {
+  return html.replace(/<script(\s[^>]*)?>/gi, (_all, attrs?: string) => {
+    const kept = (attrs ?? "").replace(
+      /\stype\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/i,
+      (_m, value: string) => ` data-type=${value}`,
+    );
+    return `<script${kept} type="${INERT_TYPE}">`;
+  });
+}
+
+export function liveScripts(html: string): string {
+  return html.replace(/<script(\s[^>]*)?>/gi, (all, attrs?: string) => {
+    const had = attrs ?? "";
+    if (!had.includes(INERT_TYPE)) return all;
+    const kept = had
+      .replace(/\stype\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/i, "")
+      .replace(
+        /\sdata-type\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/i,
+        (_m, value: string) => ` type=${value}`,
+      );
+    return `<script${kept}>`;
+  });
+}
+
 export interface ShellOptions {
   /** Which page is being shown, so its nav entry can say so. */
   current: string;
   /** Whether links inside should tell the console to change page. */
   interactive?: boolean;
+  /**
+   * Whether the page can be edited in place.
+   *
+   * Replaces the navigation script rather than joining it: while editing,
+   * clicking a link selects it instead of going anywhere.
+   */
+  editing?: boolean;
   /**
    * Addresses as files rather than paths.
    *
@@ -628,11 +864,11 @@ ${design?.css ? `<style>${design.css}</style>` : ""}
 <body>
 ${header}
   <main class="wrap">
-    <h1>${escapeText(page.title)}</h1>
-    ${page.bodyHtml}
+    <h1 data-title>${escapeText(page.title)}</h1>
+    ${options.editing ? inertScripts(page.bodyHtml) : page.bodyHtml}
   </main>
 ${footer}
-${options.interactive ? `<script>${NAV_SCRIPT}</script>` : ""}
+${options.editing ? `<script>${EDIT_SCRIPT}</script>` : options.interactive ? `<script>${NAV_SCRIPT}</script>` : ""}
 </body>
 </html>`;
 }

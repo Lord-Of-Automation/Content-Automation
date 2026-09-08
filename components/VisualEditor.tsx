@@ -2,48 +2,41 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { cleanHtml } from "@/components/PageCanvas";
+import { liveScripts, renderPage, type ShellPage, type ShellSite } from "@/lib/siteshell";
 
 /**
- * Editing a page by pointing at it.
+ * Editing the page inside the page.
  *
- * The text editor before this let you rewrite the words and nothing else. A
- * page is not only words: it is what size they are, what colour, how much room
- * they have, and what sits beside them. Changing any of that meant opening the
- * markup, which is the thing an editor exists to avoid.
+ * The first version of this put an editing surface in a bare box beneath the
+ * preview: the words in one place, the site they belong to in another. A
+ * heading's size is a decision about how it sits against the header above it
+ * and the section beside it, and neither was visible while making it.
  *
- * How it works, and why it works this way:
+ * So the preview is the editor. The panel names what is selected and offers
+ * what it is made of; the page itself is where the pointing and the typing
+ * happen.
  *
- * The page is real HTML in a real contenteditable, not a block model. Blocks
- * are what a site builder uses when it owns the markup from the start; this
- * markup arrives written by something else, with its own classes and its own
- * stylesheet, and parsing that into blocks would lose most of it and mangle the
- * rest. So the document stays as it is and edits are made to it directly.
+ * It is driven over messages rather than by reaching in, because the frame is
+ * sandboxed without same-origin access and that is worth keeping: the page
+ * carries markup a model wrote and may carry its own script, and neither
+ * should be a keystroke away from the console's session. A small bridge runs
+ * inside the frame, alone with the page, and this talks to it. The panel never
+ * touches the document; the document never reaches the console.
  *
- * Selection follows the caret rather than being a mode of its own. Clicking
- * into a paragraph to type also selects that paragraph, so there is no
- * "select" tool to switch to and nothing to remember.
- *
- * Changes are written as inline styles. They win over the page's own
- * stylesheet, which is what somebody adjusting one heading means, and they
- * travel with the element if it moves. What the panel shows is the computed
- * value, so an untouched element reads what it actually looks like rather than
- * blank.
- *
- * Nothing here runs the page's own scripts or styles: the markup is cleaned on
- * the way in, exactly as the read-only canvas cleans it, because this surface
- * is the console and a script here would arrive holding the console's session.
+ * Only the body of the page is editable. The header and footer come from
+ * settings and from the shell design, and typing into them here would put
+ * changes somewhere nothing reads back — they have their own tab.
  */
 
-/** What the panel needs to know about whatever is selected. */
-interface Selected {
-  tag: string;
-  /** "h2.title", for the breadcrumb. */
+interface Chosen {
   label: string;
-  /** The trail from the page down to it, so a parent can be reached. */
   path: string[];
   isImage: boolean;
   isLink: boolean;
+  src: string;
+  alt: string;
+  href: string;
+  styles: Record<string, string>;
 }
 
 const FONTS: Array<[string, string]> = [
@@ -55,27 +48,32 @@ const FONTS: Array<[string, string]> = [
   ["'Trebuchet MS', 'Segoe UI', sans-serif", "Humanist"],
 ];
 
-const WEIGHTS = ["", "300", "400", "500", "600", "700", "800"];
-const ALIGNS = ["", "left", "center", "right"];
-
-/** A style property the panel can set, and how it is shown. */
 interface Control {
   key: string;
   label: string;
   kind: "length" | "colour" | "select" | "text";
   options?: Array<[string, string]>;
-  /** Suffix added when a bare number is typed, so "18" means 18px. */
   unit?: string;
 }
 
-const TYPOGRAPHY: Control[] = [
+const TYPE: Control[] = [
   { key: "fontSize", label: "Size", kind: "length", unit: "px" },
-  { key: "fontWeight", label: "Weight", kind: "select", options: WEIGHTS.map((w) => [w, w || "Inherit"]) },
+  {
+    key: "fontWeight",
+    label: "Weight",
+    kind: "select",
+    options: ["", "300", "400", "500", "600", "700", "800"].map((w) => [w, w || "Inherit"]),
+  },
   { key: "fontFamily", label: "Typeface", kind: "select", options: FONTS },
   { key: "color", label: "Colour", kind: "colour" },
   { key: "lineHeight", label: "Line height", kind: "text" },
   { key: "letterSpacing", label: "Letter spacing", kind: "length", unit: "px" },
-  { key: "textAlign", label: "Align", kind: "select", options: ALIGNS.map((a) => [a, a || "Inherit"]) },
+  {
+    key: "textAlign",
+    label: "Align",
+    kind: "select",
+    options: ["", "left", "center", "right"].map((a) => [a, a || "Inherit"]),
+  },
 ];
 
 const BOX: Control[] = [
@@ -100,468 +98,434 @@ function withUnit(value: string, unit?: string): string {
 function toHex(value: string): string {
   const m = value.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
   if (!m) return /^#[0-9a-f]{6}$/i.test(value) ? value : "#000000";
-  return (
-    "#" +
-    [m[1], m[2], m[3]]
-      .map((n) => Number(n).toString(16).padStart(2, "0"))
-      .join("")
-  );
-}
-
-function describe(el: Element): string {
-  const tag = el.tagName.toLowerCase();
-  const cls = (el.getAttribute("class") ?? "").trim().split(/\s+/).filter(Boolean)[0];
-  return cls ? `${tag}.${cls}` : tag;
+  return `#${[m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, "0")).join("")}`;
 }
 
 export default function VisualEditor({
-  html,
+  site,
+  pages,
+  current,
   editable,
   onChange,
+  onTitle,
+  onNavigate,
 }: {
-  html: string;
+  site: Omit<ShellSite, "pages">;
+  pages: ShellPage[];
+  /** The slug being edited. */
+  current: string;
   editable: boolean;
   onChange: (html: string) => void;
+  /** The heading is the title field, so typing in it lands here. */
+  onTitle: (title: string) => void;
+  onNavigate: (slug: string) => void;
 }) {
-  const host = useRef<HTMLDivElement>(null);
-  const chosen = useRef<HTMLElement | null>(null);
-  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const [selected, setSelected] = useState<Selected | null>(null);
-  const [tab, setTab] = useState<"text" | "box">("text");
-  /** Snapshots for undo, newest last. Capped: this is a rescue, not history. */
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [chosen, setChosen] = useState<Chosen | null>(null);
+  const [tab, setTab] = useState<"type" | "box">("type");
+  const [full, setFull] = useState(false);
+  const [size, setSize] = useState(0);
+  /** Snapshots for undo, newest last. A rescue, not a history. */
   const [past, setPast] = useState<string[]>([]);
 
-  useEffect(() => () => {
-    if (pending.current) clearTimeout(pending.current);
-  }, []);
-
-  // Same rule as the read-only canvas: filled once while editable, tracked
-  // while not, so a page arriving mid-build still appears.
-  useEffect(() => {
-    const el = host.current;
-    if (!el) return;
-    if (editable && el.innerHTML !== "") return;
-    const cleaned = cleanHtml(html);
-    if (el.innerHTML !== cleaned) el.innerHTML = cleaned;
-  }, [html, editable]);
-
-  /**
-   * The markup, with the editor's own marks taken back out.
-   *
-   * The selection outline is an attribute on the element rather than a floating
-   * overlay, because an overlay has to be repositioned on every scroll, resize
-   * and edit and is wrong for a moment each time. The cost is remembering to
-   * strip it, which happens here, in the one place the markup leaves.
-   */
-  const serialise = useCallback((): string => {
-    const el = host.current;
-    if (!el) return html;
-    const copy = el.cloneNode(true) as HTMLElement;
-    copy.querySelectorAll("[data-chosen]").forEach((n) => n.removeAttribute("data-chosen"));
-    return copy.innerHTML;
-  }, [html]);
-
-  const report = useCallback(
-    (immediate = false) => {
-      if (!editable) return;
-      if (pending.current) clearTimeout(pending.current);
-      const send = () => {
-        const next = serialise();
-        if (next !== html) onChange(next);
-      };
-      if (immediate) send();
-      else pending.current = setTimeout(send, 250);
-    },
-    [editable, html, onChange, serialise],
+  const page = useMemo(
+    () => pages.find((p) => p.slug === current) ?? pages[0],
+    [pages, current],
   );
 
-  /** Remember where we were, before changing anything. */
-  const remember = useCallback(() => {
-    setPast((rows) => [...rows, serialise()].slice(-40));
-  }, [serialise]);
+  /**
+   * What has to change before the frame is worth loading again.
+   *
+   * Reloading is the expensive thing here, and not in cycles: it throws away
+   * the caret, the selection and the scroll position, so doing it on every
+   * keystroke would make the page impossible to type into. Content is
+   * deliberately absent from this. Edits travel outward the moment they happen
+   * and the frame already shows them, so re-rendering would only redraw what
+   * is on screen and lose the cursor doing it.
+   *
+   * Titles are absent for the same reason, even though the navigation is built
+   * from them: typing into the heading would reload the page it is being typed
+   * into. So a renamed page keeps its old label in the navigation until
+   * something else brings the frame back, which is a small staleness in
+   * exchange for a heading that can be edited at all.
+   *
+   * A string rather than a list of dependencies, because the site arrives as a
+   * fresh object every render and comparing it by identity would reload
+   * constantly.
+   */
+  const signature = JSON.stringify([
+    current,
+    editable,
+    site.name,
+    site.tagline,
+    site.language,
+    site.design,
+    site.header,
+    site.footer,
+    site.theme,
+    pages.map((p) => p.slug),
+  ]);
 
-  /** Mark an element as the one being worked on, and describe it upward. */
-  const choose = useCallback((el: HTMLElement | null) => {
-    const root = host.current;
-    if (!root) return;
-
-    root.querySelectorAll("[data-chosen]").forEach((n) => n.removeAttribute("data-chosen"));
-    chosen.current = el;
-
-    if (!el || el === root) {
-      setSelected(null);
-      return;
-    }
-
-    el.setAttribute("data-chosen", "");
-
-    const path: string[] = [];
-    for (let node: Element | null = el; node && node !== root; node = node.parentElement) {
-      path.unshift(describe(node));
-    }
-
-    setSelected({
-      tag: el.tagName.toLowerCase(),
-      label: describe(el),
-      path,
-      isImage: el.tagName === "IMG",
-      isLink: el.tagName === "A",
+  const html = useMemo(() => {
+    if (!page) return "";
+    return renderPage({ ...site, pages }, page, {
+      current,
+      editing: editable,
+      interactive: !editable,
+      year: new Date().getFullYear(),
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature]);
+
+  const send = useCallback((message: Record<string, unknown>) => {
+    frame.current?.contentWindow?.postMessage({ preview: "edit", ...message }, "*");
   }, []);
 
-  /**
-   * Selection follows the caret.
-   *
-   * Listening on the document rather than the element, because the browser
-   * moves the caret for arrow keys and clicks alike and only the document is
-   * told about all of it.
-   */
   useEffect(() => {
-    if (!editable) return;
+    function onMessage(event: MessageEvent) {
+      if (event.source !== frame.current?.contentWindow) return;
+      const data = event.data as Record<string, unknown> | null;
+      if (!data) return;
 
-    function onSelectionChange() {
-      const root = host.current;
-      const sel = document.getSelection();
-      if (!root || !sel || sel.rangeCount === 0) return;
+      if (data.preview === "selected") {
+        setChosen((data.element as Chosen | null) ?? null);
+        return;
+      }
 
-      const node = sel.anchorNode;
-      if (!node || !root.contains(node)) return;
+      if (data.preview === "title") {
+        onTitle(String(data.text ?? "").trim());
+        return;
+      }
 
-      const el = node.nodeType === Node.ELEMENT_NODE ? (node as HTMLElement) : node.parentElement;
-      if (el && el !== chosen.current) choose(el);
+      if (data.preview === "html") {
+        // The page's own scripts went in with a type nothing executes, so what
+        // comes back is the markup as written rather than as it ran. Undo that
+        // before it is saved.
+        const next = liveScripts(String(data.html ?? ""));
+        if (next !== page?.bodyHtml) {
+          setPast((rows) => [...rows, page?.bodyHtml ?? ""].slice(-40));
+          onChange(next);
+        }
+        return;
+      }
+
+      // A link click while not editing, which is the plain preview's job.
+      if (data.preview === "go") {
+        const href = String(data.href ?? "").trim();
+        if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
+          if (/^https?:/i.test(href)) window.open(href, "_blank", "noopener,noreferrer");
+          return;
+        }
+        const slug = href
+          .replace(/[?#].*$/, "")
+          .replace(/^[./]+/, "")
+          .replace(/\.html?$/i, "")
+          .replace(/\/$/, "");
+        const wanted = slug === "index" ? "" : slug;
+        if (pages.some((p) => p.slug === wanted)) onNavigate(wanted);
+      }
     }
 
-    document.addEventListener("selectionchange", onSelectionChange);
-    return () => document.removeEventListener("selectionchange", onSelectionChange);
-  }, [editable, choose]);
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [onChange, onNavigate, onTitle, page?.bodyHtml, pages]);
 
-  /** What the panel should show for one property, computed when unset. */
-  const valueOf = useCallback((key: string): string => {
-    const el = chosen.current;
-    if (!el) return "";
-    const inline = (el.style as unknown as Record<string, string>)[key];
-    if (inline) return inline;
-    const computed = getComputedStyle(el)[key as keyof CSSStyleDeclaration];
-    return typeof computed === "string" ? computed : "";
-  }, []);
-
-  const apply = useCallback(
-    (key: string, value: string) => {
-      const el = chosen.current;
-      if (!el) return;
-      remember();
-      (el.style as unknown as Record<string, string>)[key] = value;
-      report(true);
-      // Re-read so the panel shows what was actually accepted.
-      setSelected((s) => (s ? { ...s } : s));
-    },
-    [remember, report],
-  );
-
-  /** Wrap or unwrap the current text selection. */
-  const format = useCallback(
-    (command: string, argument?: string) => {
-      if (!editable) return;
-      remember();
-      document.execCommand(command, false, argument);
-      report(true);
-    },
-    [editable, remember, report],
-  );
+  useEffect(() => {
+    if (!full) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFull(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [full]);
 
   const undo = useCallback(() => {
     setPast((rows) => {
       if (!rows.length) return rows;
       const previous = rows[rows.length - 1]!;
-      const el = host.current;
-      if (el) {
-        el.innerHTML = cleanHtml(previous);
-        choose(null);
-        onChange(previous);
-      }
+      send({ do: "replace", html: previous });
+      onChange(previous);
       return rows.slice(0, -1);
     });
-  }, [choose, onChange]);
+  }, [onChange, send]);
 
-  const remove = useCallback(() => {
-    const el = chosen.current;
-    if (!el || el === host.current) return;
-    remember();
-    el.remove();
-    choose(null);
-    report(true);
-  }, [choose, remember, report]);
+  if (!page) return <div className="empty">Nothing to edit yet.</div>;
 
-  const duplicate = useCallback(() => {
-    const el = chosen.current;
-    if (!el || el === host.current) return;
-    remember();
-    const copy = el.cloneNode(true) as HTMLElement;
-    copy.removeAttribute("data-chosen");
-    el.after(copy);
-    report(true);
-  }, [remember, report]);
-
-  /** Put a picture where the caret is, or change the one selected. */
-  const setImage = useCallback(
-    (src: string, alt: string) => {
-      const el = chosen.current;
-      remember();
-      if (el && el.tagName === "IMG") {
-        el.setAttribute("src", src);
-        el.setAttribute("alt", alt);
-      } else {
-        document.execCommand(
-          "insertHTML",
-          false,
-          `<img src="${src.replace(/"/g, "&quot;")}" alt="${alt.replace(/"/g, "&quot;")}">`,
-        );
-      }
-      report(true);
-    },
-    [remember, report],
-  );
-
-  const controls = tab === "text" ? TYPOGRAPHY : BOX;
-
-  const crumbs = useMemo(() => selected?.path ?? [], [selected]);
+  const controls = tab === "type" ? TYPE : BOX;
 
   return (
-    <div className="ve">
+    <div className={full ? "ve preview-shell is-full" : "ve preview-shell"}>
       <div className="ve-bar">
-        <div className="seg seg-sm">
-          {(["B", "I", "U"] as const).map((mark, i) => (
-            <button
-              key={mark}
-              type="button"
-              className="seg-btn"
-              title={["Bold", "Italic", "Underline"][i]}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => format(["bold", "italic", "underline"][i]!)}
-              disabled={!editable}
-            >
-              <span style={{ fontWeight: mark === "B" ? 700 : 500, fontStyle: mark === "I" ? "italic" : "normal", textDecoration: mark === "U" ? "underline" : "none" }}>
-                {mark}
-              </span>
-            </button>
-          ))}
-        </div>
+        {editable ? (
+          <>
+            <div className="seg seg-sm">
+              {(["bold", "italic", "underline"] as const).map((command, i) => (
+                <button
+                  key={command}
+                  type="button"
+                  className="seg-btn"
+                  title={command[0]!.toUpperCase() + command.slice(1)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => send({ do: "exec", command })}
+                >
+                  {["B", "I", "U"][i]}
+                </button>
+              ))}
+            </div>
 
-        <div className="seg seg-sm">
-          {(["p", "h2", "h3", "h4"] as const).map((block) => (
-            <button
-              key={block}
-              type="button"
-              className="seg-btn"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => format("formatBlock", block)}
-              disabled={!editable}
-            >
-              {block === "p" ? "Text" : block.toUpperCase()}
-            </button>
-          ))}
-        </div>
+            <div className="seg seg-sm">
+              {(["p", "h2", "h3", "h4"] as const).map((block) => (
+                <button
+                  key={block}
+                  type="button"
+                  className="seg-btn"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => send({ do: "exec", command: "formatBlock", argument: block })}
+                >
+                  {block === "p" ? "Text" : block.toUpperCase()}
+                </button>
+              ))}
+            </div>
 
-        <div className="seg seg-sm">
-          <button
-            type="button"
-            className="seg-btn"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
-              const url = window.prompt("Link to where?");
-              if (url) format("createLink", url);
-            }}
-            disabled={!editable}
-          >
-            Link
-          </button>
-          <button
-            type="button"
-            className="seg-btn"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
-              const src = window.prompt("Image address");
-              if (!src) return;
-              setImage(src, window.prompt("Describe it, for anyone who cannot see it") ?? "");
-            }}
-            disabled={!editable}
-          >
-            Image
-          </button>
+            <div className="seg seg-sm">
+              <button
+                type="button"
+                className="seg-btn"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  const url = window.prompt("Link to where?");
+                  if (url) send({ do: "exec", command: "createLink", argument: url });
+                }}
+              >
+                Link
+              </button>
+              <button
+                type="button"
+                className="seg-btn"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  const src = window.prompt("Image address");
+                  if (!src) return;
+                  const alt = window.prompt("Describe it, for anyone who cannot see it") ?? "";
+                  send({
+                    do: "exec",
+                    command: "insertHTML",
+                    argument: `<img src="${src.replace(/"/g, "&quot;")}" alt="${alt.replace(/"/g, "&quot;")}">`,
+                  });
+                }}
+              >
+                Image
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={undo}
+              disabled={!past.length}
+            >
+              Undo
+            </button>
+          </>
+        ) : null}
+
+        <div className="seg seg-sm ve-widths">
+          {([["Fit", 0], ["Phone", 390], ["Tablet", 820], ["Laptop", 1280]] as const).map(
+            ([label, width]) => (
+              <button
+                key={label}
+                type="button"
+                className={size === width ? "seg-btn is-on" : "seg-btn"}
+                onClick={() => setSize(width)}
+              >
+                {label}
+              </button>
+            ),
+          )}
         </div>
 
         <button
           type="button"
           className="btn btn-ghost btn-sm"
-          onClick={undo}
-          disabled={!past.length}
-          title="Undo the last change"
+          onClick={() => setFull((v) => !v)}
         >
-          Undo
+          {full ? "Leave full screen" : "Full screen"}
         </button>
       </div>
 
       <div className="ve-body">
-        <div
-          ref={host}
-          className={editable ? "canvas is-editable" : "canvas"}
-          contentEditable={editable}
-          suppressContentEditableWarning
-          spellCheck
-          onInput={() => report()}
-          onBlur={() => report(true)}
-          onPaste={(e) => {
-            if (!editable) return;
-            e.preventDefault();
-            document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
-          }}
-        />
+        <div className={size ? "preview-stage is-sized" : "preview-stage"}>
+          <iframe
+            ref={frame}
+            className="site-preview"
+            title={editable ? "Editing the page" : "Website preview"}
+            style={size ? { width: `${size}px`, flex: "0 0 auto" } : undefined}
+            // Scripts, so the bridge and the navigation work. No same-origin,
+            // so the frame is its own origin and can reach nothing here.
+            sandbox="allow-scripts"
+            srcDoc={html}
+          />
+        </div>
 
-        <aside className="ve-panel">
-          {!selected ? (
-            <p className="provider-hint">
-              Click anything on the page to change how it looks. Typing works
-              wherever the cursor is.
-            </p>
-          ) : (
-            <>
-              <div className="ve-crumbs">
-                {crumbs.map((name, i) => (
-                  <button
-                    key={`${name}-${i}`}
-                    type="button"
-                    className={i === crumbs.length - 1 ? "ve-crumb is-on" : "ve-crumb"}
-                    title="Select this one instead"
-                    onClick={() => {
-                      // Walk up from the current element by however many steps
-                      // separate it from the crumb that was clicked.
-                      let el = chosen.current;
-                      for (let up = crumbs.length - 1 - i; up > 0 && el; up -= 1) {
-                        el = el.parentElement;
-                      }
-                      choose(el ?? null);
-                    }}
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-
-              <div className="seg seg-sm ve-tabs">
-                <button
-                  type="button"
-                  className={tab === "text" ? "seg-btn is-on" : "seg-btn"}
-                  onClick={() => setTab("text")}
-                >
-                  Type
-                </button>
-                <button
-                  type="button"
-                  className={tab === "box" ? "seg-btn is-on" : "seg-btn"}
-                  onClick={() => setTab("box")}
-                >
-                  Box
-                </button>
-              </div>
-
-              {selected.isImage ? (
-                <div className="ve-field">
-                  <label className="field-label">Image address</label>
-                  <input
-                    type="text"
-                    defaultValue={chosen.current?.getAttribute("src") ?? ""}
-                    onBlur={(e) => {
-                      remember();
-                      chosen.current?.setAttribute("src", e.target.value);
-                      report(true);
-                    }}
-                  />
-                  <label className="field-label">Description</label>
-                  <input
-                    type="text"
-                    defaultValue={chosen.current?.getAttribute("alt") ?? ""}
-                    onBlur={(e) => {
-                      remember();
-                      chosen.current?.setAttribute("alt", e.target.value);
-                      report(true);
-                    }}
-                  />
-                </div>
-              ) : null}
-
-              {selected.isLink ? (
-                <div className="ve-field">
-                  <label className="field-label">Links to</label>
-                  <input
-                    type="text"
-                    defaultValue={chosen.current?.getAttribute("href") ?? ""}
-                    onBlur={(e) => {
-                      remember();
-                      chosen.current?.setAttribute("href", e.target.value);
-                      report(true);
-                    }}
-                  />
-                </div>
-              ) : null}
-
-              {controls.map((control) => (
-                <div className="ve-field" key={control.key}>
-                  <label className="field-label">{control.label}</label>
-                  {control.kind === "select" ? (
-                    <select
-                      value={valueOf(control.key)}
-                      onChange={(e) => apply(control.key, e.target.value)}
+        {editable ? (
+          <aside className="ve-panel">
+            {!chosen ? (
+              <p className="provider-hint">
+                Click anything in the page to change how it looks. Typing works
+                wherever the cursor is. The header and footer have their own
+                tab.
+              </p>
+            ) : (
+              <>
+                <div className="ve-crumbs">
+                  {chosen.path.map((name, i) => (
+                    <button
+                      key={`${name}-${i}`}
+                      type="button"
+                      className={i === chosen.path.length - 1 ? "ve-crumb is-on" : "ve-crumb"}
+                      title="Select what contains it"
+                      onClick={() => {
+                        for (let up = chosen.path.length - 1 - i; up > 0; up -= 1) {
+                          send({ do: "up" });
+                        }
+                      }}
                     >
-                      {(control.options ?? []).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : control.kind === "colour" ? (
-                    <div className="ve-colour">
+                      {name}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="seg seg-sm ve-tabs">
+                  <button
+                    type="button"
+                    className={tab === "type" ? "seg-btn is-on" : "seg-btn"}
+                    onClick={() => setTab("type")}
+                  >
+                    Type
+                  </button>
+                  <button
+                    type="button"
+                    className={tab === "box" ? "seg-btn is-on" : "seg-btn"}
+                    onClick={() => setTab("box")}
+                  >
+                    Box
+                  </button>
+                </div>
+
+                {chosen.isImage ? (
+                  <>
+                    <div className="ve-field">
+                      <label className="field-label">Image address</label>
                       <input
-                        type="color"
-                        className="colour-input"
-                        value={toHex(valueOf(control.key))}
-                        onChange={(e) => apply(control.key, e.target.value)}
+                        type="text"
+                        defaultValue={chosen.src}
+                        key={`src-${chosen.src}`}
+                        onBlur={(e) => send({ do: "attr", name: "src", value: e.target.value })}
                       />
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => apply(control.key, "")}
-                        title="Back to whatever the page says"
-                      >
-                        Clear
-                      </button>
                     </div>
-                  ) : (
+                    <div className="ve-field">
+                      <label className="field-label">Description</label>
+                      <input
+                        type="text"
+                        defaultValue={chosen.alt}
+                        key={`alt-${chosen.alt}`}
+                        onBlur={(e) => send({ do: "attr", name: "alt", value: e.target.value })}
+                      />
+                    </div>
+                  </>
+                ) : null}
+
+                {chosen.isLink ? (
+                  <div className="ve-field">
+                    <label className="field-label">Links to</label>
                     <input
                       type="text"
-                      defaultValue={valueOf(control.key)}
-                      key={`${selected.label}-${control.key}-${valueOf(control.key)}`}
-                      placeholder="inherit"
-                      onBlur={(e) => apply(control.key, withUnit(e.target.value, control.unit))}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                      }}
+                      defaultValue={chosen.href}
+                      key={`href-${chosen.href}`}
+                      onBlur={(e) => send({ do: "attr", name: "href", value: e.target.value })}
                     />
-                  )}
-                </div>
-              ))}
+                  </div>
+                ) : null}
 
-              <div className="ve-actions">
-                <button type="button" className="btn btn-ghost btn-sm" onClick={duplicate}>
-                  Duplicate
-                </button>
-                <button type="button" className="btn btn-danger btn-sm" onClick={remove}>
-                  Delete
-                </button>
-              </div>
-            </>
-          )}
-        </aside>
+                {controls.map((control) => {
+                  const value = chosen.styles[control.key] ?? "";
+                  return (
+                    <div className="ve-field" key={control.key}>
+                      <label className="field-label">{control.label}</label>
+                      {control.kind === "select" ? (
+                        <select
+                          value={value}
+                          onChange={(e) =>
+                            send({ do: "style", key: control.key, value: e.target.value })
+                          }
+                        >
+                          {(control.options ?? []).map(([v, label]) => (
+                            <option key={v} value={v}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : control.kind === "colour" ? (
+                        <div className="ve-colour">
+                          <input
+                            type="color"
+                            className="colour-input"
+                            value={toHex(value)}
+                            onChange={(e) =>
+                              send({ do: "style", key: control.key, value: e.target.value })
+                            }
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => send({ do: "style", key: control.key, value: "" })}
+                            title="Back to whatever the page says"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      ) : (
+                        <input
+                          type="text"
+                          defaultValue={value}
+                          key={`${chosen.label}-${control.key}-${value}`}
+                          placeholder="inherit"
+                          onBlur={(e) =>
+                            send({
+                              do: "style",
+                              key: control.key,
+                              value: withUnit(e.target.value, control.unit),
+                            })
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                          }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+
+                <div className="ve-actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => send({ do: "duplicate" })}
+                  >
+                    Duplicate
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-sm"
+                    onClick={() => send({ do: "delete" })}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </>
+            )}
+          </aside>
+        ) : null}
       </div>
     </div>
   );

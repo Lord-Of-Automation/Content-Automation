@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { hasBehaviour } from "@/components/PageCanvas";
 import VisualEditor from "@/components/VisualEditor";
+import { hasBehaviour } from "@/lib/pagehtml";
 import SitePreview from "@/components/SitePreview";
 import { Select } from "@/components/Select";
 
@@ -173,11 +173,13 @@ export default function WebsiteEditor({ id }: { id: string }) {
    */
   const [view, setView] = useState<"visual" | "code">("visual");
   /**
-   * Whether the preview sits beside the editor.
+   * Whether the page is shown at all.
    *
    * On by default, and a pane rather than a mode. It was a third tab, which
    * meant seeing the result and changing it were two things you switched
    * between — so nobody looked at the result until they had stopped editing.
+   * Now it is also where the editing happens, so turning it off falls back to
+   * the HTML rather than leaving nothing to work with.
    */
   const [showPreview, setShowPreview] = useState(true);
 
@@ -291,6 +293,15 @@ export default function WebsiteEditor({ id }: { id: string }) {
     setDirty(true);
     setSaved(false);
   }
+
+  /**
+   * Whether the page can be typed into, rather than only looked at.
+   *
+   * Not while it is still being written: the build replaces pages as it
+   * finishes them, and an edit made against a page about to be overwritten is
+   * an edit thrown away without saying so.
+   */
+  const editing = view === "visual" && site?.status !== "building";
 
   const counts = useMemo(
     () => ({
@@ -715,10 +726,64 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     reads well beats a short one that does not.
                   </p>
 
+                  {/*
+                    * The HTML, for when the page is easier to say than to point
+                    * at. Editing by hand happens up in the page itself; this is
+                    * the same content with the tags showing.
+                    *
+                    * Shown when asked for, and whenever the page above is not
+                    * there to type into, so there is always a way in.
+                    */}
+                  {view === "code" || !showPreview ? (
+                    <>
+                      <div className="editor-body-head">
+                        <label className="field-label" htmlFor="page-body">
+                          Page content
+                        </label>
+                        {showPreview ? null : (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setShowPreview(true)}
+                          >
+                            Edit in the page
+                          </button>
+                        )}
+                      </div>
+                      <textarea
+                        id="page-body"
+                        className="editor-body"
+                        rows={22}
+                        spellCheck
+                        value={page.bodyHtml}
+                        onChange={(e) => change({ bodyHtml: e.target.value })}
+                      />
+                      <p className="provider-hint">
+                        HTML, because that is what was written and what
+                        WordPress will take. Images go in as ordinary img tags
+                        for now; the picture library comes with hosting.
+                      </p>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {/*
+                * The page, and the place you edit it.
+                *
+                * These used to be two things: a preview across the top and an
+                * editing box underneath. Which meant deciding a heading's size
+                * in a bare box, with the header it sits under and the section
+                * it sits beside both somewhere else on the screen. So the
+                * preview is where the editing happens, and there is one page
+                * rather than two versions of one.
+                */}
+              {showPreview && page ? (
+                <aside className="editor-preview">
                   <div className="editor-body-head">
-                    <label className="field-label" htmlFor="page-body">
-                      Page content
-                    </label>
+                    <span className="field-label">
+                      {editing ? "Editing the page" : "Live preview"}
+                    </span>
                     <div className="seg seg-sm">
                       <button
                         type="button"
@@ -735,54 +800,6 @@ export default function WebsiteEditor({ id }: { id: string }) {
                         HTML
                       </button>
                     </div>
-                  </div>
-
-                  {view === "visual" ? (
-                    <>
-                      <VisualEditor
-                        key={`${site.id}-${at}`}
-                        html={page.bodyHtml}
-                        editable={site.status !== "building"}
-                        onChange={(bodyHtml) => change({ bodyHtml })}
-                      />
-                      <p className="provider-hint">
-                        {site.status === "building"
-                          ? "Read only while the site is still being written: a page that is rewritten under you would lose the edit."
-                          : "Click anything to select it, then change its type, colour, spacing or size on the right. Typing works wherever the cursor is. Save changes writes it down."}
-                      </p>
-                      {hasBehaviour(page.bodyHtml) ? (
-                        <p className="provider-hint">
-                          This page carries a script or its own styles. They are
-                          not run here, because this view is part of the console;
-                          the preview beside it runs them, in a frame that can
-                          reach nothing. Your edits keep them either way.
-                        </p>
-                      ) : null}
-                    </>
-                  ) : (
-                    <>
-                      <textarea
-                        id="page-body"
-                        className="editor-body"
-                        rows={22}
-                        spellCheck
-                        value={page.bodyHtml}
-                        onChange={(e) => change({ bodyHtml: e.target.value })}
-                      />
-                      <p className="provider-hint">
-                        HTML, because that is what was written and what
-                        WordPress will take. Images go in as ordinary img tags
-                        for now; the picture library comes with hosting.
-                      </p>
-                    </>
-                  )}
-                </div>
-              ) : null}
-
-              {showPreview && page ? (
-                <aside className="editor-preview">
-                  <div className="editor-body-head">
-                    <span className="field-label">Live preview</span>
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
@@ -791,7 +808,8 @@ export default function WebsiteEditor({ id }: { id: string }) {
                       Hide
                     </button>
                   </div>
-                  <SitePreview
+                  <VisualEditor
+                    key={`${site.id}-${at}-${editing ? "edit" : "read"}`}
                     site={{
                       name,
                       tagline,
@@ -803,16 +821,28 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     }}
                     pages={pages}
                     current={page.slug}
+                    editable={editing}
+                    onChange={(bodyHtml) => change({ bodyHtml })}
+                    onTitle={(title) => change({ title })}
                     onNavigate={(slug) => {
                       const to = pages.findIndex((p) => p.slug === slug);
                       if (to >= 0) setAt(to);
                     }}
                   />
                   <p className="provider-hint">
-                    The whole site, header and footer included, updating as you
-                    type. The navigation works. This is the document the
-                    download writes to a file.
+                    {site.status === "building"
+                      ? "Read only while the site is still being written: a page that is rewritten under you would lose the edit."
+                      : editing
+                        ? "Click anything in the page to select it, then change its type, colour, spacing or size on the right. Typing works wherever the cursor is. The header and footer have their own tab. Save changes writes it down."
+                        : "The whole site, header and footer included. The navigation works, and anything the page does for itself runs here. This is the document the download writes to a file."}
                   </p>
+                  {editing && hasBehaviour(page.bodyHtml) ? (
+                    <p className="provider-hint">
+                      This page carries a script or its own styles. They run
+                      here as they will once it is hosted, in a frame that can
+                      reach nothing of the console. Your edits keep them.
+                    </p>
+                  ) : null}
                 </aside>
               ) : null}
             </div>
