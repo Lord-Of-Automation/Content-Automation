@@ -181,7 +181,7 @@ nav.site a:hover { color: var(--ink); background: var(--panel); }
 nav.site a.is-here { color: var(--ink); background: var(--tint); font-weight: 600; }
 
 /* ------------------------------------------------------------------ type */
-main.wrap { padding-top: 56px; padding-bottom: 24px; }
+.wrap.is-page { padding-top: 56px; padding-bottom: 24px; }
 h1 {
   font-size: clamp(34px, 5.2vw, 50px);
   line-height: 1.08; letter-spacing: -0.033em;
@@ -262,7 +262,7 @@ img:not([src]), img[src=""] {
 
 @media (max-width: 640px) {
   body { font-size: 16px; }
-  main.wrap { padding-top: 36px; }
+  .wrap.is-page { padding-top: 36px; }
   .brand-tagline { display: none; }
   header.site .wrap { min-height: 60px; gap: 14px; }
 }
@@ -290,7 +290,7 @@ function guards(): string {
    Emitted after any header design, so a header cannot restyle the pages. A
    designed shell is given the run of its own markup and none of this. */
 /* The opening paragraph, whether or not it was labelled one. */
-.lead, main.wrap > p:first-of-type {
+.lead, .wrap.is-page > p:first-of-type {
   font-size: 20px; line-height: 1.6; color: var(--muted);
   margin-bottom: 26px;
 }
@@ -903,7 +903,7 @@ ${design?.css ? `<style>${design.css}</style>` : ""}
 </head>
 <body>
 ${header}
-  <main class="wrap">
+  <main class="wrap is-page">
     <h1 data-title>${escapeText(page.title)}</h1>
     ${options.editing ? inertScripts(page.bodyHtml) : page.bodyHtml}
   </main>

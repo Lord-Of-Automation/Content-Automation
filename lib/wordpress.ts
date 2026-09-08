@@ -440,14 +440,31 @@ export function pageContent(
    * will then have opinions about.
    */
   const inner = sheet.trim()
-    ? `<main class="wrap">\n${page.bodyHtml}\n</main>`
+    ? `<div class="wrap is-page">\n${page.bodyHtml}\n</div>`
     : page.bodyHtml;
 
-  const body = [`<div class="${WRAP_CLASS}">`, chrome.header, inner, chrome.footer, "</div>"]
+  const markup = [`<div class="${WRAP_CLASS}">`, chrome.header, inner, chrome.footer, "</div>"]
     .filter(Boolean)
     .join("\n");
 
-  if (!sheet.trim()) return body;
+  /*
+   * Handed over as a block, not as loose markup.
+   *
+   * WordPress runs wpautop over anything that is not block content, inserting
+   * paragraph tags and line breaks wherever it decides a person forgot them. On
+   * a page of prose that is a kindness; on a rendered site it is a stranger
+   * rewriting the markup. Declaring it as an HTML block puts it through
+   * verbatim, and has the side benefit of opening in the editor as a Custom
+   * HTML block, which is what it is, rather than as a wall of tags in a classic
+   * one.
+   *
+   * Everything goes inside, the stylesheet included. Half a payload in a block
+   * and half outside it is a page that is partly block content and partly not,
+   * which is the arrangement least likely to survive anything.
+   */
+  const block = (content: string) => `<!-- wp:html -->\n${content}\n<!-- /wp:html -->`;
+
+  if (!sheet.trim()) return block(markup);
 
   const takeover = options.fit === "canvas";
   /*
@@ -461,7 +478,7 @@ export function pageContent(
     ? canvas(options.background ?? "") + `${SCOPE}{max-width:none;width:auto;margin:0;padding:0}`
     : normalise(Boolean(options.fullWidth));
 
-  return `<style>\n${frame}\n${scopeCss(sheet, SCOPE)}\n</style>\n${body}`;
+  return block(`<style>\n${frame}\n${scopeCss(sheet, SCOPE)}\n</style>\n${markup}`);
 }
 
 /** WordPress needs a slug; the front page's is empty here. */
