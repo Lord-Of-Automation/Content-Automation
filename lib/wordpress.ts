@@ -164,13 +164,30 @@ function canvas(background: string): string {
      * naming them one at a time means missing the one that mattered. Reverting
      * takes them all back to what a browser would do with a bare div.
      *
-     * Weighted below the design's own rules, so the design still has the last
-     * word about anything it cares to mention.
+     * The layout properties then repeat themselves as important, which reverting
+     * alone cannot do for them.
+     *
+     * A block theme does not write its spacing in a stylesheet. It writes it on
+     * the element, as style="margin-top:var(--wp--preset--spacing--60)", and an
+     * inline style outranks every selector ever written — no amount of
+     * specificity reaches it, and `revert` does not either, since there is no
+     * earlier origin to revert an inline style to. Twenty Twenty-Five puts
+     * seventy pixels of margin on the main element and seventy of padding on
+     * the group inside it, and the first of those collapses out through the
+     * body: measured, the page began at seventy and the content at a hundred
+     * and forty, with every stylesheet insisting both were zero.
+     *
+     * Important is the only thing that outranks an inline style, and this is
+     * what it is for. It reaches nothing but the boxes wrapped around content
+     * we are publishing, on pages that are ours.
      */
     `body *:has(${SCOPE})` +
-      "{all:revert;display:block;width:auto;max-width:none;min-width:0;" +
-      "margin:0;padding:0;border:0;background:none;box-shadow:none;" +
-      "float:none;position:static;transform:none}",
+      "{all:revert;" +
+      "display:block!important;width:auto!important;max-width:none!important;" +
+      "min-width:0!important;min-height:0!important;" +
+      "margin:0!important;padding:0!important;border:0!important;" +
+      "background:none!important;box-shadow:none!important;gap:0!important;" +
+      "float:none!important;position:static!important;transform:none!important}",
 
     /*
      * The document, which the theme dresses too — and which WordPress dresses
