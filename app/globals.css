@@ -4537,14 +4537,24 @@ body:has(.bulkbar) main {
   min-height: 0;
 }
 
+/* The page fills the window, and the panel beside it does too.
+
+   The row these sit in starts its children at the top, which is right when the
+   editor is a pane in a page and wrong when it is the window: the panel had
+   been told to stretch and the page had not, so the page kept the height an
+   iframe has when nobody gives it one, and the rest of the window was empty. */
+.preview-shell.is-full .ve-body > * {
+  align-self: stretch;
+  min-height: 0;
+}
+
 .preview-shell.is-full .preview-stage {
   flex: 1;
-  min-height: 0;
+  min-width: 0;
 }
 
 .preview-shell.is-full .ve-body .ve-panel {
   max-height: none;
-  align-self: stretch;
 }
 
 /* --------------------------------------------------------- visual editor
