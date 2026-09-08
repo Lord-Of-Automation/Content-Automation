@@ -116,6 +116,7 @@ export async function POST(
     status?: string;
     withDesign?: boolean;
     fullWidth?: boolean;
+    fit?: string;
     frontPageId?: number;
     host?: string;
     label?: string;
@@ -180,6 +181,10 @@ export async function POST(
         status: body.status === "publish" ? "publish" : "draft",
         fallbackSlug: site.name,
         fullWidth: Boolean(body.fullWidth),
+        fit: body.fit === "canvas" ? "canvas" : "inside",
+        // The site's own background, needed only when the theme's is hidden
+        // along with everything else it draws.
+        background: site.theme?.background ?? "",
         // Only when publishing to the same place as last time. An id from
         // another site is another site's page.
         knownId:

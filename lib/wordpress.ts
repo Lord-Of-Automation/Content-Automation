@@ -65,6 +65,22 @@ const WEIGHT = 3;
 export const SCOPE = `.${WRAP_CLASS}`.repeat(WEIGHT);
 
 /**
+ * How much of the theme a published page keeps.
+ *
+ * "inside" leaves the page a page: the theme's header, footer and sidebar stay,
+ * the design applies to the content between them. Right when the pages are
+ * being added to a site that already exists and should go on looking like
+ * itself.
+ *
+ * "canvas" takes the page over. Everything the theme draws around the content
+ * is hidden, every box between the content and the document is flattened, and
+ * what is left is the generated design and nothing else. Right when the
+ * generated site *is* the site and the WordPress underneath it is only a place
+ * to put it.
+ */
+export type ThemeFit = "inside" | "canvas";
+
+/**
  * Undo what a theme does to the box our content lands in.
  *
  * A theme wraps post content in something of its own — `.entry-content`, or a
@@ -101,6 +117,68 @@ function normalise(fullWidth: boolean): string {
     `width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw);` +
     `padding-left:0;padding-right:0;overflow-x:clip}`
   );
+}
+
+/**
+ * Take the page over.
+ *
+ * Weighting a stylesheet gets the design to win the arguments it picks. It
+ * cannot win the ones it never has: a property the design does not set keeps
+ * whatever the theme gave it, and no amount of specificity removes a header,
+ * a footer or a sidebar that the theme renders around the content. A page that
+ * is meant to *be* the generated site cannot be a page inside a theme.
+ *
+ * So this hides everything that is not the content, and flattens everything
+ * between the content and the document.
+ *
+ * The one rule that does the hiding reads as: any element under the body that
+ * does not contain our wrapper, is not our wrapper, and is not inside it. That
+ * is precisely "everything off the path to the content" — a header, a sidebar,
+ * a related-posts block, a comment form, at any depth, without this having to
+ * know a single theme's class names. It is the one thing that could not be
+ * written before `:has()`, and is why this is possible at all.
+ *
+ * Guarded by @supports, so a browser without `:has()` gets the page inside the
+ * theme rather than a page with the wrong half hidden.
+ *
+ * The admin bar is spared. It is only ever drawn for somebody already signed
+ * in, so it changes nothing for a visitor, and hiding it would strand the one
+ * person who might want to edit the page they are looking at.
+ */
+function canvas(background: string): string {
+  const keep = ":not(#wpadminbar):not(#wpadminbar *)";
+
+  return [
+    "@supports selector(:has(*)){",
+
+    // Everything off the path to the content.
+    `body *:not(:has(${SCOPE})):not(${SCOPE}):not(${SCOPE} *)${keep}` +
+      "{display:none!important}",
+
+    /*
+     * The boxes between the content and the document, flattened.
+     *
+     * `revert` rather than a list of properties: what a theme puts on these is
+     * unbounded — a grid, a max width, a shadow, a border, a background — and
+     * naming them one at a time means missing the one that mattered. Reverting
+     * takes them all back to what a browser would do with a bare div.
+     *
+     * Weighted below the design's own rules, so the design still has the last
+     * word about anything it cares to mention.
+     */
+    `body *:has(${SCOPE})${keep}` +
+      "{all:revert;display:block;width:auto;max-width:none;min-width:0;" +
+      "margin:0;padding:0;border:0;background:none;box-shadow:none;" +
+      "float:none;position:static;transform:none}",
+
+    // And the document itself, which the theme also dresses.
+    `body{margin:0!important;padding:0!important;max-width:none!important;` +
+      `width:auto!important;` +
+      (background ? `background:${background}!important;` : "") +
+      `display:block!important}`,
+
+    "}",
+  ].join("");
 }
 
 export class WordPressError extends Error {
@@ -302,13 +380,20 @@ export interface PageResult {
 export function pageContent(
   page: WebsitePage,
   design: SiteDesign | null,
-  options: { fullWidth?: boolean } = {},
+  options: { fullWidth?: boolean; fit?: ThemeFit; background?: string } = {},
 ): string {
   const body = `<div class="${WRAP_CLASS}">\n${page.bodyHtml}\n</div>`;
   if (!design?.css?.trim()) return body;
 
+  const takeover = options.fit === "canvas";
+  // Taking the page over means it already runs the full width; asking for both
+  // would push the content off its own left edge.
+  const frame = takeover
+    ? canvas(options.background ?? "") + `${SCOPE}{max-width:none;width:auto;margin:0;padding:0}`
+    : normalise(Boolean(options.fullWidth));
+
   const css = scopeCss(design.css, SCOPE);
-  return `<style>\n${normalise(Boolean(options.fullWidth))}\n${css}\n</style>\n${body}`;
+  return `<style>\n${frame}\n${css}\n</style>\n${body}`;
 }
 
 /** WordPress needs a slug; the front page's is empty here. */
@@ -336,6 +421,10 @@ export interface PublishOne {
   fallbackSlug: string;
   /** Whether the design may break out of the theme's content column. */
   fullWidth?: boolean;
+  /** How much of the theme the page keeps. */
+  fit?: ThemeFit;
+  /** The site's own background, for when the theme's is hidden with the rest. */
+  background?: string;
   /** A page id from a previous publish, tried before searching by slug. */
   knownId?: number;
 }
@@ -387,7 +476,11 @@ export async function publishPage(options: PublishOne): Promise<PageResult> {
   const payload: Record<string, unknown> = {
     title: options.page.title,
     slug,
-    content: pageContent(options.page, options.design, { fullWidth: options.fullWidth }),
+    content: pageContent(options.page, options.design, {
+      fullWidth: options.fullWidth,
+      fit: options.fit,
+      background: options.background,
+    }),
     excerpt: options.page.metaDescription,
     status: options.status,
     menu_order: options.page.order,

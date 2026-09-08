@@ -82,10 +82,21 @@ export default function SitePublish({
   const [sources, setSources] = useState<Array<{ label: string; ok: boolean; note: string }>>([]);
   const [chosen, setChosen] = useState("");
   const [live, setLive] = useState(false);
-  const [withDesign, setWithDesign] = useState(true);
+  /**
+   * How much of the target's theme the published pages keep.
+   *
+   * One choice rather than a row of checkboxes, because the three answers are
+   * three different intentions and two of them could otherwise be ticked at
+   * once. "Theme" is adding pages to a site that should go on looking like
+   * itself; "canvas" is putting a generated site somewhere, where the WordPress
+   * underneath is a host and not a look.
+   */
+  const [fit, setFit] = useState<"theme" | "inside" | "canvas">("inside");
   const [asFront, setAsFront] = useState(false);
   /** Whether the design may escape the column the theme puts content in. */
   const [fullWidth, setFullWidth] = useState(false);
+
+  const withDesign = fit !== "theme";
 
   const [check, setCheck] = useState<Check | null>(null);
   const [checking, setChecking] = useState(false);
@@ -334,6 +345,7 @@ export default function SitePublish({
             status: live ? "publish" : "draft",
             withDesign,
             fullWidth,
+            fit: fit === "canvas" ? "canvas" : "inside",
           },
           found.home,
         );
@@ -507,6 +519,40 @@ export default function SitePublish({
 
           {ready ? (
             <>
+              <label className="field-label" htmlFor="publish-fit">
+                How it should look
+              </label>
+              <Select
+                id="publish-fit"
+                value={fit}
+                onChange={(value) => setFit(value as typeof fit)}
+                options={[
+                  {
+                    value: "canvas",
+                    label: "Exactly like the generated site",
+                    hint: "the theme steps aside",
+                  },
+                  {
+                    value: "inside",
+                    label: "The design, inside the theme",
+                    hint: "keeps the header and footer",
+                  },
+                  {
+                    value: "theme",
+                    label: "Like the rest of the target site",
+                    hint: "words only, no design",
+                  },
+                ]}
+              />
+
+              <p className="provider-hint">
+                {fit === "canvas"
+                  ? "The page becomes the generated site. On these pages only, the theme's header, footer and sidebar are hidden and everything it wraps the content in is flattened, so what is left is the design and nothing else. The rest of the site is untouched."
+                  : fit === "inside"
+                    ? "The design travels as a stylesheet inside each page, confined to the published content and weighted so the theme cannot overrule it. The theme's header and footer stay, and so does anything the design does not set."
+                    : "The pages take on the look of the site they are joining, which is what you want when adding pages to a site that already exists."}
+              </p>
+
               <div className="publish-options">
                 <label className="check">
                   <input
@@ -516,15 +562,7 @@ export default function SitePublish({
                   />
                   <span>Publish live rather than as drafts</span>
                 </label>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={withDesign}
-                    onChange={(e) => setWithDesign(e.target.checked)}
-                  />
-                  <span>Bring the generated design</span>
-                </label>
-                {withDesign ? (
+                {fit === "inside" ? (
                   <label className="check">
                     <input
                       type="checkbox"
@@ -543,15 +581,6 @@ export default function SitePublish({
                   <span>Make the first page the site&apos;s front page</span>
                 </label>
               </div>
-
-              <p className="provider-hint">
-                {withDesign
-                  ? "The design travels as a stylesheet inside each page, confined to the published content so it cannot restyle the rest of the site, and weighted so the theme cannot restyle it either." +
-                    (fullWidth
-                      ? " It will break out of the column the theme puts content in, which is what a full-bleed design needs and what a text page does not."
-                      : " It stays inside the column the theme puts content in. Tick the box above if the design is meant to run edge to edge.")
-                  : "Without the design, the pages take on the look of the site they are joining, which is usually what you want when adding pages to a site that already exists."}
-              </p>
               {asFront ? (
                 <p className="notice warn">
                   Changing the front page changes what visitors see when they
