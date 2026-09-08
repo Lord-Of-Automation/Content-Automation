@@ -308,9 +308,9 @@ async function call(
   base: string,
   path: string,
   auth: string,
-  init: RequestInit & { json?: unknown } = {},
+  init: RequestInit & { json?: unknown; timeoutMs?: number } = {},
 ): Promise<unknown> {
-  const { json, ...rest } = init;
+  const { json, timeoutMs, ...rest } = init;
 
   let response: Response;
   try {
@@ -325,7 +325,7 @@ async function call(
       body: json === undefined ? rest.body : JSON.stringify(json),
       cache: "no-store",
       redirect: "follow",
-      signal: AbortSignal.timeout(45_000),
+      signal: AbortSignal.timeout(timeoutMs ?? 45_000),
     });
   } catch (error) {
     const why = error instanceof Error ? error.message : String(error);
@@ -710,6 +710,155 @@ export async function publishPage(options: PublishOne): Promise<PageResult> {
     created: !existing,
     warnings,
   };
+}
+
+
+/**
+ * A picture already on the site.
+ *
+ * The site's own media library is where uploads go and where they are chosen
+ * from, which means the console keeps no images of its own. That falls out of
+ * where these sites live: every generated site is published into WordPress, and
+ * WordPress has had a media library, thumbnails and srcset since long before we
+ * turned up. Storing a second copy in the console would mean two places to keep
+ * in step, a bill, and images served from somewhere other than the site showing
+ * them.
+ *
+ * The cost of it is that a site with nowhere to be published has nowhere to put
+ * a picture either, which the editor says plainly rather than working around.
+ */
+export interface MediaItem {
+  id: number;
+  url: string;
+  alt: string;
+  title: string;
+  width: number;
+  height: number;
+  /** A small version to draw a grid with, or the full one when there is none. */
+  thumb: string;
+  at: string;
+}
+
+function asMedia(raw: Record<string, any>): MediaItem {
+  const sizes = raw?.media_details?.sizes ?? {};
+  const small = sizes.thumbnail ?? sizes.medium ?? null;
+  return {
+    id: Number(raw.id ?? 0),
+    url: String(raw.source_url ?? ""),
+    alt: String(raw.alt_text ?? ""),
+    title: String(raw.title?.rendered ?? raw.title ?? ""),
+    width: Number(raw?.media_details?.width ?? 0),
+    height: Number(raw?.media_details?.height ?? 0),
+    thumb: String(small?.source_url ?? raw.source_url ?? ""),
+    at: String(raw.date ?? ""),
+  };
+}
+
+export interface MediaPage {
+  items: MediaItem[];
+  /** How many pages there are, so the browser knows when to stop asking. */
+  pages: number;
+}
+
+/** What is already in the site's library, newest first. */
+export async function listMedia(
+  address: string,
+  user: string,
+  password: string,
+  options: { search?: string; page?: number; perPage?: number } = {},
+): Promise<MediaPage> {
+  const base = apiBase(address);
+  const auth = basic(user, password);
+
+  const query = new URLSearchParams({
+    media_type: "image",
+    per_page: String(options.perPage ?? 24),
+    page: String(Math.max(1, options.page ?? 1)),
+    orderby: "date",
+    order: "desc",
+    _fields: "id,source_url,alt_text,title,media_details,date",
+  });
+  if (options.search?.trim()) query.set("search", options.search.trim());
+
+  /*
+   * The page count is in a header, and a header is the one thing the shared
+   * reader throws away. Asked for directly here rather than teaching every
+   * other call about headers it has no use for.
+   */
+  const response = await fetch(`${base}/wp/v2/media?${query}`, {
+    headers: { authorization: auth, accept: "application/json" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(45_000),
+  });
+
+  if (!response.ok) {
+    const said = await response.text().catch(() => "");
+    throw new WordPressError(
+      `WordPress answered ${response.status} for its media library` +
+        (said ? `: ${said.slice(0, 200)}` : ""),
+      response.status,
+    );
+  }
+
+  const rows = (await response.json()) as Array<Record<string, any>>;
+  return {
+    items: Array.isArray(rows) ? rows.map(asMedia) : [],
+    pages: Number(response.headers.get("x-wp-totalpages") ?? 1) || 1,
+  };
+}
+
+/**
+ * Put a picture in the site's library.
+ *
+ * Sent as the file itself rather than as a form, which is the shape WordPress
+ * documents and the shorter of the two. The description follows in a second
+ * call: alt text is not part of an upload, it is a property of what the upload
+ * became, and a picture with no description is worse for a site whose whole
+ * purpose is being found.
+ */
+export async function uploadMedia(
+  address: string,
+  user: string,
+  password: string,
+  file: { name: string; type: string; bytes: ArrayBuffer; alt?: string; title?: string },
+): Promise<MediaItem> {
+  const base = apiBase(address);
+  const auth = basic(user, password);
+
+  const safe = file.name.replace(/[^\w.\-]+/g, "-").replace(/^-+|-+$/g, "") || "image";
+
+  const made = (await call(base, "/wp/v2/media", auth, {
+    method: "POST",
+    body: file.bytes,
+    headers: {
+      "content-type": file.type || "application/octet-stream",
+      "content-disposition": `attachment; filename="${safe}"`,
+    },
+    // A picture is bigger than a page and the far end has to write it to disk.
+    timeoutMs: 120_000,
+  })) as Record<string, any>;
+
+  if (!made?.id) {
+    throw new WordPressError("WordPress took the file but did not say what it became.");
+  }
+
+  if (file.alt?.trim() || file.title?.trim()) {
+    try {
+      const described = (await call(base, `/wp/v2/media/${made.id}`, auth, {
+        method: "POST",
+        json: {
+          ...(file.alt?.trim() ? { alt_text: file.alt.trim() } : {}),
+          ...(file.title?.trim() ? { title: file.title.trim() } : {}),
+        },
+      })) as Record<string, any>;
+      return asMedia(described);
+    } catch {
+      // The picture is up, which is the part that could fail expensively.
+      // Losing its description is worth reporting, not worth undoing.
+    }
+  }
+
+  return asMedia(made);
 }
 
 /**

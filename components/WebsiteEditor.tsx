@@ -939,6 +939,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     }}
                     // Full screen hides the rest of the editor, so it carries
                     // its own way to save and to publish.
+                    websiteId={site.id}
                     onSave={() => void save()}
                     onPublish={() => setSection("publish")}
                     dirty={dirty}

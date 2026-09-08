@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import MediaPicker from "@/components/MediaPicker";
 import { liveScripts, renderPage, type ShellPage, type ShellSite } from "@/lib/siteshell";
 
 /**
@@ -123,6 +124,7 @@ export default function VisualEditor({
   onNavigate,
   onSave,
   onPublish,
+  websiteId,
   dirty,
   saving,
 }: {
@@ -158,6 +160,8 @@ export default function VisualEditor({
    */
   onSave: () => void;
   onPublish: () => void;
+  /** Which website this is, so its own picture library can be opened. */
+  websiteId: string;
   dirty: boolean;
   saving: boolean;
 }) {
@@ -168,6 +172,8 @@ export default function VisualEditor({
   const [size, setSize] = useState(0);
   /** Snapshots for undo, newest last. A rescue, not a history. */
   const [past, setPast] = useState<string[]>([]);
+  /** Whether the picture library is open, and where what it returns should go. */
+  const [picking, setPicking] = useState(false);
 
   const page = useMemo(
     () => pages.find((p) => p.slug === current) ?? pages[0],
@@ -394,16 +400,7 @@ export default function VisualEditor({
                 type="button"
                 className="seg-btn"
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  const src = window.prompt("Image address");
-                  if (!src) return;
-                  const alt = window.prompt("Describe it, for anyone who cannot see it") ?? "";
-                  send({
-                    do: "exec",
-                    command: "insertHTML",
-                    argument: `<img src="${src.replace(/"/g, "&quot;")}" alt="${alt.replace(/"/g, "&quot;")}">`,
-                  });
-                }}
+                onClick={() => setPicking(true)}
               >
                 Image
               </button>
@@ -478,6 +475,28 @@ export default function VisualEditor({
           )}
         </button>
       </div>
+
+      {picking ? (
+        <MediaPicker
+          websiteId={websiteId}
+          onClose={() => setPicking(false)}
+          onPublish={() => {
+            setPicking(false);
+            setFull(false);
+            onPublish();
+          }}
+          onPick={(src, alt) => {
+            setPicking(false);
+            send({
+              do: "exec",
+              command: "insertHTML",
+              argument:
+                `<img src="${src.replace(/"/g, "&quot;")}" ` +
+                `alt="${alt.replace(/"/g, "&quot;")}">`,
+            });
+          }}
+        />
+      ) : null}
 
       <div className="ve-body">
         <div className={size ? "preview-stage is-sized" : "preview-stage"}>
