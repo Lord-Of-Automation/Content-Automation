@@ -395,12 +395,22 @@ select:focus {
   pointer-events: none;
 }
 
-.select-list {
+/* The panel, which is now more than the list: a long list carries a search box
+   above it, and the box has to stay put while the rows underneath scroll. */
+.select-popup {
   position: absolute;
   z-index: 40;
   top: calc(100% + 4px);
   left: 0;
   right: 0;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.select-list {
   margin: 0;
   padding: 4px;
   list-style: none;
@@ -408,11 +418,49 @@ select:focus {
      behind it is still there. */
   max-height: 264px;
   overflow-y: auto;
-  background: var(--panel);
-  border: 1px solid var(--line-2);
-  border-radius: 9px;
-  box-shadow: var(--shadow);
   outline: none;
+}
+
+.select-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* Its own borderless box rather than the form input style: it sits inside a
+   panel that already has a border, and a second one around it reads as a field
+   dropped into a menu. */
+.select-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.select-search-input::placeholder {
+  color: var(--ink-3);
+}
+
+/* How much of the list is left, which is the only sign that typing did
+   anything when every match is below the fold. */
+.select-count {
+  flex: none;
+  font-size: 11px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.select-empty {
+  padding: 12px 10px;
+  font-size: 12.5px;
+  color: var(--ink-3);
 }
 
 .select-option {

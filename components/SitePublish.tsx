@@ -347,6 +347,7 @@ export default function SitePublish({
             <Select
               id="publish-target"
               value={chosen}
+              searchPlaceholder="Search by name, domain or server"
               onChange={(value) => {
                 setChosen(value);
                 setCheck(null);
@@ -361,6 +362,10 @@ export default function SitePublish({
                   hint:
                     `${HOST_LABEL[t.host] ?? t.host} · ${t.domain || t.address}` +
                     (t.ready ? "" : " · no login saved"),
+                  // Searchable but not drawn: the server or plan it sits on,
+                  // and whether it is ready, are both worth typing and neither
+                  // fits on a line that already carries a domain.
+                  search: `${t.place} ${t.platform} ${t.ready ? "connected ready" : "unconnected"}`,
                 })),
               ]}
             />
