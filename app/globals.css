@@ -4183,11 +4183,17 @@ body:has(.bulkbar) main {
 
 .editor-pages {
   flex: 0 0 210px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
+/* A row in this list is a button, and buttons here are told never to wrap:
+   right for a label somebody chose, wrong for a title somebody wrote. A page
+   called "Mystake Casino Review - Everything You Need to Know" ran three
+   hundred pixels through a two hundred and ten pixel column and out the other
+   side, across the fields beside it. */
 .editor-page {
   display: flex;
   flex-direction: column;
@@ -4199,6 +4205,9 @@ body:has(.bulkbar) main {
   border-radius: 7px;
   cursor: pointer;
   text-align: left;
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
 }
 
 .editor-page:hover {
@@ -4210,16 +4219,31 @@ body:has(.bulkbar) main {
   border-color: var(--line-2);
 }
 
+/* Two lines of it, which is enough to tell one page from another, and then an
+   ellipsis. A title long enough to need three lines is one nobody is reading
+   here anyway — the whole of it is in the field to the right. */
 .editor-page-title {
   font-size: 13px;
   font-weight: 560;
   color: var(--ink);
+  max-width: 100%;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  /* A single unbroken word has nowhere to wrap, so it is allowed to break. */
+  overflow-wrap: anywhere;
 }
 
 .editor-page-slug {
   font-size: 11px;
   color: var(--ink-3);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* One line: an address is read from the start, so the end is what to lose. */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .editor-panel {
@@ -4804,6 +4828,9 @@ body:has(.bulkbar) main {
   gap: 4px 6px;
 }
 
+/* A chip names a page, and a page is named by whoever wrote it. The row it
+   sits in is a button, and buttons here never wrap, so a long name would run
+   out of the row rather than stop at the end of it. */
 .version-changes li {
   padding: 2px 7px;
   border-radius: 20px;
@@ -4811,6 +4838,10 @@ body:has(.bulkbar) main {
   border: 1px solid var(--line);
   font-size: 11px;
   color: var(--ink-2);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .version-changes .version-more {
