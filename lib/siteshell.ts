@@ -549,6 +549,22 @@ const EDIT_SCRIPT = `
       var field = el.hasAttribute("data-site-name") ? "name" : "tagline";
       var was = el.textContent;
       el.setAttribute("contenteditable", "true");
+      el.setAttribute("title", "Click to change the site's " + field);
+
+      /*
+       * A brand is nearly always a link, and a link is draggable.
+       *
+       * Pressing on draggable text starts a drag rather than a selection, so
+       * the caret never lands and the field reads as dead however editable it
+       * is. Turning that off for the anchors around these two is what makes
+       * them clickable at all; nothing else about the link changes, and it is
+       * not followed here anyway.
+       */
+      for (var up = el.parentElement; up; up = up.parentElement) {
+        if (up.tagName === "A") up.setAttribute("draggable", "false");
+        if (up.tagName === "HEADER" || up.tagName === "FOOTER") break;
+      }
+
       el.addEventListener("input", function () {
         if (el.textContent === was) return;
         was = el.textContent;
@@ -560,6 +576,71 @@ const EDIT_SCRIPT = `
       });
     })(settings[s]);
   }
+
+  /*
+   * Pressing the brand puts the cursor in the name.
+   *
+   * The name is a few words inside a logo link, usually beside an image, and
+   * aiming at the text is a smaller target than it looks. A press anywhere on
+   * the brand means the name, because there is nothing else in there to mean.
+   *
+   * Nothing is prevented here, deliberately. Preventing a mousedown stops the
+   * frame this runs in from taking focus at all, and a field focused inside an
+   * unfocused frame receives no typing — which looks exactly like a field that
+   * cannot be edited, and was. So the browser has its turn first and the caret
+   * is moved afterwards, once focus has landed wherever it was going to.
+   */
+  document.addEventListener("mousedown", function (e) {
+    var el = e.target;
+    while (el && el.nodeType !== 1) el = el.parentElement;
+    if (!el || main.contains(el)) return;
+
+    /*
+     * Walk out to the brand, rather than to the nearest thing that looks like
+     * one. A search for the nearest matching ancestor lands, for a press on a
+     * logo, on the logo itself — and the name is not inside the logo, it is
+     * beside it.
+     *
+     * Bounded, and never past the header. A navigation link sits inside an
+     * element that contains the name too, several levels up, and clicking a
+     * menu item should not put the cursor in the site's name.
+     */
+    var field = el.closest("[data-site-name],[data-site-tagline]");
+    if (!field) {
+      var up = el;
+      for (var hop = 0; up && hop < 5; hop += 1, up = up.parentElement) {
+        if (!up.tagName || up.tagName === "HEADER" || up.tagName === "FOOTER") break;
+        var cls = (up.getAttribute("class") || "").toLowerCase();
+        if (up.tagName !== "A" && !/brand|logo|site-?name|title/.test(cls)) continue;
+        var found = up.querySelector("[data-site-name],[data-site-tagline]");
+        if (found) { field = found; break; }
+      }
+    }
+    if (!field) return;
+
+    var x = e.clientX;
+    var y = e.clientY;
+
+    setTimeout(function () {
+      if (document.activeElement !== field) field.focus();
+
+      var sel = document.getSelection();
+      var already = sel && sel.anchorNode &&
+        field.contains(sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+      if (already) return;
+
+      // Where they pressed, if that can be worked out; the end of the text if
+      // not, which is where somebody renaming something wants to be anyway.
+      var range = document.caretRangeFromPoint ? document.caretRangeFromPoint(x, y) : null;
+      if (!range || !field.contains(range.startContainer)) {
+        range = document.createRange();
+        range.selectNodeContents(field);
+        range.collapse(false);
+      }
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }, 0);
+  }, true);
 
   var titleEl = main.querySelector("h1[data-title]");
   var titleWas = titleEl ? titleEl.textContent : "";
