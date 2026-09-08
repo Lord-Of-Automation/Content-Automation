@@ -156,7 +156,11 @@ export default function SitePublish({
   /** Everything published before is what a repeat publish will update. */
   const previous: PublishedTo | null = site.published;
 
-  async function step(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  async function step(
+    body: Record<string, unknown>,
+    /** Where to send it, when the caller has just learned somewhere better. */
+    to?: string,
+  ): Promise<Record<string, unknown>> {
     /*
      * Where the site says it lives, once it has been asked.
      *
@@ -166,7 +170,7 @@ export default function SitePublish({
      * header, so the pages would arrive unauthenticated. Asking first and then
      * addressing the site by its own name avoids the redirect entirely.
      */
-    const address = check?.home || target?.address;
+    const address = to || check?.home || target?.address;
 
     const response = await fetch(`/api/websites/${site.id}/publish`, {
       method: "POST",
@@ -182,20 +186,32 @@ export default function SitePublish({
     return payload;
   }
 
+  /**
+   * Ask the site who we are and what we may do there.
+   *
+   * Addressed to the target as the host names it, since that is all there is to
+   * go on until the site answers with a name of its own.
+   */
+  async function runCheck(): Promise<Check> {
+    const response = await fetch(`/api/websites/${site.id}/publish`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ address: target!.address, step: "check" }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error ?? `The check returned ${response.status}.`);
+    const found = payload.check as Check;
+    setCheck(found);
+    return found;
+  }
+
   async function verify() {
     if (!target) return;
     setChecking(true);
     setError(null);
     setCheck(null);
     try {
-      const response = await fetch(`/api/websites/${site.id}/publish`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ address: target.address, step: "check" }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? `The check returned ${response.status}.`);
-      setCheck(payload.check as Check);
+      await runCheck();
     } catch (e) {
       setError(e instanceof Error ? e.message : "That site could not be reached.");
     } finally {
@@ -275,35 +291,79 @@ export default function SitePublish({
 
     const made: Done[] = [];
     try {
+      /*
+       * The check, if it has not already been run.
+       *
+       * It used to be a button you had to press before Publish would light up,
+       * which meant the main action sat greyed out with the reason hidden in a
+       * tooltip. Checking is something publishing needs, not something to make
+       * somebody do first, so it happens here and the button beside it is only
+       * for looking before committing.
+       */
+      const found = check ?? (await runCheck());
+
+      /*
+       * What the account is not allowed to do, before anything is written.
+       *
+       * A publish that fails on page four because the credentials cannot
+       * publish has already made three pages nobody asked for.
+       */
+      if (live && !found.canPublish) {
+        throw new Error(
+          `${found.who} may only write drafts on that site, so publishing live ` +
+            `would be refused. Untick "Publish live" or use an account that can.`,
+        );
+      }
+      if (withDesign && !found.canKeepMarkup) {
+        throw new Error(
+          `${found.who} may not keep styles in page content on that site, so ` +
+            `WordPress would strip the generated design out and the pages would ` +
+            `arrive unstyled. Untick "Bring the generated design", or use an ` +
+            `administrator account.`,
+        );
+      }
+
       for (const page of site.pages) {
         setAt(page.title);
-        const payload = await step({
-          step: "page",
-          slug: page.slug,
-          status: live ? "publish" : "draft",
-          withDesign,
-        });
+        const payload = await step(
+          {
+            step: "page",
+            slug: page.slug,
+            status: live ? "publish" : "draft",
+            withDesign,
+          },
+          found.home,
+        );
         const result = payload.page as Done;
         made.push(result);
         setDone([...made]);
       }
 
-      // The front page, if asked for, and only after every page exists.
-      const front = made.find((row) => row.slug === (site.pages[0]?.slug || row.slug));
+      /*
+       * The front page, if asked for, and only once every page exists.
+       *
+       * The first page published is the site's own front page. Matching it by
+       * slug would not work: the front page has no slug here, and is given one
+       * on the way out, so what WordPress calls it is not what this calls it.
+       */
+      const front = made[0];
       if (asFront && front) {
         setAt("Pointing the front page at it");
-        await step({ step: "front", frontPageId: front.id });
+        await step({ step: "front", frontPageId: front.id }, found.home);
       }
 
       setAt("Writing it down");
-      const payload = await step({
-        step: "finish",
-        host: target.host,
-        label: target.label,
-        status: live ? "publish" : "draft",
-        withDesign,
-        pages: Object.fromEntries(made.map((row) => [row.slug, row.id])),
-      });
+      const payload = await step(
+        {
+          step: "finish",
+          host: target.host,
+          label: target.label,
+          status: live ? "publish" : "draft",
+          withDesign,
+          pages: Object.fromEntries(made.map((row) => [row.slug, row.id])),
+        },
+        found.home,
+      );
       onPublished(payload.website as Website);
       setFinished(true);
     } catch (e) {
@@ -497,8 +557,7 @@ export default function SitePublish({
                   type="button"
                   className="btn btn-primary"
                   onClick={() => void publish()}
-                  disabled={running || !check}
-                  title={check ? undefined : "Check the site first"}
+                  disabled={running || checking}
                 >
                   {running
                     ? "Publishing..."
