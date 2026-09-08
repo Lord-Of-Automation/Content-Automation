@@ -32,7 +32,8 @@ export type ProviderId =
   | "cloudflare"
   | "searchconsole"
   | "cloudways"
-  | "hostinger";
+  | "hostinger"
+  | "anthropic";
 
 export interface ProviderField {
   name: string;
@@ -235,6 +236,29 @@ export const PROVIDERS: ProviderSpec[] = [
         multiline: true,
         placeholder: "one token per line",
         hint: "From hPanel, Account, API. Each line is one Hostinger account.",
+      },
+    ],
+  },
+  {
+    id: "anthropic",
+    label: "Anthropic",
+    wired: true,
+    blurb:
+      "The key behind Ask Claude, the panel on the right of every page. A key " +
+      "from console.anthropic.com, under API keys. The engine holds its own " +
+      "copy in its own environment and does not read this one: the two run on " +
+      "different machines and share nothing but a bill.",
+    fields: [
+      {
+        name: "apiKey",
+        label: "API key",
+        secret: true,
+        placeholder: "sk-ant-…",
+        pattern: /^sk-ant-[A-Za-z0-9_-]{20,}$/,
+        patternNote:
+          "An Anthropic key starts with sk-ant- and has no spaces. Paste the key " +
+          "itself, not the whole header around it.",
+        hint: "From console.anthropic.com, API keys.",
       },
     ],
   },
@@ -590,6 +614,10 @@ function fromEnvironment(id: ProviderId): Record<string, string> | null {
   if (id === "cloudways") {
     const apiToken = process.env.CLOUDWAYS_API_TOKEN?.trim();
     return apiToken ? { apiToken } : null;
+  }
+  if (id === "anthropic") {
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+    return apiKey ? { apiKey } : null;
   }
   if (id === "hostinger") {
     const apiToken = process.env.HOSTINGER_API_TOKEN?.trim();

@@ -12,6 +12,7 @@
     "users": "node scripts/make-users.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
     "bcryptjs": "^2.4.3",
     "next": "^15.5.0",
     "next-auth": "^5.0.0-beta.25",
