@@ -23,14 +23,46 @@ interface Turn {
   content: string;
 }
 
-const OPENERS = [
-  "What does the Loop page actually do?",
-  "Why would a run finish with no pages written?",
-  "How do I get a website onto one of my Cloudways sites?",
+/**
+ * Two ways to ask.
+ *
+ * Anything is the general one: it knows what any model knows and a paragraph
+ * about this console. About Platform puts the platform's own reference in front
+ * of it — the pages, the two programs, the vocabulary, and the handful of
+ * things that are true here and surprising anywhere else — and tells it to
+ * answer from that and to say when the reference does not cover something.
+ *
+ * A toggle rather than a guess at which was meant. The two give different
+ * answers to the same words, and which one somebody wanted is not something to
+ * infer from the question.
+ */
+const OPENERS: Record<"any" | "about", string[]> = {
+  any: [
+    "Write me a meta description for a Mystake review",
+    "What is a canonical tag for?",
+    "Rewrite this heading to be less generic",
+  ],
+  about: [
+    "Why would a run finish with no pages written?",
+    "What is the difference between Optimize and Loop?",
+    "How do I get a generated website onto one of my Cloudways sites?",
+  ],
+};
+
+/**
+ * Claude's mark, as angles and lengths.
+ *
+ * Eleven blades, unevenly spaced and of unequal reach. The unevenness is the
+ * whole point: spaced evenly at one length it becomes a generic asterisk.
+ */
+const BLADES: [number, number][] = [
+  [0, 9], [33, 7.4], [66, 8.6], [98, 7.1], [131, 8.9], [164, 7.6],
+  [196, 8.8], [229, 7.2], [262, 8.5], [295, 7.5], [328, 9],
 ];
 
 export default function AskClaude() {
   const [open, setOpen] = useState(false);
+  const [about, setAbout] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -105,7 +137,7 @@ export default function AskClaude() {
         const response = await fetch("/api/assistant", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ messages: history }),
+          body: JSON.stringify({ messages: history, about }),
           signal: stop.signal,
         });
 
@@ -149,7 +181,7 @@ export default function AskClaude() {
         setBusy(false);
       }
     },
-    [busy, turns],
+    [about, busy, turns],
   );
 
   return (
@@ -165,8 +197,20 @@ export default function AskClaude() {
           title="Ask Claude"
           onClick={() => setOpen(true)}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-            <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-6.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8z" />
+          {/* Claude's mark, drawn rather than loaded: it takes the button's
+              own colour and costs no request. Blades taper outward from a
+              shared centre, at uneven lengths, which is what makes the shape
+              read as the mark rather than as an asterisk. */}
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <g transform="translate(12 12)">
+              {BLADES.map(([turn, reach], i) => (
+                <path
+                  key={i}
+                  d={`M0 0 L-1.35 ${-reach} Q0 ${-reach - 1.35} 1.35 ${-reach} Z`}
+                  transform={`rotate(${turn})`}
+                />
+              ))}
+            </g>
           </svg>
           <span className="ask-tab-word">Ask Claude</span>
         </button>
@@ -203,15 +247,33 @@ export default function AskClaude() {
             </div>
           </div>
 
+          <div className="seg seg-sm ask-modes">
+            <button
+              type="button"
+              className={about ? "seg-btn" : "seg-btn is-on"}
+              onClick={() => setAbout(false)}
+            >
+              Anything
+            </button>
+            <button
+              type="button"
+              className={about ? "seg-btn is-on" : "seg-btn"}
+              onClick={() => setAbout(true)}
+            >
+              About Platform
+            </button>
+          </div>
+
           <div className="ask-thread" ref={thread}>
             {!turns.length ? (
               <div className="ask-empty">
                 <p>
-                  A question about this console, or about anything you are in the
-                  middle of. It knows what the pages here do.
+                  {about
+                    ? "Questions about this platform, answered from its own reference: the pages, what runs do, how publishing works. It will say when the reference does not cover something."
+                    : "Anything at all. Writing, a second opinion, a question about how something works. It knows roughly what this console is; switch above for answers from its reference."}
                 </p>
                 <div className="ask-openers">
-                  {OPENERS.map((line) => (
+                  {OPENERS[about ? "about" : "any"].map((line) => (
                     <button
                       key={line}
                       type="button"
@@ -256,7 +318,7 @@ export default function AskClaude() {
               ref={box}
               rows={2}
               value={draft}
-              placeholder="Ask something"
+              placeholder={about ? "Ask about the platform" : "Ask something"}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 // Enter sends, because this is a chat. A new line is still

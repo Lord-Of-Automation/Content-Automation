@@ -5282,24 +5282,21 @@ body:has(.bulkbar) main {
   align-items: center;
   gap: 8px;
   padding: 11px 14px 11px 13px;
-  border: 1px solid var(--line-2);
-  border-right: 0;
+  border: 0;
   border-radius: 10px 0 0 10px;
-  background: var(--panel);
-  color: var(--ink-2);
-  box-shadow: var(--shadow);
+  /* Claude's own colour, so the one thing on the page that is Claude looks like
+     it. Fixed rather than themed: it is a brand, not a decision this palette
+     gets to make, and it reads the same on either theme. */
+  background: #d97757;
+  color: #fff;
+  box-shadow: 0 2px 14px color-mix(in srgb, #d97757 45%, transparent);
   cursor: pointer;
-  transition: color .15s ease, background .15s ease;
+  transition: filter .15s ease, box-shadow .15s ease;
 }
 
 .ask-tab:hover {
-  color: var(--ink);
-  background: var(--panel-2);
-}
-
-.ask-tab.is-on,
-.ask-tab.is-open {
-  color: var(--accent);
+  filter: brightness(1.06);
+  box-shadow: 0 3px 18px color-mix(in srgb, #d97757 60%, transparent);
 }
 
 .ask-tab svg {
@@ -5507,4 +5504,12 @@ body:has(.bulkbar) main {
 .ask-close svg {
   width: 15px;
   height: 15px;
+}
+
+/* Which of the two is being asked. A toggle rather than a guess: the same
+   words get different answers from each, and which was meant is not something
+   to infer from the question. */
+.ask-modes {
+  margin: 12px 16px 0;
+  align-self: flex-start;
 }

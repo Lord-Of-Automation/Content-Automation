@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 
 import { errorResponse, requireSession } from "@/lib/api-guard";
+import { PLATFORM_DOC } from "@/lib/platformdoc";
 import { credentialFor } from "@/lib/providers";
 
 export const runtime = "nodejs";
@@ -44,6 +45,31 @@ const ABOUT =
   "run, what a specific site says — say what you would need rather than " +
   "guessing at it. Never use em dashes or en dashes.";
 
+/**
+ * What About Platform adds.
+ *
+ * The short briefing above is enough to answer "what is a canonical tag" and
+ * nothing like enough for "why did my run write nothing", which is the kind of
+ * question somebody has while looking at this console. In that mode the whole
+ * reference goes in front of it instead.
+ *
+ * Told to say when the reference does not cover something, because the failure
+ * that matters here is a confident answer about a page that does not exist.
+ */
+const ABOUT_PLATFORM =
+  "You are the reference desk for the platform described below. Answer from it. " +
+  "Name the real page, the real setting or the real word for the thing, so the " +
+  "reader can go and find it.\n\n" +
+  "Where the reference does not cover something, say so plainly rather than " +
+  "reasoning from how software like this usually works — a confident answer " +
+  "about a page that does not exist is worse than no answer. You cannot see " +
+  "the code, the current page, or any of this person's own runs, websites or " +
+  "domains, so questions about a particular one of those are questions about " +
+  "where to look, not what it says.\n\n" +
+  "Be direct and brief. Never use em dashes or en dashes.\n\n" +
+  "---\n\n" +
+  PLATFORM_DOC;
+
 interface Turn {
   role: "user" | "assistant";
   content: string;
@@ -53,7 +79,7 @@ export async function POST(request: Request) {
   const denied = await requireSession();
   if (denied) return denied;
 
-  let body: { messages?: Turn[] };
+  let body: { messages?: Turn[]; about?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -94,10 +120,21 @@ export async function POST(request: Request) {
   try {
     const client = new Anthropic({ apiKey });
 
+    /*
+     * The reference sits behind a cache breakpoint.
+     *
+     * It is long and identical on every message, so sending it again for each
+     * follow-up would be the largest part of the bill for the shortest part of
+     * the answer.
+     */
+    const system = body.about
+      ? [{ type: "text" as const, text: ABOUT_PLATFORM, cache_control: { type: "ephemeral" as const } }]
+      : ABOUT;
+
     const stream = client.beta.messages.stream({
       model: "claude-opus-5",
       max_tokens: 64_000,
-      system: ABOUT,
+      system,
       messages: turns,
       /*
        * Middling effort, because this is a sidebar.
@@ -118,7 +155,7 @@ export async function POST(request: Request) {
     });
 
     const encoder = new TextEncoder();
-    const body = new ReadableStream<Uint8Array>({
+    const answer = new ReadableStream<Uint8Array>({
       async start(controller) {
         try {
           for await (const event of stream) {
@@ -158,7 +195,7 @@ export async function POST(request: Request) {
       },
     });
 
-    return new Response(body, {
+    return new Response(answer, {
       headers: {
         "content-type": "text/plain; charset=utf-8",
         "cache-control": "no-store",
