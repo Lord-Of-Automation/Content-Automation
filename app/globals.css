@@ -4267,7 +4267,7 @@ body:has(.bulkbar) main {
 
 /* Pages, or the furniture around them. */
 .editor-sections {
-  padding: 12px 20px 0;
+  padding: 12px 20px 14px;
 }
 
 .editor-subhead {
@@ -4424,6 +4424,18 @@ body:has(.bulkbar) main {
   transition: opacity .15s ease, color .15s ease;
 }
 
+/* In the toolbar rather than floating over the page, for the editor, where
+   there is a row of controls to sit in and page content worth not covering. */
+.preview-expand.is-inline {
+  position: static;
+  opacity: 1;
+  /* As tall as the pills beside it. A row of controls that are almost the same
+     height reads as a mistake, where one that is plainly two sizes reads as a
+     decision; these are meant to be one size. */
+  width: 34px;
+  height: 34px;
+}
+
 .preview-expand:hover {
   opacity: 1;
   color: var(--ink);
@@ -4506,6 +4518,11 @@ body:has(.bulkbar) main {
 
 .ve-widths {
   margin-left: auto;
+}
+
+.ve-bar .btn-sm,
+.editor-body-head .btn-sm {
+  height: 34px;
 }
 
 .ve-body {
