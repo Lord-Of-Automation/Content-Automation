@@ -237,6 +237,35 @@ function canvas(background: string): string {
   ].join("");
 }
 
+/**
+ * A page's own stylesheet, weighted like everything else it argues with.
+ *
+ * A generated page carries CSS of its own, in a style tag inside its markup,
+ * for the things only that page has: a hero, a ratings bar, a call to action.
+ * It is written to sit alongside the site's base stylesheet and to win where
+ * the two overlap, because a rule for `.ms-hero__cta` is more specific than a
+ * rule for `a` and that is how it was designed.
+ *
+ * Scoping inverted that. The base stylesheet is weighted so a theme cannot
+ * overrule it, which lifts `a` from one element to three classes and an
+ * element — past `.ms-hero__cta` at one class, which was left where it was. The
+ * page's own decisions then lost to the site's defaults, and a call to action
+ * meant to be white came out in the accent colour, because the base sheet's
+ * rule for links suddenly outranked the page's rule for that button.
+ *
+ * So the page's stylesheet is weighted too. Everything moves up together and
+ * the argument between them ends the way it does in the preview.
+ *
+ * Rewritten in place rather than lifted out and appended, so a sheet that opens
+ * with an @import keeps it first — which is the only place an @import counts.
+ */
+function weighPageStyles(html: string): string {
+  return html.replace(
+    /<style\b([^>]*)>([\s\S]*?)<\/style>/gi,
+    (_all, attrs: string, css: string) => `<style${attrs}>${scopeCss(css, SCOPE)}</style>`,
+  );
+}
+
 export class WordPressError extends Error {
   readonly status: number;
   constructor(message: string, status = 0) {
@@ -493,7 +522,7 @@ export function pageContent(
    * will then have opinions about.
    */
   const inner = sheet.trim()
-    ? `<div class="wrap is-page">\n${page.bodyHtml}\n</div>`
+    ? `<div class="wrap is-page">\n${weighPageStyles(page.bodyHtml)}\n</div>`
     : page.bodyHtml;
 
   const markup = [`<div class="${WRAP_CLASS}">`, chrome.header, inner, chrome.footer, "</div>"]
