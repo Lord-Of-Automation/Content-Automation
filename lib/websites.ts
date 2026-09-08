@@ -448,9 +448,15 @@ export function cleanDesign(raw: unknown): SiteDesign | null {
   const headerHtml = String(d.headerHtml ?? "").slice(0, MAX_BODY);
   const footerHtml = String(d.footerHtml ?? "").slice(0, MAX_BODY);
   const css = String(d.css ?? "").slice(0, MAX_BODY);
-  // A design with nothing in it is no design, and storing an empty one would
-  // put an empty header on every page instead of falling back to the built-in.
-  if (!headerHtml && !footerHtml) return null;
+  /*
+   * A design with nothing in it at all is no design.
+   *
+   * Stylesheet included: a site whose shell is the built-in one still needs
+   * somewhere to keep the colours and type somebody changed in the header, and
+   * this is that somewhere. An empty header falls back to the built-in on its
+   * own, so keeping a design that has only a stylesheet costs nothing.
+   */
+  if (!headerHtml && !footerHtml && !css) return null;
   return { headerHtml, footerHtml, css };
 }
 

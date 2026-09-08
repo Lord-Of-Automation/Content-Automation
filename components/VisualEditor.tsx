@@ -35,6 +35,8 @@ export type Setting = (typeof SETTINGS)[number];
 interface Chosen {
   label: string;
   path: string[];
+  /** The page, or the header and footer, which are kept in different places. */
+  where?: "page" | "chrome";
   isImage: boolean;
   isLink: boolean;
   src: string;
@@ -113,6 +115,7 @@ export default function VisualEditor({
   onChange,
   onTitle,
   onSetting,
+  onChromeStyle,
   onNavigate,
 }: {
   site: Omit<ShellSite, "pages">;
@@ -130,6 +133,14 @@ export default function VisualEditor({
    * link, or which page's title.
    */
   onSetting: (field: Setting, value: string, at?: string) => void;
+  /**
+   * A colour or a typeface changed on the header or footer.
+   *
+   * Handed over as a selector rather than as markup, because the chrome is
+   * rendered from a template every time and an inline style on it would last
+   * until the next render.
+   */
+  onChromeStyle: (selector: string, property: string, value: string) => void;
   onNavigate: (slug: string) => void;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
@@ -189,7 +200,11 @@ export default function VisualEditor({
     // can be typed into the page, and rebuilding the frame under somebody
     // mid-word would take the cursor with it.
     site.language,
-    site.design,
+    // The stylesheet is absent: styling the header writes into it, and
+    // rebuilding the frame on every change would take the selection with it.
+    // The shell's markup is not, since changing that changes the arrangement.
+    site.design?.headerHtml ?? "",
+    site.design?.footerHtml ?? "",
     chrome,
     site.theme,
     pages.map((p) => p.slug),
@@ -240,6 +255,15 @@ export default function VisualEditor({
         return;
       }
 
+      if (data.preview === "chrome") {
+        onChromeStyle(
+          String(data.selector ?? ""),
+          String(data.key ?? ""),
+          String(data.value ?? ""),
+        );
+        return;
+      }
+
       if (data.preview === "html") {
         // The page's own scripts went in with a type nothing executes, so what
         // comes back is the markup as written rather than as it ran. Undo that
@@ -271,7 +295,7 @@ export default function VisualEditor({
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [onChange, onNavigate, onSetting, onTitle, page?.bodyHtml, pages]);
+  }, [onChange, onChromeStyle, onNavigate, onSetting, onTitle, page?.bodyHtml, pages]);
 
   useEffect(() => {
     if (!full) return;
@@ -430,6 +454,13 @@ export default function VisualEditor({
               </p>
             ) : (
               <>
+                {chosen.where === "chrome" ? (
+                  <p className="ve-scope">
+                    In the header or footer. Changes here are kept as part of
+                    the site&apos;s own look, so they apply on every page.
+                  </p>
+                ) : null}
+
                 <div className="ve-crumbs">
                   {chosen.path.map((name, i) => (
                     <button

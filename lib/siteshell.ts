@@ -454,14 +454,79 @@ const EDIT_SCRIPT = `
     "padding", "margin", "backgroundColor", "borderRadius", "border"
   ];
 
+  /*
+   * A selector for something in the header or footer.
+   *
+   * The chrome is not markup that gets saved — it is a template rendered afresh
+   * every time — so a style set on it has to be recorded as a rule against a
+   * name for the thing, and the name has to still mean the same thing after the
+   * next render.
+   *
+   * Classes first, since a designed shell names its parts and those names are
+   * the most durable thing about it. Position only where there is nothing else
+   * to go on, and only as far up as the header or footer, so a rule cannot
+   * escape into the page.
+   */
+  function selectorFor(el) {
+    var root = el.closest("header.site,footer.site");
+    if (!root) return "";
+
+    var parts = [];
+    for (var node = el; node && node !== root; node = node.parentElement) {
+      var tag = node.tagName.toLowerCase();
+      var cls = (node.getAttribute("class") || "")
+        .split(/\\s+/)
+        .filter(function (c) { return c && !/^is-/.test(c); })
+        .slice(0, 2)
+        .map(function (c) { return "." + c; })
+        .join("");
+
+      var step = cls || tag;
+      if (!cls) {
+        var siblings = node.parentElement ? node.parentElement.children : [];
+        var same = 0;
+        var mine = 0;
+        for (var i = 0; i < siblings.length; i++) {
+          if (siblings[i].tagName === node.tagName) {
+            same += 1;
+            if (siblings[i] === node) mine = same;
+          }
+        }
+        if (same > 1) step += ":nth-of-type(" + mine + ")";
+      }
+      parts.unshift(step);
+    }
+
+    var base = root.tagName.toLowerCase() + ".site";
+    var selector = parts.length ? base + " " + parts.join(" > ") : base;
+
+    // Only worth using if it means one thing. If it does not, fall back to the
+    // whole chain, which always does.
+    try {
+      if (document.querySelectorAll(selector).length === 1) return selector;
+    } catch (e) {
+      return "";
+    }
+    return selector;
+  }
+
   function describe(el) {
     var tag = el.tagName.toLowerCase();
-    var cls = (el.getAttribute("class") || "").trim().split(/\s+/)[0];
+    var cls = (el.getAttribute("class") || "").trim().split(/\\s+/)[0];
     return cls ? tag + "." + cls : tag;
   }
 
   function announce() {
-    if (!chosen || !main.contains(chosen)) {
+    /*
+     * Anything selected is described, wherever it lives.
+     *
+     * This used to describe only what was inside the page, and everything else
+     * as nothing — so a heading in the header could be selected, could be
+     * styled, and the panel that does the styling showed an empty box. The
+     * difference between the page and the chrome is in where a change is
+     * written down, not in whether it can be looked at.
+     */
+    if (!chosen || !document.body.contains(chosen)) {
       parent.postMessage({ preview: "selected", element: null }, "*");
       return;
     }
@@ -473,8 +538,9 @@ const EDIT_SCRIPT = `
       styles[key] = chosen.style[key] || computed[key] || "";
     }
 
+    var top = main.contains(chosen) ? main : chosen.closest("header.site,footer.site");
     var path = [];
-    for (var node = chosen; node && node !== main; node = node.parentElement) {
+    for (var node = chosen; node && node !== top; node = node.parentElement) {
       path.unshift(describe(node));
     }
 
@@ -483,6 +549,7 @@ const EDIT_SCRIPT = `
       element: {
         label: describe(chosen),
         path: path,
+        where: main.contains(chosen) ? "page" : "chrome",
         isImage: chosen.tagName === "IMG",
         isLink: chosen.tagName === "A",
         src: chosen.getAttribute("src") || "",
@@ -520,7 +587,16 @@ const EDIT_SCRIPT = `
     e.preventDefault();
     var el = e.target;
     while (el && el !== main && el.nodeType !== 1) el = el.parentElement;
-    if (el && main.contains(el)) pick(el);
+    if (!el) return;
+
+    /*
+     * The header and footer can be selected too, so their colours and type can
+     * be changed from the same panel as everything else. What is written for
+     * them is a rule rather than an inline style, because the chrome is
+     * rendered from a template and an inline style on it would last until the
+     * next render.
+     */
+    if (main.contains(el) || el.closest("header.site,footer.site")) pick(el);
   }, true);
 
   document.addEventListener("selectionchange", function () {
@@ -714,7 +790,18 @@ const EDIT_SCRIPT = `
     if (!m || m.preview !== "edit") return;
 
     if (m.do === "style" && chosen) {
+      // Set here for the sake of seeing it immediately; kept by the rule.
       chosen.style[m.key] = m.value;
+
+      if (!main.contains(chosen)) {
+        var selector = selectorFor(chosen);
+        if (selector) {
+          parent.postMessage(
+            { preview: "chrome", selector: selector, key: m.key, value: m.value },
+            "*",
+          );
+        }
+      }
     } else if (m.do === "attr" && chosen) {
       if (m.value) chosen.setAttribute(m.name, m.value);
       else chosen.removeAttribute(m.name);

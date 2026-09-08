@@ -9,6 +9,7 @@ import SitePreview from "@/components/SitePreview";
 import SitePublish from "@/components/SitePublish";
 import SiteVersions from "@/components/SiteVersions";
 import { Select } from "@/components/Select";
+import { applyOverride } from "@/lib/styleoverrides";
 import type {
   SiteDesign as Design,
   SiteFooter as Footer,
@@ -114,6 +115,13 @@ export default function WebsiteEditor({ id }: { id: string }) {
   const [header, setHeader] = useState<Header | null>(null);
   const [footer, setFooter] = useState<Footer | null>(null);
   const [theme, setTheme] = useState<Theme | null>(null);
+  /**
+   * The shell the build designed, and the stylesheet that goes with it.
+   *
+   * Held here rather than read from the site, because the header and footer can
+   * now be styled from the page and that writes into this.
+   */
+  const [design, setDesign] = useState<Design | null>(null);
   /** Which page, or the site furniture that surrounds all of them. */
   const [section, setSection] = useState<"pages" | "design" | "versions" | "publish">("pages");
 
@@ -177,6 +185,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
       const found = payload.website as Website;
       setSite(found);
       setPages(found.pages);
+      setDesign(found.design);
       setName(found.name);
       setTagline(found.tagline);
       setHeader(found.header);
@@ -246,7 +255,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
       const response = await fetch(`/api/websites/${id}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, tagline, pages, header, footer, theme }),
+        body: JSON.stringify({ name, tagline, pages, header, footer, theme, design }),
       });
       if (response.status === 401) {
         window.location.href = "/login";
@@ -261,6 +270,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
       setHeader(back.header);
       setFooter(back.footer);
       setTheme(back.theme);
+      setDesign(back.design);
       setDirty(false);
       setSaved(true);
       setSaves((n) => n + 1);
@@ -863,7 +873,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
                       name,
                       tagline,
                       language: site.language ?? "en",
-                      design: site.design,
+                      design,
                       header: header ?? site.header,
                       footer: footer ?? site.footer,
                       theme: theme ?? site.theme,
@@ -906,6 +916,23 @@ export default function WebsiteEditor({ id }: { id: string }) {
                       }
                       touch();
                     }}
+                    onChromeStyle={(selector, property, value) => {
+                      /*
+                       * A rule in the site's own stylesheet, against a name for
+                       * the thing that changed.
+                       *
+                       * The header and footer are rendered from a template, so
+                       * there is no markup to write an inline style onto that
+                       * would outlive the next render.
+                       */
+                      if (!selector) return;
+                      setDesign((d) => ({
+                        headerHtml: d?.headerHtml ?? "",
+                        footerHtml: d?.footerHtml ?? "",
+                        css: applyOverride(d?.css ?? "", selector, property, value),
+                      }));
+                      touch();
+                    }}
                     onNavigate={(slug) => {
                       const to = pages.findIndex((p) => p.slug === slug);
                       if (to >= 0) setAt(to);
@@ -915,7 +942,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     {site.status === "building"
                       ? "Read only while the site is still being written: a page that is rewritten under you would lose the edit."
                       : editing
-                        ? "Click anything in the page to select it, then change its type, colour, spacing or size on the right. Typing works wherever the cursor is, including the words in the header and footer: the site's name and tagline, what the footer says, the label on any link and the title of any page in a menu. Where a link points, and what shows at all, are on the Header and footer tab. Save changes writes it down."
+                        ? "Click anything in the page to select it, then change its type, colour, spacing or size on the right. Typing works wherever the cursor is, including the words in the header and footer: the site's name and tagline, what the footer says, the label on any link and the title of any page in a menu. Selecting something in the header or footer works too, so its colour, size and typeface can be changed from the same panel. Where a link points, and what shows at all, are on the Header and footer tab. Save changes writes it down."
                         : "The whole site, header and footer included. The navigation works, and anything the page does for itself runs here. This is the document the download writes to a file."}
                   </p>
                   {editing && hasBehaviour(page.bodyHtml) ? (
