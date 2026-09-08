@@ -415,6 +415,17 @@ document.addEventListener("click", function (e) {
 
 // A form has the same problem and nowhere useful to go from here.
 document.addEventListener("submit", function (e) { e.preventDefault(); });
+/*
+ * Escape, sent outward.
+ *
+ * The console listens for it too, but a key pressed inside this frame never
+ * reaches the page around it — and full screen is precisely the state in which
+ * the cursor is in here. So the frame says so, and the console decides what
+ * leaving means.
+ */
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape") parent.postMessage({ preview: "escape" }, "*");
+});
 `;
 
 /**
@@ -543,6 +554,30 @@ const EDIT_SCRIPT = `
     }
 
     var top = main.contains(chosen) ? main : chosen.closest("header.site,footer.site");
+    /*
+     * What is behind it, when it has nothing of its own.
+     *
+     * Most elements have no background: the computed value is a transparent
+     * black, which a colour swatch has no way to draw except as black. So the
+     * panel showed a black square on a white card, which reads as a background
+     * that is set and wrong rather than one that was never set at all.
+     *
+     * The colour actually showing through is found by looking behind, and the
+     * panel draws that instead — and says the element has none of its own.
+     */
+    var backdrop = computed.backgroundColor;
+    var clear = !backdrop || backdrop === "transparent" ||
+      /^rgba\\(.*,\\s*0\\)$/.test(backdrop);
+    if (clear) {
+      for (var behind = chosen.parentElement; behind; behind = behind.parentElement) {
+        var c = getComputedStyle(behind).backgroundColor;
+        if (c && c !== "transparent" && !/^rgba\\(.*,\\s*0\\)$/.test(c)) {
+          backdrop = c;
+          break;
+        }
+      }
+    }
+
     var path = [];
     for (var node = chosen; node && node !== top; node = node.parentElement) {
       path.unshift(describe(node));
@@ -554,6 +589,8 @@ const EDIT_SCRIPT = `
         label: describe(chosen),
         path: path,
         where: main.contains(chosen) ? "page" : "chrome",
+        backdrop: backdrop,
+        ownBackground: !clear,
         isImage: chosen.tagName === "IMG",
         isLink: chosen.tagName === "A",
         src: chosen.getAttribute("src") || "",
@@ -1024,6 +1061,18 @@ const EDIT_SCRIPT = `
     "[data-footer-text]:empty::before,[data-link]:empty::before,[data-page]:empty::before" +
     "{content:attr(data-placeholder);opacity:.45}";
   document.head.appendChild(style);
+
+  /*
+   * Escape, sent outward.
+   *
+   * The console listens for it too, but a key pressed inside this frame never
+   * reaches the page around it — and full screen is precisely the state in
+   * which the cursor is in here. So the frame says so and the console decides
+   * what leaving means.
+   */
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") parent.postMessage({ preview: "escape" }, "*");
+  });
 
   parent.postMessage({ preview: "ready" }, "*");
 })();

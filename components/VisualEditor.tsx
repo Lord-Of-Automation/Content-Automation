@@ -37,6 +37,10 @@ interface Chosen {
   path: string[];
   /** The page, or the header and footer, which are kept in different places. */
   where?: "page" | "chrome";
+  /** The colour showing through, when the element sets none of its own. */
+  backdrop: string;
+  /** Whether the background is the element's own rather than what is behind it. */
+  ownBackground: boolean;
   isImage: boolean;
   isLink: boolean;
   src: string;
@@ -83,12 +87,12 @@ const TYPE: Control[] = [
 ];
 
 const BOX: Control[] = [
+  { key: "backgroundColor", label: "Background", kind: "colour" },
   { key: "width", label: "Width", kind: "length", unit: "px" },
   { key: "height", label: "Height", kind: "length", unit: "px" },
   { key: "maxWidth", label: "Max width", kind: "length", unit: "px" },
   { key: "padding", label: "Padding", kind: "length", unit: "px" },
   { key: "margin", label: "Margin", kind: "length", unit: "px" },
-  { key: "backgroundColor", label: "Background", kind: "colour" },
   { key: "borderRadius", label: "Corner radius", kind: "length", unit: "px" },
   { key: "border", label: "Border", kind: "text" },
 ];
@@ -266,6 +270,12 @@ export default function VisualEditor({
           field === "footerText" ? value : value.trim(),
           data.at === undefined || data.at === null ? undefined : String(data.at),
         );
+        return;
+      }
+
+      // Pressed inside the frame, where the console cannot hear it.
+      if (data.preview === "escape") {
+        setFull(false);
         return;
       }
 
@@ -594,24 +604,43 @@ export default function VisualEditor({
                           ))}
                         </select>
                       ) : control.kind === "colour" ? (
-                        <div className="ve-colour">
-                          <input
-                            type="color"
-                            className="colour-input"
-                            value={toHex(value)}
-                            onChange={(e) =>
-                              send({ do: "style", key: control.key, value: e.target.value })
-                            }
-                          />
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => send({ do: "style", key: control.key, value: "" })}
-                            title="Back to whatever the page says"
-                          >
-                            Clear
-                          </button>
-                        </div>
+                        <>
+                          <div className="ve-colour">
+                            <input
+                              type="color"
+                              className="colour-input"
+                              /*
+                               * A background nothing has set computes to a
+                               * transparent black, and a swatch can only draw
+                               * that as black — which reads as a colour that is
+                               * set and wrong. So the colour showing through is
+                               * drawn instead, and said to be that.
+                               */
+                              value={toHex(
+                                control.key === "backgroundColor" && !chosen.ownBackground
+                                  ? chosen.backdrop
+                                  : value,
+                              )}
+                              onChange={(e) =>
+                                send({ do: "style", key: control.key, value: e.target.value })
+                              }
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => send({ do: "style", key: control.key, value: "" })}
+                              title="Back to whatever the page says"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                          {control.key === "backgroundColor" && !chosen.ownBackground ? (
+                            <p className="ve-note">
+                              None of its own. This is what shows through from
+                              behind it.
+                            </p>
+                          ) : null}
+                        </>
                       ) : (
                         <input
                           type="text"

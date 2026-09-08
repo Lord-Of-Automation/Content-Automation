@@ -5081,3 +5081,11 @@ body:has(.bulkbar) main {
   background: var(--panel);
   color: var(--ink-3);
 }
+
+/* A note under a control, when the value shown is not the element's own. */
+.ve-note {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
