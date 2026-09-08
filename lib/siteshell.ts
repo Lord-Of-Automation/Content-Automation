@@ -461,7 +461,12 @@ function fill(
     .replace(/\{\{\s*LINKS\s*\}\}/g, parts.links)
     .replace(/\{\{\s*COPYRIGHT\s*\}\}/g, parts.copyright)
     .replace(/\{\{\s*NAME\s*\}\}/g, escapeText(site.name))
-    .replace(/\{\{\s*TAGLINE\s*\}\}/g, escapeText(site.tagline))
+    // Empty when the header says not to show it, so a design cannot put back
+    // what the setting just took away.
+    .replace(
+      /\{\{\s*TAGLINE\s*\}\}/g,
+      site.header.showTagline ? escapeText(site.tagline) : "",
+    )
     .replace(/\{\{\s*YEAR\s*\}\}/g, String(options.year ?? ""))
     // Anything else it invented. Better an empty space than a curly brace.
     .replace(/\{\{[^}]{0,40}\}\}/g, "");
@@ -524,14 +529,27 @@ export function renderPage(site: ShellSite, page: ShellPage, options: ShellOptio
    * the same links and building them twice is how the two drift apart.
    */
   const parts = {
-    brand: brand || `<span class="brand-name">${escapeText(site.name)}</span>`,
-    nav: pageLinks,
+    /**
+     * The header settings govern a designed shell too.
+     *
+     * They used to govern only the built-in header, so the moment a site had a
+     * designed one — which every new site does — Show the tagline and Show
+     * navigation did nothing at all. The design decides the arrangement; these
+     * decide what goes in it, and a design cannot be allowed to overrule them
+     * by filling a placeholder the setting said to leave empty.
+     */
+    brand: h.logoUrl
+      ? `<img class="brand-logo" src="${escapeText(h.logoUrl)}" alt="${escapeText(site.name)}">`
+      : h.showName
+        ? `<span class="brand-name">${escapeText(site.name)}</span>`
+        : "",
+    nav: h.showNav ? pageLinks : "",
     pages: ordered
       .map((p) => `<a href="${escapeText(linkTo(p, options))}">${escapeText(p.title)}</a>`)
       .join(""),
-    links: h.links
-      .map((l) => `<a href="${escapeText(l.url)}">${escapeText(l.label)}</a>`)
-      .join(""),
+    links: h.showNav
+      ? h.links.map((l) => `<a href="${escapeText(l.url)}">${escapeText(l.label)}</a>`).join("")
+      : "",
     copyright: f.showCopyright
       ? `&copy; ${options.year ?? ""} ${escapeText(site.name)}`
       : "",
