@@ -4630,3 +4630,148 @@ body:has(.bulkbar) main {
     max-height: none;
   }
 }
+
+/* ------------------------------------------------------------------ versions
+
+   Every save keeps the version it replaced, so this is a list of states the
+   site has actually been in. A row is a whole button: the question being asked
+   of a version list is "which one", and the answer is found by opening them,
+   so opening one should not require aiming at anything.
+
+   What a row shows is what the version *after* it changed, in words. A diff of
+   HTML is a wall of tags, and nobody recognises the afternoon they broke the
+   pricing page by its markup. */
+.editor-versions {
+  padding-bottom: 20px;
+}
+
+.versions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.version-row {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.version-row.is-open {
+  border-color: var(--accent);
+}
+
+/* The current site, which is not a version and cannot be restored. Marked by
+   the accent down its edge rather than by a word, since it is always the top
+   row and always means the same thing. */
+.version-row.is-now {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--accent);
+}
+
+.version-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.version-head:hover {
+  background: var(--panel);
+}
+
+.version-when {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 200px;
+}
+
+.version-when strong {
+  font-size: 13px;
+}
+
+.version-by {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.version-what {
+  flex: 1;
+  min-width: 0;
+}
+
+.version-count {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.version-changes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+
+.version-changes li {
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.version-changes .version-more {
+  border-style: dashed;
+  color: var(--ink-3);
+}
+
+.version-open {
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.version-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+/* Shorter than the editor's own preview: this is for recognising a version,
+   not for working in one. */
+.version-open .site-preview {
+  height: 52vh;
+  min-height: 320px;
+}
+
+@media (max-width: 720px) {
+  .version-head,
+  .version-row.is-now {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .version-when {
+    flex: none;
+  }
+}

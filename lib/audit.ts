@@ -63,6 +63,7 @@ export type AuditAction =
    */
   | "website-created"
   | "website-edited"
+  | "website-restored"
   | "website-deleted"
   | "website-exported"
   /** A step frozen so it stops running. Logged: it changes what a run does. */

@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
 import { fetchBuiltSite } from "@/lib/engine";
+import { dropRevisions, keepRevision, sameContent, snapshot } from "@/lib/revisions";
 import {
   cleanDesign, cleanFooter, cleanHeader, cleanPages, cleanTheme, getWebsite,
   removeWebsite, saveWebsite, settleFrom, type Website,
@@ -117,6 +118,18 @@ export async function PUT(
       updatedBy: actor,
     };
 
+    /*
+     * Keep what is being replaced, before it is.
+     *
+     * Only when something actually changed: the editor saves whatever is on
+     * screen, and a save that changed nothing should not push a real version
+     * out of a bounded list. The first such save is the one that matters most,
+     * since the version it keeps is the site exactly as the AI wrote it.
+     */
+    if (!sameContent(snapshot(site), snapshot(updated))) {
+      await keepRevision(site, "edit");
+    }
+
     await saveWebsite(updated);
     await record(actor, "website-edited", `${updated.name}, ${pages.length} page(s)`);
 
@@ -144,6 +157,9 @@ export async function DELETE(
     if (!site) return NextResponse.json({ error: "No such website." }, { status: 404 });
 
     await removeWebsite(id);
+    // The history goes with the site. Keeping versions of something that no
+    // longer exists is storage spent on nothing anybody can reach.
+    await dropRevisions(id);
     // Nothing was hosted, so this destroys writing rather than a live site.
     // Logged all the same: it is the only record it was ever written.
     await record(actor, "website-deleted", `${site.name}, ${site.pages.length} page(s)`);

@@ -6,58 +6,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import VisualEditor from "@/components/VisualEditor";
 import { hasBehaviour } from "@/lib/pagehtml";
 import SitePreview from "@/components/SitePreview";
+import SiteVersions from "@/components/SiteVersions";
 import { Select } from "@/components/Select";
-
-type Page = {
-  slug: string;
-  title: string;
-  metaTitle: string;
-  metaDescription: string;
-  bodyHtml: string;
-  keywords: string[];
-  order: number;
-};
-
-type Link = { label: string; url: string };
-
-type Header = {
-  logoUrl: string;
-  showName: boolean;
-  showTagline: boolean;
-  showNav: boolean;
-  links: Link[];
-};
-
-type Footer = { text: string; links: Link[]; showCopyright: boolean };
-
-type Theme = {
-  accent: string;
-  background: string;
-  ink: string;
-  font: "sans" | "serif";
-  width: number;
-};
-
-/** The header and footer the build designed, when it managed one. */
-type Design = { headerHtml: string; footerHtml: string; css: string } | null;
-
-type Website = {
-  id: string;
-  name: string;
-  tagline: string;
-  description: string;
-  topic: string;
-  format: "wordpress" | "static";
-  language: string;
-  header: Header;
-  footer: Footer;
-  theme: Theme;
-  design: Design;
-  status: "building" | "ready" | "failed";
-  runId: string;
-  note: string;
-  pages: Page[];
-};
+import type {
+  SiteDesign as Design,
+  SiteFooter as Footer,
+  SiteHeader as Header,
+  SiteLink,
+  SiteTheme as Theme,
+  Website,
+  WebsitePage as Page,
+} from "@/lib/websites";
 
 /** What Google will show, near enough, so the limits mean something. */
 const TITLE_LIMIT = 60;
@@ -100,8 +59,8 @@ function LinkList({
 }: {
   label: string;
   hint: string;
-  links: Link[];
-  onChange: (links: Link[]) => void;
+  links: SiteLink[];
+  onChange: (links: SiteLink[]) => void;
 }) {
   return (
     <>
@@ -155,7 +114,14 @@ export default function WebsiteEditor({ id }: { id: string }) {
   const [footer, setFooter] = useState<Footer | null>(null);
   const [theme, setTheme] = useState<Theme | null>(null);
   /** Which page, or the site furniture that surrounds all of them. */
-  const [section, setSection] = useState<"pages" | "design">("pages");
+  const [section, setSection] = useState<"pages" | "design" | "versions">("pages");
+  /**
+   * Bumped whenever the site is written to, so the version list reloads.
+   *
+   * A counter rather than a callback into the list: the list owns its own
+   * loading, and the only thing the editor knows is that something changed.
+   */
+  const [saves, setSaves] = useState(0);
   const [at, setAt] = useState(0);
 
   const [loading, setLoading] = useState(true);
@@ -282,6 +248,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
       setTheme(back.theme);
       setDirty(false);
       setSaved(true);
+      setSaves((n) => n + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "The website could not be saved.");
     } finally {
@@ -442,6 +409,13 @@ export default function WebsiteEditor({ id }: { id: string }) {
               >
                 Header and footer
               </button>
+              <button
+                type="button"
+                className={section === "versions" ? "seg-btn is-on" : "seg-btn"}
+                onClick={() => setSection("versions")}
+              >
+                Versions
+              </button>
             </div>
             {section === "pages" && !showPreview ? (
               <button
@@ -453,6 +427,40 @@ export default function WebsiteEditor({ id }: { id: string }) {
               </button>
             ) : null}
           </div>
+
+          {section === "versions" ? (
+            <div className="editor-sections editor-versions">
+              {dirty ? (
+                <p className="notice warn">
+                  There are unsaved changes. They are not a version yet, and
+                  restoring an earlier one would discard them.
+                </p>
+              ) : null}
+              <SiteVersions
+                site={site}
+                token={saves}
+                onRestored={(back) => {
+                  /*
+                   * A restore replaces everything the editor is holding, so all
+                   * of it is taken from what came back rather than merged. An
+                   * editor still showing the old header over a restored site
+                   * would write that header straight back on the next save.
+                   */
+                  setSite(back);
+                  setName(back.name);
+                  setTagline(back.tagline);
+                  setPages(back.pages);
+                  setHeader(back.header);
+                  setFooter(back.footer);
+                  setTheme(back.theme);
+                  setAt(0);
+                  setDirty(false);
+                  setSaved(false);
+                  setSaves((n) => n + 1);
+                }}
+              />
+            </div>
+          ) : null}
 
           {section === "design" && header && footer && theme ? (
             <div className="editor-split">
