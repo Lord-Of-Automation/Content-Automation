@@ -27,20 +27,31 @@ export default async function TopBar({
             live in the profile menu, where they stop reading as somewhere to
             go and start reading as something to change. */}
         <nav className="topnav">
-          {/* The label says what the page does; the address stays /runs, which
-              is what every bookmark and every stored selection points at. */}
-          <Link
-            href="/runs"
-            className={current === "runs" ? "topnav-link is-current" : "topnav-link"}
-          >
-            Optimize
-          </Link>
-          <Link
-            href="/loop"
-            className={current === "loop" ? "topnav-link is-current" : "topnav-link"}
-          >
-            Loop
-          </Link>
+{/* The two ways of running the engine over a site, under the one word
+              for what they are both for. Separately they read as two unrelated
+              features; together they read as a choice between doing it now and
+              having it done.
+
+              The addresses do not move. Every bookmark, every stored selection
+              and every link in the logs points at /runs and /loop. */}
+          <NavMenu
+            label="SEO"
+            active={current === "runs" || current === "loop"}
+            items={[
+              {
+                href: "/runs",
+                label: "Optimize",
+                note: "run it over a site now, once",
+                current: current === "runs",
+              },
+              {
+                href: "/loop",
+                label: "Loop",
+                note: "have it run again on a schedule",
+                current: current === "loop",
+              },
+            ]}
+          />
           {/* Not a link. Domains is two pages now, and a parent that both
               navigates and opens a menu makes you guess which it will do. */}
           <NavMenu
