@@ -149,13 +149,11 @@ function normalise(fullWidth: boolean): string {
  * person who might want to edit the page they are looking at.
  */
 function canvas(background: string): string {
-  const keep = ":not(#wpadminbar):not(#wpadminbar *)";
-
   return [
     "@supports selector(:has(*)){",
 
     // Everything off the path to the content.
-    `body *:not(:has(${SCOPE})):not(${SCOPE}):not(${SCOPE} *)${keep}` +
+    `body *:not(:has(${SCOPE})):not(${SCOPE}):not(${SCOPE} *)` +
       "{display:none!important}",
 
     /*
@@ -169,16 +167,41 @@ function canvas(background: string): string {
      * Weighted below the design's own rules, so the design still has the last
      * word about anything it cares to mention.
      */
-    `body *:has(${SCOPE})${keep}` +
+    `body *:has(${SCOPE})` +
       "{all:revert;display:block;width:auto;max-width:none;min-width:0;" +
       "margin:0;padding:0;border:0;background:none;box-shadow:none;" +
       "float:none;position:static;transform:none}",
 
-    // And the document itself, which the theme also dresses.
+    /*
+     * The document, which the theme dresses too — and which WordPress dresses
+     * on top of that.
+     *
+     * The admin bar is the reason `html` is here. WordPress pins it to the top
+     * of the window and pushes the whole document down by its height with a
+     * margin it marks important, so a page that has otherwise taken over still
+     * begins thirty-two pixels below the top of the window, with a strip of the
+     * theme's background above it. That is not the site that was previewed, and
+     * it is the one thing a visitor never sees, so on these pages it goes. The
+     * way back to the editor is the address bar.
+     */
+    "html{margin:0!important;padding:0!important;max-width:none!important}",
+    "#wpadminbar{display:none!important}",
+
     `body{margin:0!important;padding:0!important;max-width:none!important;` +
-      `width:auto!important;` +
+      `width:auto!important;min-height:0!important;` +
       (background ? `background:${background}!important;` : "") +
       `display:block!important}`,
+
+    /*
+     * And the page fills the window, the way a document does.
+     *
+     * In the generated site the body is the page, so its background reaches the
+     * bottom of the window however little there is to say. Published, the site
+     * is a box inside a document, and a box is only as tall as its contents —
+     * which leaves whatever is underneath showing below the footer on any page
+     * short enough not to scroll.
+     */
+    `${SCOPE}{min-height:100vh}`,
 
     "}",
   ].join("");
