@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import PageCanvas, { hasBehaviour } from "@/components/PageCanvas";
+import { hasBehaviour } from "@/components/PageCanvas";
+import VisualEditor from "@/components/VisualEditor";
 import SitePreview from "@/components/SitePreview";
 import { Select } from "@/components/Select";
 
@@ -738,7 +739,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
 
                   {view === "visual" ? (
                     <>
-                      <PageCanvas
+                      <VisualEditor
                         key={`${site.id}-${at}`}
                         html={page.bodyHtml}
                         editable={site.status !== "building"}
@@ -747,7 +748,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
                       <p className="provider-hint">
                         {site.status === "building"
                           ? "Read only while the site is still being written: a page that is rewritten under you would lose the edit."
-                          : "Click into the page and type. Changes are kept when you click away, and saved when you press Save changes."}
+                          : "Click anything to select it, then change its type, colour, spacing or size on the right. Typing works wherever the cursor is. Save changes writes it down."}
                       </p>
                       {hasBehaviour(page.bodyHtml) ? (
                         <p className="provider-hint">
