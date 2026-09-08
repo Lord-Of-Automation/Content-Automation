@@ -34,6 +34,8 @@ export default function NewApplication({
   onDone: () => void;
 }) {
   const [installable, setInstallable] = useState<Installable[]>([]);
+  /** How many applications already run each platform, keyed by identifier. */
+  const [inUse, setInUse] = useState<Record<string, number>>({});
   const [servers, setServers] = useState<Server[]>([]);
   const [serverId, setServerId] = useState("");
   const [choice, setChoice] = useState("");
@@ -69,6 +71,7 @@ export default function NewApplication({
       if (!response.ok) throw new Error(payload.error ?? `The catalogue returned ${response.status}.`);
 
       const list = (payload.installable ?? []) as Installable[];
+      setInUse((payload.inUse ?? {}) as Record<string, number>);
       const hosts = (payload.servers ?? []) as Server[];
       setInstallable(list);
       setServers(hosts);
@@ -76,8 +79,18 @@ export default function NewApplication({
       // Preselected when there is nothing to decide, which is the common case
       // for the application and never for the server.
       if (hosts.length === 1) setServerId(hosts[0].id);
-      const wordpress = list.find((i) => i.application === "wordpress") ?? list[0];
-      if (wordpress) setChoice(`${wordpress.application}|${wordpress.version}`);
+      /*
+       * Start on whatever the account already runs most of.
+       *
+       * Better than naming a platform here: it follows the estate rather than
+       * a guess, and it lands on the one that has been proven to work on these
+       * servers, with these settings, hundreds of times over.
+       */
+      const tally = (payload.inUse ?? {}) as Record<string, number>;
+      const best = [...list].sort(
+        (a, b) => (tally[b.application] ?? 0) - (tally[a.application] ?? 0),
+      )[0];
+      if (best) setChoice(`${best.application}|${best.version}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "The catalogue could not be read.");
     } finally {
@@ -212,13 +225,23 @@ export default function NewApplication({
                   id="new-app-kind"
                   value={choice}
                   onChange={setChoice}
-                  options={installable.map((i) => ({
-                    value: `${i.application}|${i.version}`,
-                    label: `${i.label} ${i.version}`,
-                    // The raw identifier, because one name can carry more than
-                    // one build and Cloudways does not say how they differ.
-                    hint: i.application,
-                  }))}
+                  options={installable.map((i) => {
+                    const running = inUse[i.application] ?? 0;
+                    return {
+                      value: `${i.application}|${i.version}`,
+                      label: `${i.label} ${i.version}`,
+                      /*
+                       * The raw identifier, because one name can carry more
+                       * than one build and Cloudways does not say how they
+                       * differ — and then how many of your applications run
+                       * it, which is the only thing that does tell them apart.
+                       */
+                      hint:
+                        running > 0
+                          ? `${i.application} · ${running} of yours run this`
+                          : i.application,
+                    };
+                  })}
                 />
               </section>
 

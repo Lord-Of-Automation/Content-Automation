@@ -29,7 +29,22 @@ export async function GET(request: Request) {
         listInstallable(),
         listApplications(),
       ]);
-      return NextResponse.json({ installable, servers: estate.servers });
+      /*
+       * How many applications already run each platform.
+       *
+       * Cloudways offers two entries both labelled "WordPress 6.2.2", telling
+       * them apart only by an identifier it does not explain and no public
+       * documentation describes. What the console can say honestly is which of
+       * them everything else on the account is running, which is the answer
+       * most people actually want from that question.
+       */
+      const inUse: Record<string, number> = {};
+      for (const app of estate.apps) {
+        if (!app.platform) continue;
+        inUse[app.platform] = (inUse[app.platform] ?? 0) + 1;
+      }
+
+      return NextResponse.json({ installable, servers: estate.servers, inUse });
     }
 
     // Every host, merged. One failing leaves a row in `sources` saying so
