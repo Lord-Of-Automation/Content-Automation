@@ -78,6 +78,15 @@ export async function GET(
       sources: hosted.sources,
       connected: hosted.connected,
       published: site.published,
+      /*
+       * Where it went last time, as the list names places.
+       *
+       * Worked out here rather than in the browser, so the comparison uses the
+       * same rule that decides which login belongs to which site: a site
+       * published to one spelling of its address has to match the row offering
+       * another.
+       */
+      publishedDomain: site.published ? normaliseDomain(site.published.address) ?? "" : "",
       pages: site.pages.map((p) => ({ slug: p.slug, title: p.title })),
     });
   } catch (error) {

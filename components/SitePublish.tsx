@@ -79,6 +79,8 @@ export default function SitePublish({
   onPublished: (site: Website) => void;
 }) {
   const [targets, setTargets] = useState<Target[] | null>(null);
+  /** The domain it went to last time, so its row can say so. */
+  const [went, setWent] = useState("");
   const [sources, setSources] = useState<Array<{ label: string; ok: boolean; note: string }>>([]);
   const [chosen, setChosen] = useState("");
   const [live, setLive] = useState(false);
@@ -121,8 +123,27 @@ export default function SitePublish({
       }
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? `The hosts returned ${response.status}.`);
-      setTargets(payload.targets as Target[]);
+      const rows = payload.targets as Target[];
+      setTargets(rows);
       setSources(payload.sources ?? []);
+
+      /*
+       * Start on where it went last time.
+       *
+       * A site that has been published somewhere is nearly always going back
+       * to the same place, and picking it out of three hundred and sixty-nine
+       * rows to say so is work nobody should repeat. Only when nothing has
+       * been chosen yet, so a reload does not undo somebody's own choice.
+       */
+      const went = String(payload.publishedDomain ?? "");
+      setWent(went);
+      if (went) {
+        setChosen((now) => {
+          if (now) return now;
+          const again = rows.find((t) => t.domain === went);
+          return again ? again.key : now;
+        });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "The connected hosts could not be read.");
       setTargets([]);
@@ -445,11 +466,14 @@ export default function SitePublish({
                   label: t.label,
                   hint:
                     `${HOST_LABEL[t.host] ?? t.host} · ${t.domain || t.address}` +
+                    (t.domain && t.domain === went ? " · published here before" : "") +
                     (t.ready ? "" : " · no login saved"),
                   // Searchable but not drawn: the server or plan it sits on,
                   // and whether it is ready, are both worth typing and neither
                   // fits on a line that already carries a domain.
-                  search: `${t.place} ${t.platform} ${t.ready ? "connected ready" : "unconnected"}`,
+                  search:
+                    `${t.place} ${t.platform} ${t.ready ? "connected ready" : "unconnected"}` +
+                    (t.domain && t.domain === went ? " published before again" : ""),
                 })),
               ]}
             />
