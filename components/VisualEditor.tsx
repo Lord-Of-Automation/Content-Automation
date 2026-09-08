@@ -28,6 +28,10 @@ import { liveScripts, renderPage, type ShellPage, type ShellSite } from "@/lib/s
  * changes somewhere nothing reads back — they have their own tab.
  */
 
+/** What the chrome can be typed into, and what each of them changes. */
+const SETTINGS = ["name", "tagline", "footerText", "linkLabel", "pageTitle"] as const;
+export type Setting = (typeof SETTINGS)[number];
+
 interface Chosen {
   label: string;
   path: string[];
@@ -119,8 +123,13 @@ export default function VisualEditor({
   onChange: (html: string) => void;
   /** The heading is the title field, so typing in it lands here. */
   onTitle: (title: string) => void;
-  /** So are the name and tagline in the header. */
-  onSetting: (field: "name" | "tagline", value: string) => void;
+  /**
+   * So is everything else the header and footer are written from.
+   *
+   * `at` says which one, for the settings there is more than one of: which
+   * link, or which page's title.
+   */
+  onSetting: (field: Setting, value: string, at?: string) => void;
   onNavigate: (slug: string) => void;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
@@ -156,6 +165,23 @@ export default function VisualEditor({
    * fresh object every render and comparing it by identity would reload
    * constantly.
    */
+  /*
+   * Everything in the header and footer except the words that can be typed into
+   * them.
+   *
+   * A setting changed on the other tab — whether the navigation shows, what a
+   * link points at, whether there is a copyright line — changes the shape of the
+   * page and the frame has to be built again to show it. A word typed into the
+   * page must not, because rebuilding it takes the cursor along.
+   *
+   * So the difference is drawn here rather than by leaving the header and
+   * footer out altogether, which would have left the arrangement stale.
+   */
+  const chrome = JSON.stringify([
+    { ...site.header, links: site.header.links.map((l) => l.url) },
+    { ...site.footer, text: "", links: site.footer.links.map((l) => l.url) },
+  ]);
+
   const signature = JSON.stringify([
     current,
     editable,
@@ -164,8 +190,7 @@ export default function VisualEditor({
     // mid-word would take the cursor with it.
     site.language,
     site.design,
-    site.header,
-    site.footer,
+    chrome,
     site.theme,
     pages.map((p) => p.slug),
   ]);
@@ -202,8 +227,16 @@ export default function VisualEditor({
       }
 
       if (data.preview === "site") {
-        const field = data.field === "name" ? "name" : "tagline";
-        onSetting(field, String(data.text ?? "").trim());
+        const field = String(data.field ?? "");
+        if (!SETTINGS.includes(field as Setting)) return;
+        const value = String(data.text ?? "");
+        onSetting(
+          field as Setting,
+          // The footer's words may have lines in them and are theirs to keep;
+          // everything else here is one string and is trimmed.
+          field === "footerText" ? value : value.trim(),
+          data.at === undefined || data.at === null ? undefined : String(data.at),
+        );
         return;
       }
 

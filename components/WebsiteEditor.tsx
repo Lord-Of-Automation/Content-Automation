@@ -873,11 +873,37 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     editable={editing}
                     onChange={(bodyHtml) => change({ bodyHtml })}
                     onTitle={(title) => change({ title })}
-                    onSetting={(field, value) => {
-                      // The header is drawn from these, so they are the site's
-                      // settings wherever they are typed.
+                    onSetting={(field, value, at) => {
+                      /*
+                       * The header and footer are drawn from settings, so what
+                       * is typed into them belongs to the settings rather than
+                       * to the page it was typed on.
+                       *
+                       * A link's label and a page's title say which one they
+                       * are: "footer:2" for the third link in the footer, or a
+                       * page's own address. The rest are one of a kind.
+                       */
                       if (field === "name") setName(value);
-                      else setTagline(value);
+                      else if (field === "tagline") setTagline(value);
+                      else if (field === "footerText") {
+                        setFooter((f) => (f ? { ...f, text: value } : f));
+                      } else if (field === "linkLabel") {
+                        const [which, index] = String(at ?? "").split(":");
+                        const i = Number(index);
+                        const relabel = (links: SiteLink[]) =>
+                          links.map((l, n) => (n === i ? { ...l, label: value } : l));
+                        if (which === "footer") {
+                          setFooter((f) => (f ? { ...f, links: relabel(f.links) } : f));
+                        } else {
+                          setHeader((h) => (h ? { ...h, links: relabel(h.links) } : h));
+                        }
+                      } else if (field === "pageTitle") {
+                        // The menu shows every page, so this may be the title
+                        // of one that is not on screen.
+                        setPages((rows) =>
+                          rows.map((p) => (p.slug === at ? { ...p, title: value } : p)),
+                        );
+                      }
                       touch();
                     }}
                     onNavigate={(slug) => {
@@ -889,7 +915,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     {site.status === "building"
                       ? "Read only while the site is still being written: a page that is rewritten under you would lose the edit."
                       : editing
-                        ? "Click anything in the page to select it, then change its type, colour, spacing or size on the right. Typing works wherever the cursor is, including the site's name and tagline in the header. The rest of the header and footer have their own tab. Save changes writes it down."
+                        ? "Click anything in the page to select it, then change its type, colour, spacing or size on the right. Typing works wherever the cursor is, including the words in the header and footer: the site's name and tagline, what the footer says, the label on any link and the title of any page in a menu. Where a link points, and what shows at all, are on the Header and footer tab. Save changes writes it down."
                         : "The whole site, header and footer included. The navigation works, and anything the page does for itself runs here. This is the document the download writes to a file."}
                   </p>
                   {editing && hasBehaviour(page.bodyHtml) ? (

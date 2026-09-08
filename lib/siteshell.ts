@@ -543,37 +543,85 @@ const EDIT_SCRIPT = `
    *
    * Only these two elements are made editable, not the header around them.
    */
-  var settings = document.querySelectorAll("[data-site-name],[data-site-tagline]");
+  /*
+   * The settings written into the header and the footer, editable where they
+   * are read.
+   *
+   * The chrome is otherwise not editable here: what is in it comes from the
+   * shell the build designed, so typing into it would put changes somewhere
+   * nothing reads back. These are the exception, because each of them is a
+   * setting and has somewhere to go — the site's name and tagline, the words
+   * under the footer's heading, the label on a link, and the title of a page
+   * as it appears in a menu.
+   *
+   * Only these elements are made editable, never the chrome around them.
+   */
+  var SETTINGS = "[data-site-name],[data-site-tagline],[data-footer-text],[data-link],[data-page]";
+
+  function fieldOf(el) {
+    if (el.hasAttribute("data-site-name")) return { field: "name" };
+    if (el.hasAttribute("data-site-tagline")) return { field: "tagline" };
+    if (el.hasAttribute("data-footer-text")) return { field: "footerText" };
+    if (el.hasAttribute("data-link")) return { field: "linkLabel", at: el.getAttribute("data-link") };
+    return { field: "pageTitle", at: el.getAttribute("data-page") };
+  }
+
+  var settings = document.querySelectorAll(SETTINGS);
   for (var s = 0; s < settings.length; s++) {
     (function (el) {
-      var field = el.hasAttribute("data-site-name") ? "name" : "tagline";
-      var was = el.textContent;
+      var what = fieldOf(el);
+      // The footer's words are a paragraph and may have lines in them; every
+      // other setting here is a single string.
+      var lines = what.field === "footerText";
+      var was = lines ? el.innerText : el.textContent;
+
       el.setAttribute("contenteditable", "true");
-      el.setAttribute("title", "Click to change the site's " + field);
+      el.setAttribute("title", "Click to change this");
 
       /*
-       * A brand is nearly always a link, and a link is draggable.
-       *
-       * Pressing on draggable text starts a drag rather than a selection, so
-       * the caret never lands and the field reads as dead however editable it
-       * is. Turning that off for the anchors around these two is what makes
-       * them clickable at all; nothing else about the link changes, and it is
-       * not followed here anyway.
+       * A link is draggable, and pressing on draggable text starts a drag
+       * rather than a selection, so the caret never lands and the field reads
+       * as dead however editable it is. That goes for the element itself, when
+       * it is the link, and for the anchors around it when it is not.
        */
+      if (el.tagName === "A") el.setAttribute("draggable", "false");
       for (var up = el.parentElement; up; up = up.parentElement) {
         if (up.tagName === "A") up.setAttribute("draggable", "false");
         if (up.tagName === "HEADER" || up.tagName === "FOOTER") break;
       }
 
       el.addEventListener("input", function () {
-        if (el.textContent === was) return;
-        was = el.textContent;
-        parent.postMessage({ preview: "site", field: field, text: was }, "*");
+        var now = lines ? el.innerText : el.textContent;
+        if (now === was) return;
+        was = now;
+
+        /*
+         * A name appears in the brand, in the copyright line and twice in the
+         * footer, and it is one setting in all of them. The others are kept in
+         * step here rather than by rebuilding the page, which would take the
+         * cursor with it.
+         */
+        if (what.field === "name" || what.field === "tagline") {
+          var twins = document.querySelectorAll(
+            what.field === "name" ? "[data-site-name]" : "[data-site-tagline]",
+          );
+          for (var i = 0; i < twins.length; i++) {
+            if (twins[i] !== el && twins[i].textContent !== now) twins[i].textContent = now;
+          }
+        }
+
+        parent.postMessage(
+          { preview: "site", field: what.field, at: what.at, text: now },
+          "*",
+        );
       });
-      // A line break in a site's name is not something anybody means.
-      el.addEventListener("keydown", function (e) {
-        if (e.key === "Enter") { e.preventDefault(); el.blur(); }
-      });
+
+      // A line break belongs in the footer's words and nowhere else here.
+      if (!lines) {
+        el.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") { e.preventDefault(); el.blur(); }
+        });
+      }
     })(settings[s]);
   }
 
@@ -605,7 +653,7 @@ const EDIT_SCRIPT = `
      * element that contains the name too, several levels up, and clicking a
      * menu item should not put the cursor in the site's name.
      */
-    var field = el.closest("[data-site-name],[data-site-tagline]");
+    var field = el.closest(SETTINGS);
     if (!field) {
       var up = el;
       for (var hop = 0; up && hop < 5; hop += 1, up = up.parentElement) {
@@ -708,10 +756,14 @@ const EDIT_SCRIPT = `
     // The two settings in the header, marked as editable and given something
     // to show when they are empty. Drawn rather than written, so a prompt
     // cannot be mistaken for a value and saved.
-    "[data-site-name],[data-site-tagline]{cursor:text;outline-offset:2px}" +
-    "[data-site-name]:hover,[data-site-tagline]:hover{outline:1px dashed rgba(127,127,127,.6)}" +
-    "[data-site-name]:focus,[data-site-tagline]:focus{outline:2px solid #2f6df6}" +
-    "[data-site-name]:empty::before,[data-site-tagline]:empty::before" +
+    "[data-site-name],[data-site-tagline],[data-footer-text],[data-link],[data-page]" +
+    "{cursor:text;outline-offset:2px}" +
+    "[data-site-name]:hover,[data-site-tagline]:hover,[data-footer-text]:hover," +
+    "[data-link]:hover,[data-page]:hover{outline:1px dashed rgba(127,127,127,.6)}" +
+    "[data-site-name]:focus,[data-site-tagline]:focus,[data-footer-text]:focus," +
+    "[data-link]:focus,[data-page]:focus{outline:2px solid #2f6df6}" +
+    "[data-site-name]:empty::before,[data-site-tagline]:empty::before," +
+    "[data-footer-text]:empty::before,[data-link]:empty::before,[data-page]:empty::before" +
     "{content:attr(data-placeholder);opacity:.45}";
   document.head.appendChild(style);
 
@@ -841,6 +893,44 @@ function mark(
   }">${value}</span>`;
 }
 
+/**
+ * The site's name, wrapped so the editor can find it.
+ *
+ * It appears in four places — the brand, the copyright line, the footer's
+ * opening words and the line at the very bottom — and a name is one setting
+ * wherever it is written. Marked in all of them, and kept in step by the editor
+ * while somebody types into any one.
+ */
+function nameHere(site: ShellSite, options: ShellOptions): string {
+  const text = escapeText(site.name);
+  return options.editing
+    ? `<span data-site-name data-placeholder="Name the site">${text}</span>`
+    : text;
+}
+
+/** A link whose label is a setting, so the editor can offer to change it. */
+function markedLink(
+  href: string,
+  label: string,
+  where: string,
+  editing: boolean | undefined,
+): string {
+  const mark = editing ? ` data-link="${where}" data-placeholder="Name this link"` : "";
+  return `<a href="${escapeText(href)}"${mark}>${escapeText(label)}</a>`;
+}
+
+/**
+ * A page's entry in a menu.
+ *
+ * Its text is the page's title, which is a page setting rather than a menu one,
+ * so typing here changes the page it points at — including from a page that is
+ * not the one on screen.
+ */
+function markedPage(page: ShellPage, options: ShellOptions): string {
+  const mark = options.editing ? ` data-page="${escapeText(page.slug)}"` : "";
+  return `<a href="${escapeText(linkTo(page, options))}"${mark}>${escapeText(page.title)}</a>`;
+}
+
 function fill(
   markup: string,
   site: ShellSite,
@@ -909,12 +999,13 @@ export function renderChrome(
   const pageLinks = ordered
     .map((p) => {
       const here = p.slug === options.current ? ' class="is-here"' : "";
-      return `<a href="${escapeText(linkTo(p, options))}"${here}>${escapeText(p.title)}</a>`;
+      const mark = options.editing ? ` data-page="${escapeText(p.slug)}"` : "";
+      return `<a href="${escapeText(linkTo(p, options))}"${here}${mark}>${escapeText(p.title)}</a>`;
     })
     .join("\n          ");
 
   const extraLinks = h.links
-    .map((l) => `<a href="${escapeText(l.url)}">${escapeText(l.label)}</a>`)
+    .map((l, i) => markedLink(l.url, l.label, `header:${i}`, options.editing))
     .join("\n          ");
 
   /**
@@ -982,18 +1073,14 @@ export function renderChrome(
     brand: h.logoUrl
       ? `<img class="brand-logo" src="${escapeText(h.logoUrl)}" alt="${escapeText(site.name)}">`
       : h.showName
-        ? `<span class="brand-name">${escapeText(site.name)}</span>`
+        ? `<span class="brand-name">${nameHere(site, options)}</span>`
         : "",
     nav: h.showNav ? pageLinks : "",
-    pages: ordered
-      .map((p) => `<a href="${escapeText(linkTo(p, options))}">${escapeText(p.title)}</a>`)
-      .join(""),
+    pages: ordered.map((p) => markedPage(p, options)).join(""),
     links: h.showNav
-      ? h.links.map((l) => `<a href="${escapeText(l.url)}">${escapeText(l.label)}</a>`).join("")
+      ? h.links.map((l, i) => markedLink(l.url, l.label, `header:${i}`, options.editing)).join("")
       : "",
-    copyright: f.showCopyright
-      ? `&copy; ${options.year ?? ""} ${escapeText(site.name)}`
-      : "",
+    copyright: f.showCopyright ? `&copy; ${options.year ?? ""} ${nameHere(site, options)}` : "",
   };
 
   const header = design?.headerHtml
@@ -1009,31 +1096,45 @@ ${fill(design.headerHtml, site, options, parts)}
     </header>`
       : "";
 
+  /*
+   * The footer's opening words, which are two settings in one paragraph.
+   *
+   * The name and the text sit side by side, so each is wrapped separately —
+   * marking the paragraph would make typing anywhere in it look like a change
+   * to whichever of the two the editor guessed.
+   *
+   * Shown while editing even when empty, since a paragraph nobody has written
+   * yet is one nobody can click on to start.
+   */
+  const words = f.text
+    .split(/\n+/)
+    .map((l) => escapeText(l))
+    .join("<br>");
+
   const about =
-    f.text || site.name
+    f.text || site.name || options.editing
       ? `<p class="footer-about">${
-          f.showCopyright || site.name ? `<strong>${escapeText(site.name)}</strong>` : ""
-        }${f.text
-          .split(/\n+/)
-          .map((l) => escapeText(l))
-          .join("<br>")}</p>`
+          f.showCopyright || site.name ? `<strong>${nameHere(site, options)}</strong>` : ""
+        }${
+          options.editing
+            ? `<span data-footer-text data-placeholder="Say something about the site">${words}</span>`
+            : words
+        }</p>`
       : "";
 
   const footerNav = f.links.length
     ? `<nav>${f.links
-        .map((l) => `<a href="${escapeText(l.url)}">${escapeText(l.label)}</a>`)
+        .map((l, i) => markedLink(l.url, l.label, `footer:${i}`, options.editing))
         .join("")}</nav>`
     : "";
 
   const pageNav =
     ordered.length > 1
-      ? `<nav>${ordered
-          .map((p) => `<a href="${escapeText(linkTo(p, options))}">${escapeText(p.title)}</a>`)
-          .join("")}</nav>`
+      ? `<nav>${ordered.map((p) => markedPage(p, options)).join("")}</nav>`
       : "";
 
   const base = f.showCopyright
-    ? `<div class="footer-base"><span>&copy; ${options.year ?? ""} ${escapeText(site.name)}</span></div>`
+    ? `<div class="footer-base"><span>&copy; ${options.year ?? ""} ${nameHere(site, options)}</span></div>`
     : "";
 
   const footer = design?.footerHtml
