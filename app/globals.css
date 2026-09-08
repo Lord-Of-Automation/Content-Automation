@@ -5030,3 +5030,23 @@ body:has(.bulkbar) main {
 .ve-save {
   margin-left: 10px;
 }
+
+/* Moving a block among the ones beside it. Its own row, above the pair that
+   duplicate and delete, because reordering is a different kind of act from
+   making and unmaking. */
+.ve-order {
+  margin-top: 10px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.ve-order .btn {
+  flex: 1;
+}
+
+/* The same note as the header's, said more quietly: this one is a hint about
+   what can be done, not a warning about what a change will reach. */
+.ve-quiet {
+  background: var(--panel);
+  color: var(--ink-3);
+}

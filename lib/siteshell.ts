@@ -590,6 +590,7 @@ const EDIT_SCRIPT = `
     var wanted = real(el);
     chosen = wanted && wanted !== main ? wanted : null;
     if (chosen) chosen.setAttribute("data-chosen", "");
+    placeGrips();
     announce();
   }
 
@@ -792,6 +793,121 @@ const EDIT_SCRIPT = `
     }, 0);
   }, true);
 
+
+  /*
+   * Dragging a box to the size you want.
+   *
+   * The panel has boxes for width and height, which means knowing the number
+   * before you can have the size. Nobody knows the number. They know it should
+   * be a bit wider, and the way to say that is to take hold of the edge and
+   * pull it.
+   *
+   * Three handles: the right edge for width, the bottom for height, the corner
+   * for both. Not the left or the top — those would mean moving the box as well
+   * as sizing it, and a box in a flowing page does not have a position of its
+   * own to move to.
+   *
+   * The handles live outside the page's own markup, in a layer of their own, so
+   * nothing here is ever saved as part of the page.
+   */
+  var grips = document.createElement("div");
+  grips.setAttribute("data-resizer", "");
+  grips.innerHTML =
+    '<i data-grip="e"></i><i data-grip="s"></i><i data-grip="se"></i><b></b>';
+  document.body.appendChild(grips);
+  var readout = grips.querySelector("b");
+
+  function placeGrips() {
+    if (!chosen) {
+      grips.style.display = "none";
+      return;
+    }
+    var r = chosen.getBoundingClientRect();
+    grips.style.display = "block";
+    grips.style.left = r.left + window.scrollX + "px";
+    grips.style.top = r.top + window.scrollY + "px";
+    grips.style.width = r.width + "px";
+    grips.style.height = r.height + "px";
+  }
+
+  window.addEventListener("scroll", placeGrips, { passive: true });
+  window.addEventListener("resize", placeGrips);
+
+  grips.addEventListener("pointerdown", function (e) {
+    var grip = e.target.getAttribute && e.target.getAttribute("data-grip");
+    if (!grip || !chosen) return;
+
+    e.preventDefault();
+    e.target.setPointerCapture(e.pointerId);
+
+    var box = chosen.getBoundingClientRect();
+    var fromX = e.clientX;
+    var fromY = e.clientY;
+    var wide = box.width;
+    var tall = box.height;
+    var sized = chosen;
+
+    readout.style.display = "block";
+
+    function move(ev) {
+      /*
+       * Nothing below a size somebody could still grab.
+       *
+       * Dragged to nothing, a box has no edges left to take hold of, and the
+       * only way back would be the panel — which is the thing this exists to
+       * avoid needing.
+       */
+      if (grip.indexOf("e") >= 0) {
+        sized.style.width = Math.max(24, Math.round(wide + ev.clientX - fromX)) + "px";
+      }
+      if (grip.indexOf("s") >= 0) {
+        sized.style.height = Math.max(24, Math.round(tall + ev.clientY - fromY)) + "px";
+      }
+      var now = sized.getBoundingClientRect();
+      readout.textContent = Math.round(now.width) + " x " + Math.round(now.height);
+      placeGrips();
+    }
+
+    function stop() {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", stop);
+      readout.style.display = "none";
+
+      /*
+       * Where the new size is written down.
+       *
+       * Inside the page it is already there: the size is an inline style on the
+       * element, and the page's markup is what gets saved. In the header or
+       * footer there is no markup to save, so it goes the way every other
+       * change there goes — as a rule against a name for the thing.
+       */
+      if (main.contains(sized)) {
+        report();
+      } else {
+        var selector = selectorFor(sized);
+        if (selector) {
+          if (grip.indexOf("e") >= 0) {
+            parent.postMessage(
+              { preview: "chrome", selector: selector, key: "width", value: sized.style.width },
+              "*",
+            );
+          }
+          if (grip.indexOf("s") >= 0) {
+            parent.postMessage(
+              { preview: "chrome", selector: selector, key: "height", value: sized.style.height },
+              "*",
+            );
+          }
+        }
+      }
+
+      announce();
+    }
+
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", stop);
+  });
+
   var titleEl = main.querySelector("h1[data-title]");
   var titleWas = titleEl ? titleEl.textContent : "";
 
@@ -838,6 +954,24 @@ const EDIT_SCRIPT = `
       var going = chosen;
       pick(null);
       going.remove();
+    } else if (m.do === "move" && chosen && main.contains(chosen)) {
+      /*
+       * Up or down among the things beside it.
+       *
+       * Only inside the page. The header and footer are rendered from a
+       * template, so an order changed there would be undone by the next render
+       * and there is nowhere to write it down.
+       *
+       * It swaps with the neighbour rather than moving by a measurement: a
+       * block in a flowing page has an order, not a position, and "after the
+       * next one" is the only thing moving down can mean.
+       */
+      var beside = m.by < 0 ? chosen.previousElementSibling : chosen.nextElementSibling;
+      if (beside) {
+        if (m.by < 0) beside.before(chosen);
+        else beside.after(chosen);
+        chosen.scrollIntoView({ block: "nearest" });
+      }
     } else if (m.do === "duplicate" && chosen) {
       var copy = chosen.cloneNode(true);
       copy.removeAttribute("data-chosen");
@@ -850,6 +984,7 @@ const EDIT_SCRIPT = `
       pick(null);
     }
 
+    placeGrips();
     announce();
     report();
   });
@@ -875,6 +1010,16 @@ const EDIT_SCRIPT = `
     "[data-link]:hover,[data-page]:hover{outline:1px dashed rgba(127,127,127,.6)}" +
     "[data-site-name]:focus,[data-site-tagline]:focus,[data-footer-text]:focus," +
     "[data-link]:focus,[data-page]:focus{outline:2px solid #2f6df6}" +
+    "[data-resizer]{position:absolute;pointer-events:none;z-index:2147483646;display:none}" +
+    "[data-resizer] i{position:absolute;pointer-events:auto;width:13px;height:13px;" +
+    "background:#2f6df6;border:2px solid #fff;border-radius:3px;" +
+    "box-shadow:0 1px 3px rgba(0,0,0,.35);touch-action:none}" +
+    "[data-resizer] i[data-grip=e]{right:-7px;top:50%;margin-top:-7px;cursor:ew-resize}" +
+    "[data-resizer] i[data-grip=s]{bottom:-7px;left:50%;margin-left:-7px;cursor:ns-resize}" +
+    "[data-resizer] i[data-grip=se]{right:-7px;bottom:-7px;cursor:nwse-resize}" +
+    "[data-resizer] b{position:absolute;right:0;top:-25px;display:none;" +
+    "background:#2f6df6;color:#fff;border-radius:4px;padding:2px 7px;" +
+    "font:600 11px/1.5 ui-sans-serif,system-ui,sans-serif;white-space:nowrap}" +
     "[data-site-name]:empty::before,[data-site-tagline]:empty::before," +
     "[data-footer-text]:empty::before,[data-link]:empty::before,[data-page]:empty::before" +
     "{content:attr(data-placeholder);opacity:.45}";

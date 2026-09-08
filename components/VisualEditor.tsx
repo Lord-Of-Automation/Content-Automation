@@ -498,7 +498,12 @@ export default function VisualEditor({
                     In the header or footer. Changes here are kept as part of
                     the site&apos;s own look, so they apply on every page.
                   </p>
-                ) : null}
+                ) : (
+                  <p className="ve-scope ve-quiet">
+                    Drag the blue handles on the box to size it, or move it
+                    among the things beside it below.
+                  </p>
+                )}
 
                 <div className="ve-crumbs">
                   {chosen.path.map((name, i) => (
@@ -628,6 +633,27 @@ export default function VisualEditor({
                     </div>
                   );
                 })}
+
+                {chosen.where !== "chrome" ? (
+                  <div className="ve-actions ve-order">
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      title="Move it above the one before it"
+                      onClick={() => send({ do: "move", by: -1 })}
+                    >
+                      Move up
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      title="Move it below the one after it"
+                      onClick={() => send({ do: "move", by: 1 })}
+                    >
+                      Move down
+                    </button>
+                  </div>
+                ) : null}
 
                 <div className="ve-actions">
                   <button
