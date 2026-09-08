@@ -80,6 +80,18 @@ export function applyOverride(
   const before = at < 0 ? css : css.slice(0, at);
   const rules = read(at < 0 ? "" : css.slice(at + OPEN.length));
 
+  /*
+   * Clear out a rule this one supersedes.
+   *
+   * Selectors used to be able to end at a span the editor invents around a
+   * setting's text while it is being edited — a span that is not on the
+   * published page, so the rule matched nothing there and the change looked
+   * like it had been ignored. Those selectors are the same as the right one
+   * with a span on the end, so changing the same thing again removes the rule
+   * that never worked rather than leaving it behind.
+   */
+  rules.delete(`${clean} > span`);
+
   const name = cssProperty(property);
   const declarations = rules.get(clean) ?? new Map<string, string>();
 

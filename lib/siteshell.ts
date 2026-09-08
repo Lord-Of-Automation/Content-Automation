@@ -473,6 +473,10 @@ const EDIT_SCRIPT = `
 
     var parts = [];
     for (var node = el; node && node !== root; node = node.parentElement) {
+      // A wrapper that only exists while editing cannot be part of a name for
+      // something that has to be found again once it is gone.
+      if (node.matches && node.matches(WRAPPERS)) continue;
+
       var tag = node.tagName.toLowerCase();
       var cls = (node.getAttribute("class") || "")
         .split(/\\s+/)
@@ -560,9 +564,31 @@ const EDIT_SCRIPT = `
     }, "*");
   }
 
+  /*
+   * Some of what is on screen while editing is not on screen otherwise.
+   *
+   * Some settings are made editable by wrapping their text in a span that
+   * exists only while editing. Selecting one of those and styling it writes a
+   * rule ending in that span, and the span is not there on the published page,
+   * so the rule matches nothing and the change appears to have been ignored.
+   *
+   * So a wrapper stands for the thing it wraps. The wrappers say so
+   * themselves rather than being recognised by what they are for: the same
+   * marker sits on a span invented here and on a heading that was already
+   * there, depending on whether the shell is designed or built in, and only one
+   * of the two should be stepped over.
+   */
+  var WRAPPERS = "[data-editor-wrap]";
+
+  function real(el) {
+    if (!el || !el.matches) return el;
+    return el.matches(WRAPPERS) && el.parentElement ? el.parentElement : el;
+  }
+
   function pick(el) {
     if (chosen) chosen.removeAttribute("data-chosen");
-    chosen = el && el !== main ? el : null;
+    var wanted = real(el);
+    chosen = wanted && wanted !== main ? wanted : null;
     if (chosen) chosen.setAttribute("data-chosen", "");
     announce();
   }
@@ -975,7 +1001,7 @@ function mark(
   at: number,
 ): string {
   if (!editing || inTag(whole, at)) return value;
-  return `<span ${attribute} data-placeholder="${
+  return `<span ${attribute} data-editor-wrap data-placeholder="${
     attribute === "data-site-name" ? "Name the site" : "Add a tagline"
   }">${value}</span>`;
 }
@@ -991,7 +1017,7 @@ function mark(
 function nameHere(site: ShellSite, options: ShellOptions): string {
   const text = escapeText(site.name);
   return options.editing
-    ? `<span data-site-name data-placeholder="Name the site">${text}</span>`
+    ? `<span data-site-name data-editor-wrap data-placeholder="Name the site">${text}</span>`
     : text;
 }
 
@@ -1204,7 +1230,7 @@ ${fill(design.headerHtml, site, options, parts)}
           f.showCopyright || site.name ? `<strong>${nameHere(site, options)}</strong>` : ""
         }${
           options.editing
-            ? `<span data-footer-text data-placeholder="Say something about the site">${words}</span>`
+            ? `<span data-footer-text data-editor-wrap data-placeholder="Say something about the site">${words}</span>`
             : words
         }</p>`
       : "";
