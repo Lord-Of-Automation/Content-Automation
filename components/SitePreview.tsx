@@ -115,11 +115,40 @@ export default function SitePreview({
   useEffect(() => {
     function onMessage(event: MessageEvent) {
       if (event.source !== frame.current?.contentWindow) return;
-      const data = event.data as { preview?: string; slug?: string } | null;
+      const data = event.data as { preview?: string; href?: string } | null;
       if (!data || data.preview !== "go") return;
 
-      const slug = String(data.slug ?? "");
-      if (pages.some((p) => p.slug === slug)) onNavigate(slug);
+      const href = String(data.href ?? "").trim();
+
+      /**
+       * Somewhere else entirely.
+       *
+       * Opened in a tab rather than followed here: the frame cannot go there,
+       * and silently doing nothing when somebody clicks a real link reads as a
+       * broken preview.
+       */
+      if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
+        if (/^https?:/i.test(href)) window.open(href, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      /**
+       * A page of this site, however the link happened to spell it.
+       *
+       * The interceptor used to take only addresses beginning with a slash, so
+       * a link written as "about.html" or "about" escaped it, navigated the
+       * frame to the console's own address, and landed on the sign-in page.
+       * Every shape is reduced to a slug here instead.
+       */
+      const slug = href
+        .replace(/[?#].*$/, "")
+        .replace(/^[./]+/, "")
+        .replace(/\.html?$/i, "")
+        .replace(/\/$/, "");
+
+      // index.html and an empty address are both the front page.
+      const wanted = slug === "index" ? "" : slug;
+      if (pages.some((p) => p.slug === wanted)) onNavigate(wanted);
     }
 
     window.addEventListener("message", onMessage);

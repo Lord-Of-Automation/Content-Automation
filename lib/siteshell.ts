@@ -396,13 +396,23 @@ svg:not([width]):not([height]):not([class]) { max-height: 420px; }
  */
 const NAV_SCRIPT = `
 document.addEventListener("click", function (e) {
-  var a = e.target.closest ? e.target.closest("a") : null;
+  var a = e.target && e.target.closest ? e.target.closest("a") : null;
   if (!a) return;
+
   var href = a.getAttribute("href") || "";
-  if (href.charAt(0) !== "/") return;
+
+  // An anchor within the page is the browser's own job and works here.
+  if (href.charAt(0) === "#") return;
+
+  // Nothing else may navigate this frame. It is a document with no address of
+  // its own, so anything relative resolves against the console around it and
+  // lands on a page that does not exist, which then asks you to sign in.
   e.preventDefault();
-  parent.postMessage({ preview: "go", slug: href.slice(1) }, "*");
+  parent.postMessage({ preview: "go", href: href }, "*");
 });
+
+// A form has the same problem and nowhere useful to go from here.
+document.addEventListener("submit", function (e) { e.preventDefault(); });
 `;
 
 export interface ShellOptions {
