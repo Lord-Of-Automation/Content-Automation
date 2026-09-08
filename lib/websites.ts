@@ -144,6 +144,14 @@ export interface PublishedTo {
   status: "publish" | "draft";
   /** Whether the generated design travelled with them. */
   withDesign: boolean;
+  /**
+   * How much of the target's theme the pages kept.
+   *
+   * Recorded because it is the first thing worth knowing when a published page
+   * does not look right: a page that kept the theme's header was not a page
+   * that failed to take it over.
+   */
+  fit: "canvas" | "inside" | "theme";
   at: string;
   by: string;
 }

@@ -187,6 +187,19 @@ function canvas(background: string): string {
     "html{margin:0!important;padding:0!important;max-width:none!important}",
     "#wpadminbar{display:none!important}",
 
+    /*
+     * The spacers a theme draws rather than declares.
+     *
+     * A box of the theme's own can be hidden and a box on the way down can be
+     * flattened, but a theme that makes room for a fixed header by hanging a
+     * tall ::before on the body or on a wrapper leaves something that is
+     * neither. It belongs to an element that has to stay, so hiding it is not
+     * an option, and it carries its own height, so flattening the element it
+     * hangs on does nothing to it. It has to be named.
+     */
+    `body::before,body::after,body *:has(${SCOPE})::before,body *:has(${SCOPE})::after` +
+      "{display:none!important;content:none!important}",
+
     `body{margin:0!important;padding:0!important;max-width:none!important;` +
       `width:auto!important;min-height:0!important;` +
       (background ? `background:${background}!important;` : "") +

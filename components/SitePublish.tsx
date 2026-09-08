@@ -91,7 +91,7 @@ export default function SitePublish({
    * itself; "canvas" is putting a generated site somewhere, where the WordPress
    * underneath is a host and not a look.
    */
-  const [fit, setFit] = useState<"theme" | "inside" | "canvas">("inside");
+  const [fit, setFit] = useState<"theme" | "inside" | "canvas">("canvas");
   const [asFront, setAsFront] = useState(false);
   /** Whether the design may escape the column the theme puts content in. */
   const [fullWidth, setFullWidth] = useState(false);
@@ -378,6 +378,7 @@ export default function SitePublish({
           label: target.label,
           status: live ? "publish" : "draft",
           withDesign,
+          fit,
           pages: Object.fromEntries(made.map((row) => [row.slug, row.id])),
         },
         found.home,
@@ -403,9 +404,14 @@ export default function SitePublish({
         <p className="notice ok">
           Last published to <strong>{previous.label}</strong>{" "}
           {new Date(previous.at).toLocaleString()} by {previous.by}, as{" "}
-          {previous.status === "publish" ? "live pages" : "drafts"}. Publishing
-          to the same place again updates those pages rather than making new
-          ones.
+          {previous.status === "publish" ? "live pages" : "drafts"}
+          {previous.fit === "canvas"
+            ? ", looking exactly like the generated site"
+            : previous.fit === "inside"
+              ? ", with the design inside the target's theme"
+              : ", taking the target's own look"}
+          . Publishing to the same place again updates those pages rather than
+          making new ones.
         </p>
       ) : null}
 

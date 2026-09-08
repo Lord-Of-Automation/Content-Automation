@@ -249,6 +249,8 @@ export async function POST(
         ),
         status: body.status === "publish" ? "publish" : "draft",
         withDesign: Boolean(body.withDesign),
+        fit:
+          body.fit === "canvas" ? "canvas" : body.withDesign ? "inside" : "theme",
         at: new Date().toISOString(),
         by: actor,
       };
