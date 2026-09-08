@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import VisualEditor from "@/components/VisualEditor";
 import { hasBehaviour } from "@/lib/pagehtml";
 import SitePreview from "@/components/SitePreview";
+import SitePublish from "@/components/SitePublish";
 import SiteVersions from "@/components/SiteVersions";
 import { Select } from "@/components/Select";
 import type {
@@ -114,7 +115,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
   const [footer, setFooter] = useState<Footer | null>(null);
   const [theme, setTheme] = useState<Theme | null>(null);
   /** Which page, or the site furniture that surrounds all of them. */
-  const [section, setSection] = useState<"pages" | "design" | "versions">("pages");
+  const [section, setSection] = useState<"pages" | "design" | "versions" | "publish">("pages");
   /**
    * Bumped whenever the site is written to, so the version list reloads.
    *
@@ -416,6 +417,13 @@ export default function WebsiteEditor({ id }: { id: string }) {
               >
                 Versions
               </button>
+              <button
+                type="button"
+                className={section === "publish" ? "seg-btn is-on" : "seg-btn"}
+                onClick={() => setSection("publish")}
+              >
+                Publish
+              </button>
             </div>
             {section === "pages" && !showPreview ? (
               <button
@@ -427,6 +435,25 @@ export default function WebsiteEditor({ id }: { id: string }) {
               </button>
             ) : null}
           </div>
+
+          {section === "publish" ? (
+            <div className="editor-sections editor-versions">
+              {dirty ? (
+                <p className="notice warn">
+                  There are unsaved changes. Publishing sends what was saved, so
+                  save first or the site will go out a version behind.
+                </p>
+              ) : null}
+              <SitePublish
+                site={site}
+                onPublished={(back) => {
+                  // Only the record of where it went changed; everything being
+                  // edited is untouched, so nothing on screen is replaced.
+                  setSite(back);
+                }}
+              />
+            </div>
+          ) : null}
 
           {section === "versions" ? (
             <div className="editor-sections editor-versions">

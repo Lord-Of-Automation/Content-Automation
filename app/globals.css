@@ -4792,3 +4792,120 @@ body:has(.bulkbar) main {
     flex: none;
   }
 }
+
+/* ------------------------------------------------------------------- publish
+
+   Choosing on the left, what happened on the right. The report is a list that
+   grows a page at a time rather than a spinner, because publishing writes to
+   somebody's live site and "which page did it get to" is the question that
+   matters when it stops. */
+.publish {
+  margin-top: 12px;
+}
+
+.publish-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  margin-top: 12px;
+}
+
+.publish-choice,
+.publish-report {
+  min-width: 0;
+}
+
+.publish-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0 10px;
+}
+
+.publish-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.publish-actions .btn {
+  flex: 1;
+}
+
+.publish-check {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+.publish-check h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.publish-facts {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+/* What the account cannot do, which is the half of the check worth reading. */
+.publish-facts .is-warn {
+  color: var(--warn);
+}
+
+.publish-pages {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.publish-pages li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  font-size: 12.5px;
+}
+
+.publish-pages li.is-running {
+  border-style: dashed;
+  color: var(--ink-3);
+}
+
+.publish-page-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.publish-page-what {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.publish-warnings,
+.publish-sources {
+  margin-top: 12px;
+}
+
+@media (max-width: 960px) {
+  .publish-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

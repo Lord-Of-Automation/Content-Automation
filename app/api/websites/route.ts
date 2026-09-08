@@ -144,6 +144,7 @@ export async function POST(request: Request) {
       createdBy: actor,
       updatedAt: now,
       updatedBy: actor,
+      published: null,
     };
 
     await saveWebsite(site);

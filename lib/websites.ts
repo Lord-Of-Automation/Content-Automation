@@ -120,6 +120,34 @@ export const DEFAULT_THEME: SiteTheme = {
   width: 760,
 };
 
+/**
+ * Where a site was last published, and what it became there.
+ *
+ * The page ids are the part that matters. Publishing the same site twice has to
+ * update the pages it made the first time rather than leave a second copy of
+ * each behind, and a slug is not enough to go on — somebody may have renamed a
+ * page here, or renamed it there. So what WordPress called each page is kept,
+ * keyed by what this console calls it.
+ *
+ * Null until a site has been published, which is most of them.
+ */
+export interface PublishedTo {
+  /** The site it went to, as an address. */
+  address: string;
+  /** Which connected host it belongs to, or empty when typed in by hand. */
+  host: string;
+  /** A label for the target, so the editor can name it without asking a host. */
+  label: string;
+  /** WordPress page ids, keyed by this console's slug for the page. */
+  pages: Record<string, number>;
+  /** Whether the pages went up live or as drafts. */
+  status: "publish" | "draft";
+  /** Whether the generated design travelled with them. */
+  withDesign: boolean;
+  at: string;
+  by: string;
+}
+
 export interface Website {
   id: string;
   name: string;
@@ -152,6 +180,8 @@ export interface Website {
   createdBy: string;
   updatedAt: string;
   updatedBy: string;
+  /** Where it was last published, or null. */
+  published: PublishedTo | null;
 }
 
 /** Enough to be useful, few enough that the list stays a list. */
@@ -423,6 +453,9 @@ export function withDefaults(site: Website): Website {
     footer: cleanFooter(site.footer),
     theme: cleanTheme(site.theme),
     design: cleanDesign(site.design),
+    // Sites written before publishing existed have no record of it, which is
+    // the same thing as never having been published.
+    published: site.published ?? null,
   };
 }
 
