@@ -937,6 +937,12 @@ export default function WebsiteEditor({ id }: { id: string }) {
                       const to = pages.findIndex((p) => p.slug === slug);
                       if (to >= 0) setAt(to);
                     }}
+                    // Full screen hides the rest of the editor, so it carries
+                    // its own way to save and to publish.
+                    onSave={() => void save()}
+                    onPublish={() => setSection("publish")}
+                    dirty={dirty}
+                    saving={saving}
                   />
                   <p className="provider-hint">
                     {site.status === "building"

@@ -117,6 +117,10 @@ export default function VisualEditor({
   onSetting,
   onChromeStyle,
   onNavigate,
+  onSave,
+  onPublish,
+  dirty,
+  saving,
 }: {
   site: Omit<ShellSite, "pages">;
   pages: ShellPage[];
@@ -142,6 +146,16 @@ export default function VisualEditor({
    */
   onChromeStyle: (selector: string, property: string, value: string) => void;
   onNavigate: (slug: string) => void;
+  /**
+   * Saving and publishing, for when this is the whole window.
+   *
+   * Full screen hides the page these two normally live on, and the moment
+   * somebody is most likely to want them is after an hour of editing in it.
+   */
+  onSave: () => void;
+  onPublish: () => void;
+  dirty: boolean;
+  saving: boolean;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [chosen, setChosen] = useState<Chosen | null>(null);
@@ -410,6 +424,31 @@ export default function VisualEditor({
             ),
           )}
         </div>
+
+        {full && editable ? (
+          <>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm ve-save"
+              onClick={onSave}
+              disabled={!dirty || saving}
+            >
+              {saving ? "Saving…" : dirty ? "Save changes" : "Saved"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                // Publishing is a tab on the page behind this, so the way to it
+                // is out of here first.
+                setFull(false);
+                onPublish();
+              }}
+            >
+              Publish
+            </button>
+          </>
+        ) : null}
 
         <button
           type="button"
