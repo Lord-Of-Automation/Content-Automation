@@ -64,7 +64,7 @@ export const SITE_TOOLS = [
       properties: {
         slug: {
           type: "string",
-          description: "The page's slug. The front page's slug is the empty string.",
+          description: "The page's slug. The front page's slug is the empty string, which has to be passed as one rather than left out.",
         },
       },
       required: ["slug"],
@@ -194,10 +194,31 @@ export const SITE_TOOLS = [
   },
 ];
 
-/** The page a slug names, or nothing. The front page's slug is empty. */
+/**
+ * The page a slug names, or nothing.
+ *
+ * An omitted slug is not the front page, and the difference is the whole
+ * reason this is written out. The front page's slug is the empty string, and
+ * String(undefined ?? "") is also the empty string, so a write_page call that
+ * simply forgot its slug was finding the front page and overwriting the
+ * homepage with a draft meant for somewhere else. The schema says the field is
+ * required, which is a request rather than a guarantee.
+ *
+ * So the front page has to be asked for as "", deliberately, and anything that
+ * is not a string at all matches nothing.
+ */
 function find(site: Website, slug: unknown): WebsitePage | undefined {
-  const wanted = String(slug ?? "").trim().replace(/^\/+|\/+$/g, "");
+  if (typeof slug !== "string") return undefined;
+  const wanted = slug.trim().replace(/^\/+|\/+$/g, "");
   return site.pages.find((p) => p.slug === wanted);
+}
+
+/** Said whenever a slug named nothing, so the next attempt can be right. */
+function noSuchPage(site: Website): string {
+  return (
+    `There is no page with that slug. Pass one of these exactly, and the front ` +
+    `page as an empty string: ${names(site)}.`
+  );
 }
 
 function names(site: Website): string {
@@ -252,7 +273,7 @@ export function applyTool(
 
     case "read_page": {
       const page = find(site, input.slug);
-      if (!page) return no(`There is no page with that slug. The site has: ${names(site)}.`);
+      if (!page) return no(noSuchPage(site));
       return {
         site,
         result: {
@@ -266,7 +287,7 @@ export function applyTool(
 
     case "write_page": {
       const page = find(site, input.slug);
-      if (!page) return no(`There is no page with that slug. The site has: ${names(site)}.`);
+      if (!page) return no(noSuchPage(site));
 
       if (input.bodyHtml !== undefined) {
         const body = String(input.bodyHtml);
@@ -341,7 +362,7 @@ export function applyTool(
 
     case "remove_page": {
       const page = find(site, input.slug);
-      if (!page) return no(`There is no page with that slug. The site has: ${names(site)}.`);
+      if (!page) return no(noSuchPage(site));
       if (!page.slug) return no("The front page cannot be removed.");
       if (site.pages.length <= 1) return no("A site must keep at least one page.");
       return {

@@ -773,7 +773,16 @@ export async function listMedia(
   const query = new URLSearchParams({
     media_type: "image",
     per_page: String(options.perPage ?? 24),
-    page: String(Math.max(1, options.page ?? 1)),
+    /*
+     * A page number that is actually a number.
+     *
+     * The caller reads this off a query string, so it arrives as whatever
+     * somebody typed. Math.max(1, NaN) is NaN, which was being sent to
+     * WordPress as page=NaN and coming back a 400: a malformed address in this
+     * console's own URL turned into an error from the site, which is a long
+     * way to look for a typo.
+     */
+    page: String(Math.max(1, Math.trunc(Number(options.page)) || 1)),
     orderby: "date",
     order: "desc",
     _fields: "id,source_url,alt_text,title,media_details,date",
