@@ -500,12 +500,7 @@ export default function PerformanceView() {
               ) : null}
 
               <p className="domain-note">
-                Whole days in each property&rsquo;s own time zone, ending
-                yesterday &mdash; today is always partial, and half a day beside
-                twenty-seven whole ones makes every trend look like a collapse.
-                A site with no impressions is not an error: it is a property
-                Google has nothing to report for. Read as{" "}
-                <code>{data.readingAs}</code>.
+                Read as <code>{data.readingAs}</code>.
               </p>
             </>
           ) : null}

@@ -648,24 +648,6 @@ export default function AppsView() {
                   </button>
                 </div>
               ) : null}
-
-              <p className="domain-note">
-                Every site on every connected host. The name links to the
-                domain when one is pointed at it, and to the host&rsquo;s own
-                address otherwise. An <strong>SSL</strong> mark means Cloudways
-                holds a certificate; most of these sit behind Cloudflare, which
-                does its own, so no mark does not mean no padlock, and Hostinger
-                does not report certificates at all. Cloudways returns four
-                passwords per application and only the admin login is kept, the
-                rest dropped before anything reaches your browser; it is what
-                was set at install, so it will be out of date if someone has
-                changed it since. Hostinger returns no passwords, and supports
-                neither cloning nor domain changes, so those controls do not
-                appear on its rows. <strong>Clear cache</strong> on a row goes
-                through Cloudflare and clears that one site; the button beside
-                the filter goes through Cloudways, which purges Varnish by
-                server and offers nothing smaller.
-              </p>
             </>
           ) : null}
         </div>

@@ -834,23 +834,21 @@ export default function DomainsView() {
                 </div>
               ) : null}
 
-              <p className="domain-note">
-                Prices are each registrar&rsquo;s published renewal rate for the
-                extension, looked up once per extension and applied to every
-                domain on it. They are not a quote for your account: a discount
-                club membership, a multi-year term or a premium name will all
-                differ. Neither registrar publishes what was originally paid, so
-                that is not shown at all.
-                {sources
-                  .filter((s) => s.unpriced.length)
-                  .map((s) => (
-                    <span key={s.provider}>
-                      {" "}
-                      {s.label} would not price{" "}
-                      {s.unpriced.map((x) => `.${x}`).join(", ")}.
-                    </span>
-                  ))}
-              </p>            </>
+              {/* Not an explanation of the column: the reason some rows in it
+                  are empty. Silent, when every extension priced. */}
+              {sources.some((s) => s.unpriced.length) ? (
+                <p className="domain-note">
+                  {sources
+                    .filter((s) => s.unpriced.length)
+                    .map((s) => (
+                      <span key={s.provider}>
+                        {s.label} would not price{" "}
+                        {s.unpriced.map((x) => `.${x}`).join(", ")}.{" "}
+                      </span>
+                    ))}
+                </p>
+              ) : null}
+            </>
           ) : null}
         </div>
       </div>
