@@ -5890,6 +5890,18 @@ body:has(.bulkbar) main {
   position: relative;
 }
 
+/* One height across the filter row.
+   The search box, the filter pills and this menu are three different kinds of
+   control and stood at three different heights, which reads as three rows of
+   one thing rather than one row of three. The pills and an ordinary button
+   already agreed within half a pixel; it is the input that came down to meet
+   them. */
+.domain-bar .domain-search,
+.domain-bar .seg,
+.domain-bar .cols > .btn {
+  height: 34px;
+}
+
 .cols .btn svg {
   width: 14px;
   height: 14px;
@@ -5898,6 +5910,15 @@ body:has(.bulkbar) main {
 
 /* How many are off, on the button rather than only inside the menu. A table
    missing a column somebody forgot they hid is a table that looks broken. */
+/* A ghost button that is currently on: a menu open, a panel showing. Tinted
+   rather than filled, because it is still the same button and a filled one
+   reads as the page's main action. */
+.btn-ghost.is-on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
 .cols-count {
   padding: 1px 6px;
   border-radius: 999px;

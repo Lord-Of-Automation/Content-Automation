@@ -167,7 +167,7 @@ export function ColumnPicker({
     <div className="cols" ref={wrap}>
       <button
         type="button"
-        className={chosen.count ? "btn btn-ghost btn-sm is-on" : "btn btn-ghost btn-sm"}
+        className={chosen.count ? "btn btn-ghost is-on" : "btn btn-ghost"}
         aria-expanded={open}
         aria-haspopup="true"
         onClick={() => setOpen((on) => !on)}
