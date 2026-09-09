@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { auth } from "@/auth";
 import { logout } from "@/app/actions";
+import NavLink from "@/components/NavLink";
 import NavMenu from "@/components/NavMenu";
 import type { Section } from "@/lib/nav";
 import ProfileMenu from "@/components/ProfileMenu";
@@ -83,12 +84,12 @@ export default async function TopBar({
 
               AI Websites rather than Websites, which is every page on every
               host in this console. These are the ones written here. */}
-          <Link
+          <NavLink
             href="/websites"
             className={current === "websites" ? "topnav-link is-current" : "topnav-link"}
           >
             AI Websites
-          </Link>
+          </NavLink>
           {/* Between Websites and Search Console on purpose: what is
               registered, what is running on it, what it earns.
 
@@ -96,27 +97,27 @@ export default async function TopBar({
               site and nobody else's. The page lists what is hosted across two
               hosts, and the row for a Hostinger site was never an application
               in anybody's vocabulary. */}
-          <Link
+          <NavLink
             href="/apps"
             className={current === "apps" ? "topnav-link is-current" : "topnav-link"}
           >
             Hosting
-          </Link>
+          </NavLink>
           {/* Named for the thing it reads rather than for what the numbers
               are about. Everything in this console is performance; only this
               page is Google's own report of it. */}
-          <Link
+          <NavLink
             href="/performance"
             className={current === "performance" ? "topnav-link is-current" : "topnav-link"}
           >
             Search Console
-          </Link>
-          <Link
+          </NavLink>
+          <NavLink
             href="/logs"
             className={current === "logs" ? "topnav-link is-current" : "topnav-link"}
           >
             Logs
-          </Link>
+          </NavLink>
         </nav>
 
         <div className="spacer" />

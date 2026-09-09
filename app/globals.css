@@ -6359,3 +6359,239 @@ body:has(.bulkbar) main {
     font-size: 21px;
   }
 }
+
+
+/* --------------------------------------------------------------- movement */
+
+/*
+ * How this console moves, said once.
+ *
+ * Fifty-four hover states and forty-two clickable things shared sixteen
+ * transitions between them, so about two thirds of everything you could point
+ * at changed instantly. Nothing was wrong with any single one of them; the sum
+ * was a product that felt twitchy rather than settled.
+ *
+ * One duration for everything that responds to a pointer, and it is short. A
+ * hundred and twenty milliseconds is long enough to be seen as a change rather
+ * than a jump, and short enough that nobody waits for it. Anything slower on a
+ * control is a control that feels reluctant.
+ */
+:root {
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+  --quick: 120ms;
+}
+
+/*
+ * Named properties rather than `all`.
+ *
+ * `transition: all` animates things nobody meant, and the ones that hurt are
+ * the layout properties: a width or a height caught by it turns a re-render
+ * into a visible slide. These four are the ones a hover actually changes.
+ */
+a,
+button,
+summary,
+label.check,
+.tld,
+.seg-btn,
+.topnav-link,
+.navmenu-item,
+.profile-item,
+.ov-row,
+.ask-opener,
+.cols-item,
+.site-check,
+input,
+select,
+textarea {
+  transition:
+    background-color var(--quick) var(--ease),
+    border-color var(--quick) var(--ease),
+    color var(--quick) var(--ease),
+    box-shadow var(--quick) var(--ease);
+}
+
+/* Rows are the exception worth making: hundreds of them, and a transition on
+   each is work the browser does on every repaint of a long table. */
+.logs tbody tr {
+  transition: background-color var(--quick) var(--ease);
+}
+
+/*
+ * The dialogs that had no motion at all.
+ *
+ * Menus, toasts, the date picker and the bulk bar all animate in and each has
+ * its own keyframes. The two largest things that appear — the sheet and the
+ * confirmation — simply popped. A dialog is the most abrupt thing in a product
+ * and was the only thing not softened.
+ */
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+}
+
+.sheet-card,
+.confirm-card,
+.confirm > form,
+.sheet[open],
+.confirm[open] {
+  animation: dialog-in 140ms var(--ease);
+}
+
+.sheet::backdrop,
+.confirm::backdrop {
+  animation: fade-in 140ms var(--ease);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/*
+ * Content arriving where a skeleton was.
+ *
+ * The shape was already held, so nothing moves; what was missing is that the
+ * real thing appeared in a single frame. A short fade reads as the data
+ * landing rather than as the page being replaced.
+ *
+ * On the table rather than the rows: a hundred rows each fading independently
+ * is a hundred animations and looks like a wave.
+ */
+.card-body > table.logs,
+.ov-list,
+.loop-list {
+  animation: fade-in 160ms var(--ease);
+}
+
+/*
+ * A value that changed while you were looking elsewhere.
+ *
+ * Six views poll on a timer, so a run's status can move without anybody
+ * touching anything. It moved silently, which is the worst way for a number to
+ * change: you either miss it or you distrust the whole list.
+ */
+@keyframes just-changed {
+  from {
+    background-color: var(--accent-soft);
+  }
+}
+
+.just-changed {
+  animation: just-changed 1.2s var(--ease);
+}
+
+/*
+ * Anything that scrolls the page does it as a movement.
+ *
+ * Nothing set this, so every jump to an anchor or a restored position was
+ * instant. It is one line and it is the cheapest smoothing here.
+ */
+html {
+  scroll-behavior: smooth;
+}
+
+/*
+ * A sticky heading that knows it is holding something up.
+ *
+ * A shadow painted permanently is a heading that looks detached before you
+ * scroll. This draws it only once the table has moved under it, using a
+ * scroll-driven animation, which is a progressive enhancement: a browser
+ * without it gets exactly what it had before.
+ */
+@supports (animation-timeline: scroll()) {
+  @keyframes lift {
+    to {
+      box-shadow:
+        inset 0 -1px 0 var(--line),
+        0 6px 12px -8px color-mix(in srgb, var(--ink) 35%, transparent);
+    }
+  }
+
+  .logs thead th {
+    animation: lift linear both;
+    animation-timeline: scroll();
+    animation-range: 0 120px;
+  }
+}
+
+/*
+ * Not skipping the layout of off-screen rows, though it was tempting.
+ *
+ * content-visibility: auto would stop the browser measuring three hundred
+ * domain rows on every repaint, and on a list that long it is real work. It is
+ * also wrong here. A table with automatic layout sizes its columns from the
+ * content of its rows, so rows whose layout is skipped do not vote, and the
+ * columns re-measure as they scroll into view. The gain is a faster repaint;
+ * the cost is column widths shifting under the reader, which is the exact
+ * thing everything else in this section is for.
+ *
+ * It becomes safe with a fixed table layout, and that is a decision about how
+ * these tables are sized rather than a performance tweak.
+ */
+
+/*
+ * The mark on a link that is loading the page it points at.
+ *
+ * Two dots rather than a spinner: it sits inside a navigation pill a few
+ * pixels tall, and a spinner at that size is a smudge. Delayed, because a
+ * navigation that resolves in eighty milliseconds does not need announcing and
+ * an indicator that flashes on every click is worse than none.
+ */
+.nav-pending {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  margin-left: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: middle;
+  opacity: 0;
+  animation: nav-pending 900ms var(--ease) 140ms infinite;
+}
+
+@keyframes nav-pending {
+  0% { opacity: 0.15; }
+  50% { opacity: 0.9; }
+  100% { opacity: 0.15; }
+}
+
+/*
+ * And none of it for anybody who asked their system for less movement.
+ *
+ * Everything above is decoration on something that already worked, which is
+ * exactly the kind of thing this setting exists to turn off. The scroll
+ * behaviour goes back to instant; the transitions go to a duration short
+ * enough to be a change of state rather than an animation.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --quick: 1ms;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+
+  .sheet-card,
+  .confirm-card,
+  .confirm > form,
+  .sheet[open],
+  .confirm[open],
+  .sheet::backdrop,
+  .confirm::backdrop,
+  .card-body > table.logs,
+  .ov-list,
+  .loop-list,
+  .just-changed,
+  .nav-pending {
+    animation: none;
+  }
+
+  .nav-pending {
+    opacity: 0.9;
+  }
+}

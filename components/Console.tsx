@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import RunForm, { type RunValues } from "@/components/RunForm";
 import RunProgress from "@/components/RunProgress";
 import StatusBadge from "@/components/StatusBadge";
+import { useChanged } from "@/lib/changed";
 import { formatDuration, formatWhen } from "@/lib/format";
 import type { ExecutionDetail, ExecutionSummary, N8nStatus } from "@/lib/n8n";
 
@@ -26,6 +27,45 @@ function isTerminal(status: N8nStatus | undefined): boolean {
 }
 
 type Pending = { startedAt: string; since: number };
+
+/**
+ * One run in the list, as its own component.
+ *
+ * Its own, because whether this run's status just moved is a question with an
+ * answer per row, and a hook cannot be called inside a map. Splitting it also
+ * means a poll that changes one run re-renders one row.
+ */
+function RunRow({
+  run,
+  selected,
+  onSelect,
+}: {
+  run: ExecutionSummary;
+  selected: boolean;
+  onSelect: (id: string) => void;
+}) {
+  // The list refreshes on a timer, so a run can finish while somebody is
+  // reading. Marked for a moment, so the change is seen rather than merely
+  // having happened.
+  const moved = useChanged(run.status);
+
+  return (
+    <li>
+      <button
+        type="button"
+        className={moved ? "run just-changed" : "run"}
+        aria-current={selected}
+        onClick={() => onSelect(run.id)}
+      >
+        <span className="run-id">#{run.id}</span>
+        <span className="run-meta">
+          {formatWhen(run.startedAt)} · {formatDuration(run.startedAt, run.stoppedAt)}
+        </span>
+        <StatusBadge status={run.status} />
+      </button>
+    </li>
+  );
+}
 
 export default function Console() {
   const [history, setHistory] = useState<ExecutionSummary[]>([]);
@@ -498,21 +538,12 @@ export default function Console() {
               <>
                 <ul className="runs">
                   {history.slice(0, visibleRuns).map((run) => (
-                    <li key={run.id}>
-                      <button
-                        type="button"
-                        className="run"
-                        aria-current={run.id === selectedId}
-                        onClick={() => selectRun(run.id)}
-                      >
-                        <span className="run-id">#{run.id}</span>
-                        <span className="run-meta">
-                          {formatWhen(run.startedAt)} ·{" "}
-                          {formatDuration(run.startedAt, run.stoppedAt)}
-                        </span>
-                        <StatusBadge status={run.status} />
-                      </button>
-                    </li>
+                    <RunRow
+                      key={run.id}
+                      run={run}
+                      selected={run.id === selectedId}
+                      onSelect={selectRun}
+                    />
                   ))}
                 </ul>
                 {history.length > visibleRuns ? (
