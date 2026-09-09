@@ -115,6 +115,33 @@ function isWholeSite(pages: number): boolean {
   return pages === 0 || pages >= 1000;
 }
 
+/**
+ * The same loop again, as a new one.
+ *
+ * Opened in the form rather than saved on the spot. A duplicate is made to
+ * change something — a second competitor, a different market, the casino half
+ * of the same site — and a copy that saved itself would put the thing you were
+ * about to edit into the schedule before you edited it.
+ *
+ * Paused, and named as a copy. A duplicate that arrives switched on is a
+ * second crawl of the same site tonight, which is the one outcome nobody
+ * pressing Duplicate is asking for.
+ *
+ * The password is not copied because it is never here to copy. The save
+ * attaches whatever login is stored for that site, which is also the more
+ * correct answer: a copy gets the current credentials rather than whatever
+ * the original was created with.
+ */
+function copyOf(schedule: Schedule): Draft {
+  const from = draftOf(schedule);
+  return {
+    ...from,
+    id: undefined,
+    name: `${schedule.name} copy`.slice(0, 120),
+    enabled: false,
+  };
+}
+
 function draftOf(schedule: Schedule): Draft {
   return {
     id: schedule.id,
@@ -502,6 +529,15 @@ export default function LoopView() {
                         onClick={() => setDraft(draftOf(schedule))}
                       >
                         Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        disabled={busy}
+                        title="Open a copy of this loop, paused, for you to change and save."
+                        onClick={() => setDraft(copyOf(schedule))}
+                      >
+                        Duplicate
                       </button>
                       <button
                         type="button"
