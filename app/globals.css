@@ -4474,7 +4474,11 @@ body:has(.bulkbar) main {
   grid-template-areas:
     "preview preview"
     "pages   panel";
-  gap: 18px;
+  /* More between the rows than between the columns. The page and the controls
+     under it are two different things and want a gap that says so, where the
+     page list and the panel beside it are one row of controls. A paragraph of
+     help used to do this by accident, and it went. */
+  gap: 26px 18px;
   align-items: start;
 }
 

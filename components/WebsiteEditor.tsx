@@ -34,7 +34,6 @@ function ClaudeMark() {
 }
 
 import VisualEditor from "@/components/VisualEditor";
-import { hasBehaviour } from "@/lib/pagehtml";
 import SitePreview from "@/components/SitePreview";
 import SitePublish from "@/components/SitePublish";
 import SiteVersions from "@/components/SiteVersions";
@@ -1024,18 +1023,22 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     dirty={dirty}
                     saving={saving}
                   />
-                  <p className="provider-hint">
-                    {site.status === "building"
-                      ? "Read only while the site is still being written: a page that is rewritten under you would lose the edit."
-                      : editing
-                        ? "Click anything in the page to select it, then change its type, colour, spacing or size on the right. Typing works wherever the cursor is, including the words in the header and footer: the site's name and tagline, what the footer says, the label on any link and the title of any page in a menu. Selecting something in the header or footer works too, so its colour, size and typeface can be changed from the same panel. Where a link points, and what shows at all, are on the Header and footer tab. Save changes writes it down."
-                        : "The whole site, header and footer included. The navigation works, and anything the page does for itself runs here. This is the document the download writes to a file."}
-                  </p>
-                  {editing && hasBehaviour(page.bodyHtml) ? (
+                  {/* Two states left, and neither explains the editor.
+                      Read only says why nothing responds, and the preview
+                      note says what is being looked at. Editing says
+                      nothing at all: the panel on the right is the
+                      instruction, and a paragraph repeating it sat under
+                      the page on every visit forever. */}
+                  {site.status === "building" ? (
                     <p className="provider-hint">
-                      This page carries a script or its own styles. They run
-                      here as they will once it is hosted, in a frame that can
-                      reach nothing of the console. Your edits keep them.
+                      Read only while the site is still being written: a page that
+                      is rewritten under you would lose the edit.
+                    </p>
+                  ) : !editing ? (
+                    <p className="provider-hint">
+                      The whole site, header and footer included. The navigation
+                      works, and anything the page does for itself runs here. This
+                      is the document the download writes to a file.
                     </p>
                   ) : null}
                 </aside>
