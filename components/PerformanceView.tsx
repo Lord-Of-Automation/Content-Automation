@@ -4,7 +4,24 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import DatePicker from "@/components/DatePicker";
 import { Select } from "@/components/Select";
+import { ColumnPicker, useColumns, type ColumnSpec } from "@/components/Columns";
 import { SkeletonTable } from "@/components/Skeleton";
+
+/**
+ * The columns, and which may be turned off.
+ *
+ * The site stays, and so does the last column, which holds the link out to
+ * Search Console itself. The four figures are what somebody is here for on any
+ * one visit, and rarely all four: a check on traffic is clicks, and a check on
+ * how a page is doing in the results is position.
+ */
+const COLUMNS: ColumnSpec[] = [
+  { key: "site", label: "Site", fixed: true },
+  { key: "clicks", label: "Clicks" },
+  { key: "impressions", label: "Impressions" },
+  { key: "ctr", label: "CTR" },
+  { key: "position", label: "Avg position" },
+];
 
 type Site = {
   siteUrl: string;
@@ -92,6 +109,7 @@ export default function PerformanceView() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [loading, setLoading] = useState(true);
+  const columns = useColumns("performance", COLUMNS);
   const [error, setError] = useState<string | null>(null);
   const [configError, setConfigError] = useState(false);
   const [query, setQuery] = useState("");
@@ -368,6 +386,8 @@ export default function PerformanceView() {
                     ]}
                   />
                 </div>
+                <ColumnPicker specs={COLUMNS} chosen={columns} />
+
                 <span className="domain-counts">
                   <span className="domain-count">
                     <strong>{data.startDate}</strong> to {data.endDate}
@@ -386,14 +406,16 @@ export default function PerformanceView() {
                         ["ctr", "CTR", "mid"],
                         ["position", "Avg position", "mid"],
                       ] as Array<[SortKey, string, string]>
-                    ).map(([key, label, align]) => (
-                      <th key={key} className={align ? `${align} sortable` : "sortable"}>
-                        <button type="button" onClick={() => sortBy(key)}>
-                          {label}
-                          <Chevrons state={sortKey === key ? direction : "none"} />
-                        </button>
-                      </th>
-                    ))}
+                    )
+                      .filter(([key]) => columns.shown(key))
+                      .map(([key, label, align]) => (
+                        <th key={key} className={align ? `${align} sortable` : "sortable"}>
+                          <button type="button" onClick={() => sortBy(key)}>
+                            {label}
+                            <Chevrons state={sortKey === key ? direction : "none"} />
+                          </button>
+                        </th>
+                      ))}
                     <th />
                   </tr>
                 </thead>
@@ -410,14 +432,22 @@ export default function PerformanceView() {
                           {s.site}
                         </a>
                       </td>
-                      <td className="mid">{whole(s.clicks)}</td>
-                      <td className="mid">{whole(s.impressions)}</td>
-                      <td className="mid">
-                        {s.impressions ? `${(s.ctr * 100).toFixed(1)}%` : <span className="quiet">—</span>}
-                      </td>
-                      <td className="mid">
-                        {s.position ? s.position.toFixed(1) : <span className="quiet">—</span>}
-                      </td>
+                      {columns.shown("clicks") ? (
+                        <td className="mid">{whole(s.clicks)}</td>
+                      ) : null}
+                      {columns.shown("impressions") ? (
+                        <td className="mid">{whole(s.impressions)}</td>
+                      ) : null}
+                      {columns.shown("ctr") ? (
+                        <td className="mid">
+                          {s.impressions ? `${(s.ctr * 100).toFixed(1)}%` : <span className="quiet">—</span>}
+                        </td>
+                      ) : null}
+                      {columns.shown("position") ? (
+                        <td className="mid">
+                          {s.position ? s.position.toFixed(1) : <span className="quiet">—</span>}
+                        </td>
+                      ) : null}
                       <td className="detail">
                         {s.error && TROUBLE[s.errorKind] ? (
                           <>

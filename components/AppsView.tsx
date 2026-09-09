@@ -8,7 +8,24 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import NewApplication from "@/components/NewApplication";
 import { Select } from "@/components/Select";
 import { HOSTS, type HostId } from "@/lib/hosts";
+import { ColumnPicker, useColumns, type ColumnSpec } from "@/components/Columns";
 import { SkeletonTable } from "@/components/Skeleton";
+
+/**
+ * The columns, and which may be turned off.
+ *
+ * The name and the buttons stay: one is how you know which site a row is, the
+ * other is how you do anything to it. The rest are facts somebody needs on one
+ * visit and not the next, and the admin login is a whole password box that most
+ * visits are not here for.
+ */
+const COLUMNS: ColumnSpec[] = [
+  { key: "name", label: "Application", fixed: true },
+  { key: "platform", label: "Platform" },
+  { key: "server", label: "Server" },
+  { key: "admin", label: "Admin login" },
+  { key: "actions", label: "Actions", fixed: true },
+];
 
 type App = {
   host: HostId;
@@ -99,6 +116,7 @@ function Chevrons({ state }: { state: "none" | "asc" | "desc" }) {
 export default function AppsView() {
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
+  const columns = useColumns("apps", COLUMNS);
   const [error, setError] = useState<string | null>(null);
   const [configError, setConfigError] = useState(false);
   const [query, setQuery] = useState("");
@@ -460,6 +478,8 @@ export default function AppsView() {
                         : "Flush cache on every server"}
                   </button>
                 ) : null}
+                <ColumnPicker specs={COLUMNS} chosen={columns} />
+
                 <span className="domain-counts">
                   <span className="domain-count">
                     {shown.length > visible ? (
@@ -485,14 +505,16 @@ export default function AppsView() {
                         ["server", "Server", "mid"],
                         ["admin", "Admin login", "mid cred-cell"],
                       ] as Array<[SortKey, string, string]>
-                    ).map(([key, label, align]) => (
-                      <th key={key} className={align ? `${align} sortable` : "sortable"}>
-                        <button type="button" onClick={() => sortBy(key)}>
-                          {label}
-                          <Chevrons state={sortKey === key ? direction : "none"} />
-                        </button>
-                      </th>
-                    ))}
+                    )
+                      .filter(([key]) => columns.shown(key))
+                      .map(([key, label, align]) => (
+                        <th key={key} className={align ? `${align} sortable` : "sortable"}>
+                          <button type="button" onClick={() => sortBy(key)}>
+                            {label}
+                            <Chevrons state={sortKey === key ? direction : "none"} />
+                          </button>
+                        </th>
+                      ))}
                     {/* Not sortable: it holds controls, not a value to order
                         rows by. Right, to sit over the buttons beneath it. */}
                     <th className="act-head">Actions</th>
@@ -520,23 +542,29 @@ export default function AppsView() {
                           <div className="app-sub">{a.label}</div>
                         ) : null}
                       </td>
-                      <td className="mid">
-                        {a.platformLabel}
-                        {a.version ? <span className="app-sub-inline">{a.version}</span> : null}
-                      </td>
-                      <td className="mid">
-                        <span className="registrar">{a.placeLabel}</span>
-                        <div className="app-sub">
-                          {/* The host, once there is more than one connected.
-                              With one it is the same word on every row. */}
-                          {(data?.connected.length ?? 0) > 1
-                            ? HOSTS[a.host].label
-                            : a.placeAddress}
-                        </div>
-                      </td>
-                      <td className="mid cred-cell">
-                        <AppCredential user={a.adminUser} password={a.adminPassword} />
-                      </td>
+                      {columns.shown("platform") ? (
+                        <td className="mid">
+                          {a.platformLabel}
+                          {a.version ? <span className="app-sub-inline">{a.version}</span> : null}
+                        </td>
+                      ) : null}
+                      {columns.shown("server") ? (
+                        <td className="mid">
+                          <span className="registrar">{a.placeLabel}</span>
+                          <div className="app-sub">
+                            {/* The host, once there is more than one connected.
+                                With one it is the same word on every row. */}
+                            {(data?.connected.length ?? 0) > 1
+                              ? HOSTS[a.host].label
+                              : a.placeAddress}
+                          </div>
+                        </td>
+                      ) : null}
+                      {columns.shown("admin") ? (
+                        <td className="mid cred-cell">
+                          <AppCredential user={a.adminUser} password={a.adminPassword} />
+                        </td>
+                      ) : null}
                       <td className="detail">
                         <div className="app-links">
                           {!a.domain && !a.staging ? (
