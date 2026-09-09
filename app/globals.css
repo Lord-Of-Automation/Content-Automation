@@ -122,11 +122,31 @@ body {
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  /*
+   * Inter, with the stack it replaces behind it.
+   *
+   * The fallback inside the var() is the part that matters and is easy to get
+   * wrong: an undefined custom property makes the WHOLE declaration invalid at
+   * computed-value time, so `var(--font-sans), ui-sans-serif, …` does not fall
+   * through to the list beside it — it falls all the way to the browser's
+   * default serif. Written without the second argument, this page rendered in
+   * Times New Roman anywhere the variable had not reached, which is every
+   * element if the font ever fails to load at build time.
+   *
+   * The rest of the stack still earns its place: next/font measures Inter and
+   * writes a size-adjusted version of the first of these, so text laid out
+   * before the real face arrives takes the same room and nothing moves when it
+   * does.
+   */
+  font-family:
+    var(--font-sans, ui-sans-serif), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  /* Inter carries an optical size axis; letting it respond keeps small text
+     from thinning out and large text from looking loose. */
+  font-optical-sizing: auto;
 }
 
 a {
@@ -1140,7 +1160,7 @@ button,
 }
 
 .mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12.5px;
 }
 
@@ -1990,7 +2010,7 @@ button,
   width: 100%;
   resize: vertical;
   min-height: 96px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12.5px;
   line-height: 1.6;
   /* Long URLs should scroll rather than wrap mid-path, so a pasted list stays
@@ -3453,7 +3473,7 @@ button,
    running them together makes two look like one. */
 .rr-value {
   font-size: 11.5px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--ink-2);
   word-break: break-all;
 }
@@ -4094,7 +4114,7 @@ body:has(.bulkbar) main {
 }
 
 .cred-value {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
   color: var(--ink-2);
   /* Wide enough for a full email address, which is what most of these are.
@@ -4266,7 +4286,7 @@ body:has(.bulkbar) main {
   flex: 1;
   min-width: 0;
   padding: 8px 10px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
   color: var(--ink);
   background: var(--panel-2);
@@ -4392,7 +4412,7 @@ body:has(.bulkbar) main {
 .editor-page-slug {
   font-size: 11px;
   color: var(--ink-3);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace;
   /* One line: an address is read from the start, so the end is what to lose. */
   max-width: 100%;
   overflow: hidden;
@@ -4407,7 +4427,7 @@ body:has(.bulkbar) main {
 
 /* Monospace, because it is markup. Tall, because it is a whole page of it. */
 .editor-body {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12.5px;
   line-height: 1.6;
 }
@@ -4687,7 +4707,7 @@ body:has(.bulkbar) main {
 
 .preview-size {
   font-size: 11.5px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--ink-3);
 }
 
@@ -4807,7 +4827,7 @@ body:has(.bulkbar) main {
   border: 0;
   border-radius: 5px;
   background: none;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
   color: var(--ink-3);
   cursor: pointer;
@@ -6875,4 +6895,50 @@ html {
   .head-do svg.spin {
     animation-duration: 2.4s;
   }
+}
+
+
+/* ------------------------------------------------------------ the numbers */
+
+/*
+ * Figures that line up down a column.
+ *
+ * Every cell in these tables is data: a price, a date, a count, a position. In
+ * a proportional face a 1 is narrower than a 0, so a column of them wanders,
+ * and comparing two rows means reading rather than glancing. Tabular figures
+ * are the same width by definition, which is what a column is for.
+ *
+ * On the table rather than on the numeric columns, because a date is a figure
+ * too, and so is the number inside a domain called bet365.
+ */
+.logs {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Except where a figure is being read as a word.
+ *
+ * A run id and a domain are strings that happen to contain digits, and forcing
+ * their numbers to a uniform width makes them look like a table of figures
+ * rather than a name.
+ */
+.logs .domain-name,
+.logs .detail,
+.run-id {
+  font-variant-numeric: normal;
+}
+
+/*
+ * A zero that cannot be an O.
+ *
+ * The point of a monospace here is not that it is fixed width, it is that an
+ * application password, a token and a run id are read character by character
+ * and the reader has to be sure. JetBrains Mono slashes its zero by default;
+ * this asks for it explicitly so a fallback face does it too where it can.
+ */
+.cred-box,
+.mono,
+code,
+.run-id {
+  font-variant-numeric: slashed-zero;
 }
