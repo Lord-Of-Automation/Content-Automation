@@ -188,7 +188,6 @@ export default function DomainCheck() {
   const [query, setQuery] = useState("");
   const [tlds, setTlds] = useState<string[]>(DEFAULT_TLDS);
   const [answer, setAnswer] = useState<Answer | null>(null);
-  const [asked, setAsked] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
@@ -224,7 +223,6 @@ export default function DomainCheck() {
       if (!response.ok) throw new Error(payload.error ?? `The check returned ${response.status}.`);
 
       setAnswer(payload as Answer);
-      setAsked(text);
     } catch (e) {
       setAnswer(null);
       setError(e instanceof Error ? e.message : "The name could not be checked.");
@@ -405,16 +403,6 @@ export default function DomainCheck() {
             </div>
           ) : null}
         </>
-      ) : !error ? (
-        <div className="card">
-          <div className="card-body">
-            <p className="quiet">
-              {asked
-                ? "Nothing came back for that one."
-                : "Type a name above. If it is taken, the same name on other endings appears underneath, with what each costs to buy and to keep."}
-            </p>
-          </div>
-        </div>
       ) : null}
     </div>
   );
