@@ -6753,3 +6753,126 @@ html {
     transform: none;
   }
 }
+
+
+/* ------------------------------------------------- the actions on a site */
+
+/*
+ * Three buttons doing three unrelated things, weighted by what they do.
+ *
+ * They were identical ghosts, so a row of them was three grey rectangles and
+ * telling them apart meant reading them. Colour here is not decoration: it is
+ * the difference between leaving the console, changing something out on the
+ * live site, and opening a dialog.
+ *
+ * Only one of them is coloured. Three colours on every row of a long table is
+ * a table nobody can scan, so the one people press most gets the accent and
+ * the other two stay quiet until the pointer is on them.
+ */
+.app-do {
+  gap: 6px;
+}
+
+.app-do svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+/* Leaves the console for the site's own admin, which is what most visits to
+   this page are for. */
+.app-do.is-go {
+  color: var(--accent);
+}
+
+.app-do.is-go svg {
+  /* Slightly back, so the arrow reads as a mark on the label rather than as
+     another word in it. */
+  opacity: 0.75;
+}
+
+/*
+ * Reaches out and changes something on the live site.
+ *
+ * Quiet at rest and warm under the pointer. A permanent warning colour on
+ * every row would shout on a page where nothing is wrong; a warning at the
+ * moment somebody is about to press it is the same information, delivered when
+ * it is worth anything.
+ */
+.app-do.is-cache:hover:not(:disabled) {
+  background: var(--warn-soft);
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 35%, var(--line-2));
+}
+
+/* Opens a dialog and changes nothing by itself, so it stays neutral. */
+.app-do.is-modify:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+/* Mid-purge, the button says so rather than merely being unpressable. */
+.app-do.is-cache:disabled {
+  background: var(--warn-soft);
+  color: var(--warn);
+  opacity: 1;
+  cursor: progress;
+}
+
+
+/*
+ * The two buttons in the Hosting header.
+ *
+ * They were the same small ghost, so reading the page again and creating a
+ * hosted site looked like the same size of decision. One of them makes
+ * something exist.
+ */
+.head-do {
+  gap: 7px;
+}
+
+.head-do svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+/*
+ * The page's own action, and the only place the accent appears up here.
+ *
+ * width:auto because .btn-primary is full width by default, which is a trap
+ * this has now been scoped around in six places.
+ */
+.head-do.is-new {
+  width: auto;
+  padding: 8px 15px;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.head-do.is-new:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+/* Turning while it reads. Its own mark rather than its label, so the button
+   does not change width under a pointer that is still on it. */
+.head-do svg.spin {
+  animation: head-spin 900ms linear infinite;
+}
+
+@keyframes head-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A disabled Refresh is a Refresh that is working, not one that is forbidden. */
+.head-do:disabled {
+  opacity: 0.75;
+  cursor: progress;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .head-do svg.spin {
+    animation-duration: 2.4s;
+  }
+}

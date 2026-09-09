@@ -27,6 +27,76 @@ const COLUMNS: ColumnSpec[] = [
   { key: "actions", label: "Actions", fixed: true },
 ];
 
+/**
+ * The marks on a row's three actions.
+ *
+ * Three buttons that did three unrelated things looked identical, so telling
+ * them apart on a row you were not reading meant reading them. An icon is what
+ * the eye lands on first, and at this size a shape is faster than a word.
+ *
+ * Drawn rather than loaded: each takes the colour of the button it sits in,
+ * which is the point of giving those buttons different colours at all.
+ */
+/**
+ * The two marks in the page's header.
+ *
+ * Refresh spins its own icon while it reads rather than swapping its label for
+ * a longer one, which resizes a button somebody's pointer is still on.
+ */
+function RefreshIcon({ spinning }: { spinning?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className={spinning ? "spin" : undefined}
+      aria-hidden
+    >
+      <path d="M20 11a8 8 0 1 0-1.6 5.2" />
+      <path d="M20 4v7h-7" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function OpenIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M14 4h6v6" />
+      <path d="M20 4l-8 8" />
+      <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+    </svg>
+  );
+}
+
+function SweepIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M4 20l5-5" />
+      <path d="M11 9l4 4" />
+      <path d="M15 5l4 4-6 6-4-4z" />
+      <path d="M3 21h6" />
+    </svg>
+  );
+}
+
+function ModifyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4" />
+    </svg>
+  );
+}
+
 type App = {
   host: HostId;
   key: string;
@@ -359,19 +429,27 @@ export default function AppsView() {
             <h2>Hosting</h2>
           </div>
           <div className="app-head-actions">
+            {/* Reading, rather than doing: quiet, and it says so by spinning
+                its own mark rather than by changing into a different word that
+                resizes the button under the pointer. */}
             <button
               type="button"
-              className="btn btn-ghost btn-sm"
+              className="btn btn-ghost head-do"
               onClick={() => void load()}
               disabled={loading}
+              title="Read every connected host again"
             >
+              <RefreshIcon spinning={loading} />
               {loading ? "Reading…" : "Refresh"}
             </button>
+            {/* The one thing on this page that makes something exist. It is
+                the page's action and it looks like one. */}
             <button
               type="button"
-              className="btn btn-ghost btn-sm"
+              className="btn btn-primary head-do is-new"
               onClick={() => setCreating(true)}
             >
+              <PlusIcon />
               New application
             </button>
           </div>
@@ -601,11 +679,13 @@ export default function AppsView() {
                               it. */}
                           {a.adminPath ? (
                             <a
-                              className="btn btn-ghost btn-sm"
+                              className="btn btn-primary-soft btn-sm app-do is-go"
                               href={`${home(a)}${a.adminPath}`}
                               target="_blank"
                               rel="noreferrer noopener"
+                              title={`Open ${a.label}'s own WordPress admin in a new tab`}
                             >
+                              <OpenIcon />
                               Go To Admin
                             </a>
                           ) : null}
@@ -615,19 +695,22 @@ export default function AppsView() {
                           {a.domain ? (
                             <button
                               type="button"
-                              className="btn btn-ghost btn-sm"
+                              className="btn btn-ghost btn-sm app-do is-cache"
                               onClick={() => void purgeSite(a)}
                               disabled={purging === a.key}
                               title={`Clear the Cloudflare cache for ${a.domain}, and nothing else`}
                             >
+                              <SweepIcon />
                               {purging === a.key ? "Clearing…" : "Clear cache"}
                             </button>
                           ) : null}
                           <button
                             type="button"
-                            className="btn btn-ghost btn-sm"
+                            className="btn btn-ghost btn-sm app-do is-modify"
                             onClick={() => setManaging(a)}
+                            title={`Rename ${a.label}, change its domain, clone or delete it`}
                           >
+                            <ModifyIcon />
                             Modify
                           </button>
                         </div>
