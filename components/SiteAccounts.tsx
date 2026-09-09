@@ -23,11 +23,22 @@ type Check = {
   username?: string;
   passwordLength?: number;
   bridge?: boolean;
+  /** True when something other than WordPress answered for the REST API. */
+  gatekeeper?: boolean;
+  site?: string | null;
   identity?: {
     name?: string;
     roles?: string[];
     publish_posts?: boolean;
   } | null;
+  /** Each request the check made and what came back, in the order it made them. */
+  probes?: Array<{
+    label: string;
+    status: number | null;
+    ok: boolean;
+    code?: string | null;
+    message?: string | null;
+  }>;
   reading?: string;
   note?: string;
 };
@@ -247,9 +258,13 @@ export default function SiteAccounts() {
                 {checked[site.domain] ? (
                   <div
                     className={
-                      checked[site.domain]!.reading?.startsWith("The login works, the plugin")
+                      checked[site.domain]!.reading?.endsWith(
+                        "Nothing stands between a run and publishing.",
+                      )
                         ? "site-check is-ok"
-                        : "site-check is-bad"
+                        : checked[site.domain]!.gatekeeper
+                          ? "site-check is-mixed"
+                          : "site-check is-bad"
                     }
                   >
                     <strong>
@@ -257,16 +272,42 @@ export default function SiteAccounts() {
                         checked[site.domain]!.note ??
                         "No answer."}
                     </strong>
-                    {checked[site.domain]!.identity ? (
+
+                    {checked[site.domain]!.identity ||
+                    checked[site.domain]!.site ||
+                    typeof checked[site.domain]!.passwordLength === "number" ? (
                       <span className="site-check-who">
-                        {checked[site.domain]!.identity!.name}
-                        {checked[site.domain]!.identity!.roles?.length
-                          ? ` · ${checked[site.domain]!.identity!.roles!.join(", ")}`
-                          : ""}
-                        {typeof checked[site.domain]!.passwordLength === "number"
-                          ? ` · password ${checked[site.domain]!.passwordLength} characters`
-                          : ""}
+                        {[
+                          checked[site.domain]!.site,
+                          checked[site.domain]!.identity?.name,
+                          checked[site.domain]!.identity?.roles?.join(", "),
+                          typeof checked[site.domain]!.passwordLength === "number"
+                            ? `password ${checked[site.domain]!.passwordLength} characters`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </span>
+                    ) : null}
+
+                    {/* What the sentence above was worked out from.
+                        A reading can be wrong, and this one has been: it once
+                        called a working site broken on the evidence of an
+                        endpoint nothing here uses. Somebody whose own site
+                        disagrees with the verdict should be able to see why
+                        without opening a browser console. */}
+                    {checked[site.domain]!.probes?.length ? (
+                      <ul className="site-probes">
+                        {checked[site.domain]!.probes!.map((probe) => (
+                          <li key={probe.label}>
+                            <span>{probe.label}</span>
+                            <code>
+                              {probe.status ?? "no answer"}
+                              {probe.code ? ` ${probe.code}` : ""}
+                            </code>
+                          </li>
+                        ))}
+                      </ul>
                     ) : null}
                   </div>
                 ) : null}

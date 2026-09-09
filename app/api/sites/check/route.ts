@@ -63,12 +63,16 @@ export async function GET(request: Request) {
     const probe = async (
       label: string,
       path: string,
-      init: RequestInit = {},
+      init: RequestInit & { anonymous?: boolean } = {},
     ): Promise<Record<string, unknown>> => {
+      const { anonymous, ...rest } = init;
       try {
         const response = await fetch(`${origin}${path}`, {
-          ...init,
-          headers: { authorization: auth, ...(init.headers ?? {}) },
+          ...rest,
+          headers: {
+            ...(anonymous ? {} : { authorization: auth }),
+            ...(rest.headers ?? {}),
+          },
           signal: AbortSignal.timeout(20_000),
           cache: "no-store",
         });
@@ -80,7 +84,7 @@ export async function GET(request: Request) {
           status: response.status,
           ok: response.ok,
           code: body?.code ?? null,
-          message: (body?.message ?? text.slice(0, 160)) || null,
+          message: (body?.message ?? body?.error_description ?? text.slice(0, 160)) || null,
           body,
         };
       } catch (error) {
@@ -93,12 +97,56 @@ export async function GET(request: Request) {
       }
     };
 
-    const me = await probe("who am I", "/wp-json/wp/v2/users/me?context=edit");
-    const types = await probe("core REST", "/wp-json/wp/v2/types");
-    // Every namespace the site serves. The content bridge registers n8n/v1,
-    // so its presence here is the plugin being installed and active, asked
-    // for without writing anything.
-    const root = await probe("the REST index", "/wp-json/");
+    /*
+     * What the platform actually does, asked in that order.
+     *
+     * The first version leant on /wp/v2/users/me, which was the wrong question
+     * and gave a wrong answer on a site that publishes perfectly well. Sites
+     * put a plugin in front of the REST API, and those plugins answer for
+     * /wp/v2 in their own words: one of ours replies 400 INVALID_USERNAME to a
+     * Basic header it does not recognise, having never asked WordPress at all.
+     * The login was being called broken on the evidence of a wrapper that
+     * publishing never goes near.
+     *
+     * So three questions, each asked where its answer actually lives.
+     */
+
+    // Is the site there, and is the content bridge on it? The index is public
+    // and lists every namespace a plugin registers, so this needs no login and
+    // cannot be answered wrongly by one.
+    const root = await probe("the site's REST index", "/wp-json/");
+
+    /*
+     * Does the bridge route exist, and does it guard itself?
+     *
+     * Asked WITHOUT credentials, deliberately. Unauthenticated the route
+     * refuses at its permission check and never reaches the handler, so this
+     * cannot write anything: rest_forbidden means the route is there and
+     * protected, rest_no_route means it is missing. Sending the login here
+     * instead would test more and risk creating a post to do it, and a
+     * diagnostic that writes to the site it is diagnosing is the wrong tool.
+     */
+    const bridgeRoute = await probe("the content bridge", "/wp-json/n8n/v1/content", {
+      method: "POST",
+      anonymous: true,
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+
+    /*
+     * Is the login accepted?
+     *
+     * A draft page is a read no stranger may make, so WordPress answers 401 to
+     * one and 200 to somebody who may edit pages, which is the permission
+     * publishing needs. On a site whose REST API is fronted by an auth plugin
+     * this answers for the plugin rather than for WordPress, which the reading
+     * below says rather than blaming the password for it.
+     */
+    const drafts = await probe(
+      "a signed-in read",
+      "/wp-json/wp/v2/pages?status=draft&per_page=1&context=edit",
+    );
+    const me = await probe("who the login is", "/wp-json/wp/v2/users/me?context=edit");
 
     const meBody = (me.body ?? {}) as any;
     const caps = meBody.capabilities ?? {};
@@ -107,11 +155,40 @@ export async function GET(request: Request) {
       : [];
     const bridge = namespaces.includes("n8n/v1");
 
+    /*
+     * Whether something other than WordPress answered.
+     *
+     * WordPress states an error as {code, message, data:{status}}, where the
+     * code is a string like rest_forbidden. A plugin in front of it answers in
+     * its own shape, and the ones seen so far carry an error_description and
+     * put the HTTP status in the code. Either tells us the reply is a
+     * wrapper's opinion of a Basic header, not WordPress's opinion of this
+     * login.
+     */
+    const wrapped = (answer: Record<string, unknown>): boolean => {
+      const body = (answer.body ?? {}) as any;
+      if (!body || typeof body !== "object") return false;
+      if (typeof body.error_description === "string") return true;
+      return typeof body.code === "string" && /^[0-9]{3}$/.test(body.code);
+    };
+    const gatekeeper = wrapped(drafts);
+
+    /*
+     * Whether the bridge answered as a route that exists.
+     *
+     * WordPress replies rest_no_route to a path it does not serve and
+     * rest_forbidden to one it serves and will not let a stranger use. Both
+     * come back as an error to a stranger, so the code is what separates them.
+     */
+    const bridgeGuards = bridgeRoute.code === "rest_forbidden" || bridgeRoute.status === 403;
+    const bridgeMissing = bridgeRoute.code === "rest_no_route";
+
     return NextResponse.json({
       domain,
       found: true,
       username: creds.username,
       passwordLength: creds.password.length,
+      site: String((root.body as any)?.name ?? "").trim() || null,
       identity: meBody.id
         ? {
             id: meBody.id,
@@ -124,27 +201,39 @@ export async function GET(request: Request) {
           }
         : null,
       bridge,
+      gatekeeper,
       namespaces: namespaces.length,
-      probes: [me, types, root].map(({ body, ...rest }) => rest),
+      /*
+       * Every probe, with what it answered.
+       *
+       * The sentence below is a reading of these, and a reading can be wrong,
+       * as this one was. Somebody whose own site disagrees with the verdict
+       * should be able to see what it was worked out from.
+       */
+      probes: [root, bridgeRoute, drafts, me].map(({ body, ...rest }) => rest),
       /*
        * One sentence, in the order the failures actually happen.
        *
        * Reachability first, because a site that answers nothing makes every
-       * other reading meaningless. Then the login, then whether the plugin
-       * that does the publishing is even there, then whether this login is
-       * allowed to publish once it is.
+       * other reading meaningless. Then the bridge, which is what publishing
+       * goes through. The login last, and hedged rather than blamed when
+       * something other than WordPress answered for it.
        */
-      reading: !me.status
-        ? `The site could not be reached: ${me.message ?? "no answer"}.`
-        : me.status === 401 || me.status === 403
-          ? "The login itself is being rejected. Wrong username, or the application password was regenerated."
-          : !me.ok
-            ? `The site answered ${me.status} to a signed-in request, so the login could not be confirmed.`
-            : !bridge
-              ? "The login works, but the content bridge plugin is not on this site. A run would write the article and stop before publishing."
-              : !caps.publish_posts
-                ? "The login works and the plugin is there, but this user may not publish. A run would create drafts at best."
-                : "The login works, the plugin is there, and this user may publish.",
+      reading: !root.status
+        ? `The site could not be reached: ${root.message ?? "no answer"}.`
+        : !root.ok
+          ? `The site answered ${root.status} at /wp-json/, so its REST API is not reachable. A run cannot publish to it.`
+          : bridgeMissing || (!bridge && !bridgeGuards)
+            ? "The content bridge plugin is not on this site. A run would write the article and stop before publishing."
+            : drafts.ok
+              ? "The login works, the content bridge is there, and this user may edit pages. Nothing stands between a run and publishing."
+              : gatekeeper
+                ? `The content bridge is there and guarding itself, which is what publishing uses. A security plugin answers for the rest of this site's REST API and refused a Basic login with ${drafts.status}${drafts.code ? ` ${drafts.code}` : ""}, so the login could not be confirmed that way. That plugin is not in the publishing path, so this is not evidence of a problem.`
+                : drafts.status === 401
+                  ? "The login is being rejected. Wrong username, or the application password was regenerated. It can also be a host stripping the Authorization header before WordPress sees it."
+                  : drafts.status === 403
+                    ? "The login works but may not edit pages, so a run would write the article and fail to publish it."
+                    : `A signed-in read answered ${drafts.status}${drafts.code ? ` ${drafts.code}` : ""}, so the login could not be confirmed. The requests below say which.`,
     });
   } catch (error) {
     return errorResponse(error);

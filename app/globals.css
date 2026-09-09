@@ -2038,6 +2038,13 @@ button,
 }
 
 .site-check.is-bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+/* Neither a pass nor a failure: the part that publishes is fine and the login
+   could not be proven, because something other than WordPress answered. */
+.site-check.is-mixed {
   background: var(--warn-soft);
   color: var(--warn);
 }
@@ -2045,6 +2052,32 @@ button,
 .site-check-who {
   font-size: 12px;
   opacity: 0.85;
+}
+
+/* The requests behind the verdict. Quiet enough to ignore when the verdict is
+   the expected one, and there when it is not. */
+.site-probes {
+  list-style: none;
+  margin: 7px 0 0;
+  padding: 7px 0 0;
+  border-top: 1px solid currentColor;
+  border-color: color-mix(in srgb, currentColor 22%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.site-probes li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.site-probes code {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
 }
 
 .sites li:last-child {
