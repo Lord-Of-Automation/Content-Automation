@@ -218,6 +218,115 @@ export function namesFrom(input: string, tlds: string[]): string[] {
 }
 
 /**
+ * One search: the name asked for, and the same name elsewhere.
+ *
+ * What somebody types into a box like this is one name, and the answer they
+ * want is bigger than a row in a table: is this the name, yes or no, and what
+ * would it cost. So the name asked for is answered first and on its own, and
+ * the same stem on other extensions comes underneath as somewhere to go when
+ * the answer was no.
+ *
+ * Both halves are one request. Availability is priced per call, not per name,
+ * so offering the alternatives costs nothing over answering the question.
+ */
+export interface SearchResult {
+  /** The names actually asked for, in the order typed. Usually one. */
+  asked: Checked[];
+  /** The first name's stem on other extensions, free ones first. */
+  others: Checked[];
+  /** The stem the alternatives are built from, for the heading. */
+  stem: string;
+  note: string;
+}
+
+/** The part before the first dot, which is the name; the rest is the ending. */
+export function splitName(domain: string): { label: string; suffix: string } {
+  const dot = domain.indexOf(".");
+  return dot < 0
+    ? { label: domain, suffix: "" }
+    : { label: domain.slice(0, dot), suffix: domain.slice(dot + 1) };
+}
+
+export async function searchDomain(input: string, tlds: string[]): Promise<SearchResult> {
+  const authorization = await goDaddyAuthorization();
+
+  /*
+   * Bare words get one extension here, not all of them.
+   *
+   * On the checker a word meant "try it everywhere". Here the alternatives are
+   * a section of their own, so expanding the word as well would put the same
+   * five names in both halves of the page.
+   */
+  const suffixes = [
+    ...new Set(tlds.map((t) => t.replace(/^\./, "").toLowerCase()).filter(Boolean)),
+  ];
+  // A word with no ending of its own gets the first one chosen, and .com when
+  // nothing was chosen at all, because that is what people mean by a name.
+  const asked = namesFrom(input, [suffixes[0] ?? "com"]);
+  if (!asked.length) {
+    throw new Error("Type a domain, or a word and the extensions to try it with.");
+  }
+
+  const stem = splitName(asked[0]!).label;
+  const taken = new Set(asked);
+  const others = suffixes
+    .map((suffix) => `${stem}.${suffix}`)
+    .filter((name) => !taken.has(name))
+    .slice(0, MOST_NAMES - asked.length);
+
+  const all = [...asked, ...others];
+  const found = new Map<string, Availability>();
+  const refused = new Map<string, string>();
+  for (let i = 0; i < all.length; i += BATCH) {
+    const answer = await checkBatch(all.slice(i, i + BATCH), authorization);
+    for (const [name, row] of answer.found) found.set(name, row);
+    for (const [name, why] of answer.refused) refused.set(name, why);
+  }
+
+  const row = (domain: string): Checked => {
+    const answer = found.get(domain);
+    if (answer) {
+      return {
+        domain,
+        status: answer.available ? "free" : "taken",
+        price: answer.price,
+        renewal: answer.renewal,
+        currency: answer.currency,
+        definitive: answer.definitive,
+        note: answer.definitive
+          ? ""
+          : "GoDaddy answered from its cache rather than the registry.",
+      };
+    }
+    return {
+      domain,
+      status: "unknown",
+      price: null,
+      renewal: null,
+      currency: "USD",
+      definitive: false,
+      note: refused.get(domain) ?? "GoDaddy did not answer for this one.",
+    };
+  };
+
+  /*
+   * Free first among the alternatives, and the ones that could not be checked
+   * last. The question underneath a taken name is "what can I have instead",
+   * and an ending nobody could price is not an answer to it.
+   */
+  const rank = { free: 0, taken: 1, unknown: 2 } as const;
+
+  return {
+    asked: asked.map(row),
+    others: others
+      .map(row)
+      .sort((a, b) => rank[a.status] - rank[b.status]),
+    stem,
+    note: "",
+  };
+}
+
+/**
  * Check a list of names, and say so for every one of them.
  *
  * Order is preserved, because it is the order somebody typed and they are

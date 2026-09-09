@@ -6007,3 +6007,266 @@ body:has(.bulkbar) main {
   padding: 6px;
   border-top: 1px solid var(--line);
 }
+
+
+/* ------------------------------------------------------ domain availability */
+
+/* One box, the width of the page. On arrival there is exactly one thing to do
+   here, so it is the only thing on screen with any weight. */
+.dsearch {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.dsearch-tune {
+  flex: none;
+  width: 52px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--ink-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dsearch-tune svg {
+  width: 20px;
+  height: 20px;
+}
+
+.dsearch-tune:hover,
+.dsearch-tune.is-on {
+  color: var(--ink);
+  border-color: var(--ink-3);
+}
+
+.dsearch-box {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+}
+
+.dsearch-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.dsearch-glass {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--ink-3);
+}
+
+.dsearch-box input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 17px;
+  color: var(--ink);
+}
+
+/* The browser's own clear button, which draws itself in a colour of its
+   choosing and looks wrong on a dark page. */
+.dsearch-box input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.dsearch-go {
+  flex: none;
+  border: 0;
+  border-radius: 9px;
+  padding: 12px 22px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--ink);
+  color: var(--bg);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dsearch-go:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.dsearch-go:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* The answer, said in a sentence before it is said in a table. */
+.dhead {
+  margin: 26px 0 0;
+  text-align: center;
+  font-size: 26px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+/* Capped and centred rather than stretched across the page. One card that
+   fills a monitor is a banner; two of them side by side is the comparison
+   somebody makes when the name they wanted is gone. */
+.dcards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 460px));
+  justify-content: center;
+  gap: 20px;
+}
+
+.dcard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.dcard.is-lead {
+  border-color: var(--line-2);
+}
+
+.dcard h3 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+/* The ending in the accent, the way a registrar prints it. It is the part that
+   changes between one card and the next, so it is the part to colour. */
+.dname-tld {
+  color: var(--accent);
+}
+
+.dbadge {
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dbadge.is-free {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.dbadge.is-taken {
+  background: var(--panel-2);
+  color: var(--ink-3);
+  border: 1px solid var(--line);
+}
+
+.dbadge.is-unknown {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.dprice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: auto;
+}
+
+.dprice-now {
+  font-size: 25px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The renewal, beside the first year rather than crossed out above it. A
+   struck-through price means "this was the price"; the renewal is not a
+   discount off anything, it is the other number, and printing it as a saving
+   would be the one lie this page could tell. */
+.dprice-note {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.dprice-none {
+  font-size: 15px;
+  color: var(--ink-3);
+}
+
+.dbuy {
+  width: auto;
+  align-self: stretch;
+  justify-content: center;
+  padding: 11px 18px;
+}
+
+.dwhy {
+  width: 100%;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.dwhy strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 7px;
+}
+
+.dwhy ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dwhy li {
+  position: relative;
+  padding-left: 17px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.dwhy li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--line-2);
+}
+
+@media (max-width: 620px) {
+  .dsearch-box {
+    flex-wrap: wrap;
+  }
+
+  .dsearch-go {
+    flex: 1;
+  }
+
+  .dhead {
+    font-size: 21px;
+  }
+}

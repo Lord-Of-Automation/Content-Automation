@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse, requireSession } from "@/lib/api-guard";
-import { checkDomains } from "@/lib/availability";
+import { searchDomain } from "@/lib/availability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// Two bulk calls at most, each of up to a hundred names.
+// One bulk call: the name asked for and the alternatives travel together.
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
@@ -19,14 +19,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  // Capped here rather than trusted from the browser: a bare word is checked
-  // against every extension chosen, so the list is what decides how many names
-  // one request becomes.
-  const names = String(body.names ?? "").slice(0, 4000);
-  const tlds = (Array.isArray(body.tlds) ? body.tlds : []).slice(0, 12).map(String);
+  const names = String(body.names ?? "").slice(0, 2000);
+  // Capped here rather than trusted from the browser: the list is what decides
+  // how many alternatives one search becomes.
+  const tlds = (Array.isArray(body.tlds) ? body.tlds : []).slice(0, 14).map(String);
 
   try {
-    return NextResponse.json(await checkDomains(names, tlds));
+    return NextResponse.json(await searchDomain(names, tlds));
   } catch (error) {
     // A missing token or an empty box is something to correct in the form, not
     // an upstream failure to retry.

@@ -5,17 +5,19 @@ import { useMemo, useState } from "react";
 /**
  * Is this name free, and what would it cost.
  *
- * The name generator answers the same question about names it invented. This
- * answers it about the names you already have in mind, which is the more common
- * situation and was the one thing the console could not do: you had a list on
- * paper and typed it into a registrar's search box one line at a time.
+ * The name generator answers that about names it invented. This answers it
+ * about the name you already have in mind, which is the more common situation
+ * and the one thing this console could not do: you had a name on paper and
+ * typed it into a registrar's search box.
  *
- * It reports the taken ones too. "No" is the answer most names get, and a
- * checker that only lists the winners leaves you working out which of yours are
- * missing from it.
+ * Shaped like a registrar's own search on purpose, because that is the shape of
+ * the question. One box, one answer, and somewhere to go when the answer is no.
+ * The name asked for gets a card of its own; the same name on other endings
+ * follows underneath, which is what people want next and costs nothing extra to
+ * find out, since availability is priced per call rather than per name.
  *
  * Nothing here buys anything. A free name links to GoDaddy's own page, because
- * a purchase is a decision with a bill attached and it belongs where the person
+ * a purchase is a decision with a bill attached and belongs where the person
  * making it can see the terms.
  */
 
@@ -29,6 +31,12 @@ type Checked = {
   currency: string;
   definitive: boolean;
   note: string;
+};
+
+type Answer = {
+  asked: Checked[];
+  others: Checked[];
+  stem: string;
 };
 
 /** GoDaddy prices in millionths. Rendered in the viewer's own locale. */
@@ -46,80 +54,167 @@ function money(micro: number | null, currency: string): string {
 }
 
 /**
- * The extensions a bare word is tried against.
+ * The endings a name is offered on when the one asked for is gone.
  *
- * Only used for words with no extension of their own: a line that already says
- * ".io" has already decided. Each one ticked multiplies how many names a word
- * becomes, which is why this is a short list of the ones people buy rather than
- * GoDaddy's several hundred.
+ * A short list of the ones people buy rather than GoDaddy's several hundred,
+ * with the two this business actually uses among them.
  */
 const COMMON = ["com", "net", "org", "co", "io", "casino", "bet", "club", "live", "site"];
-const DEFAULT_TLDS = ["com", "net", "co"];
+const DEFAULT_TLDS = ["com", "net", "org", "co", "io", "casino", "bet"];
 
-const TONE: Record<Status, string> = {
-  free: "ok",
-  taken: "idle",
-  unknown: "warn",
+const BADGE: Record<Status, { label: string; tone: string }> = {
+  free: { label: "Available", tone: "free" },
+  taken: { label: "Taken", tone: "taken" },
+  unknown: { label: "Not checked", tone: "unknown" },
 };
 
-const LABEL: Record<Status, string> = {
-  free: "Free",
-  taken: "Taken",
-  unknown: "Unknown",
-};
+const PILL: Record<Status, string> = { free: "ok", taken: "idle", unknown: "warn" };
 
-type Only = "all" | "free" | "taken";
+/** The name, split so the ending can be coloured the way a registrar does. */
+function Name({ domain }: { domain: string }) {
+  const dot = domain.indexOf(".");
+  if (dot < 0) return <span className="dname">{domain}</span>;
+  return (
+    <span className="dname">
+      {domain.slice(0, dot)}
+      <span className="dname-tld">{domain.slice(dot)}</span>
+    </span>
+  );
+}
+
+/**
+ * What is worth saying about a name, in facts rather than in praise.
+ *
+ * A registrar's version of this section sells. There is nothing to sell here,
+ * so it says only what is true of the name in front of you and might weigh on
+ * the decision. The renewal line is the one that earns its place: a first year
+ * at a penny on a name that renews at ninety is the trap this page exists to
+ * show.
+ */
+function reasons(row: Checked): string[] {
+  const dot = row.domain.indexOf(".");
+  const label = dot < 0 ? row.domain : row.domain.slice(0, dot);
+  const suffix = dot < 0 ? "" : row.domain.slice(dot + 1);
+
+  if (row.status === "taken") {
+    return ["Somebody already owns it. The endings below are the ones still free."];
+  }
+  if (row.status === "unknown") {
+    return [row.note || "GoDaddy did not answer for this one."];
+  }
+
+  const out: string[] = [];
+  if (suffix === "com") out.push("Uses .com, which is still what people type first.");
+  out.push(
+    `${label.length} character${label.length === 1 ? "" : "s"} before the dot` +
+      (label.length <= 10 ? ", short enough to say out loud." : "."),
+  );
+  if (!/[0-9]/.test(label) && !label.includes("-")) {
+    out.push("No digits and no hyphens, so it survives being read down a phone.");
+  }
+  if (row.renewal !== null && row.price !== null && row.renewal > row.price) {
+    out.push(
+      `The first year is the cheap one. It renews at ${money(row.renewal, row.currency)} a year after that.`,
+    );
+  }
+  if (!row.definitive) {
+    out.push("GoDaddy answered from its cache, so check again at the till.");
+  }
+  return out;
+}
+
+/** One result: the name, what it costs, and the way to buy it. */
+function Card({ row, lead }: { row: Checked; lead?: boolean }) {
+  const badge = BADGE[row.status];
+  return (
+    <div className={lead ? "dcard is-lead" : "dcard"}>
+      <span className={`dbadge is-${badge.tone}`}>{badge.label}</span>
+
+      <h3>
+        <Name domain={row.domain} />
+      </h3>
+
+      <div className="dprice">
+        {row.status === "free" ? (
+          <>
+            <span className="dprice-now">{money(row.price, row.currency)}</span>
+            <span className="dprice-note">
+              first year
+              {row.renewal !== null
+                ? `, then ${money(row.renewal, row.currency)} a year`
+                : ""}
+            </span>
+          </>
+        ) : (
+          <span className="dprice-none">
+            {row.status === "taken" ? "Not for sale here" : "No price"}
+          </span>
+        )}
+      </div>
+
+      {row.status === "free" ? (
+        <a
+          className="btn btn-primary dbuy"
+          href={`https://www.godaddy.com/domainsearch/find?domainToCheck=${encodeURIComponent(row.domain)}`}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          Buy at GoDaddy
+        </a>
+      ) : row.status === "taken" ? (
+        <a
+          className="btn btn-ghost dbuy"
+          href={`https://${row.domain}`}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          See what is there
+        </a>
+      ) : null}
+
+      <div className="dwhy">
+        <strong>What to know</strong>
+        <ul>
+          {reasons(row).map((line, i) => (
+            <li key={i}>{line}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
 
 export default function DomainCheck() {
-  const [names, setNames] = useState("");
+  const [query, setQuery] = useState("");
   const [tlds, setTlds] = useState<string[]>(DEFAULT_TLDS);
-  const [extra, setExtra] = useState("");
-  const [only, setOnly] = useState<Only>("all");
-
-  const [rows, setRows] = useState<Checked[] | null>(null);
-  const [note, setNote] = useState("");
+  const [answer, setAnswer] = useState<Answer | null>(null);
+  const [asked, setAsked] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [settings, setSettings] = useState(false);
 
-  const chosen = useMemo(() => {
-    const typed = extra
-      .split(/[\s,.]+/)
-      .map((t) => t.replace(/^\./, "").toLowerCase())
-      .filter(Boolean);
-    return [...new Set([...tlds, ...typed])];
-  }, [extra, tlds]);
+  const lead = answer?.asked[0] ?? null;
 
-  const shown = useMemo(
-    () => (rows ?? []).filter((r) => only === "all" || r.status === only),
-    [only, rows],
+  const free = useMemo(
+    () => (answer?.others ?? []).filter((r) => r.status === "free"),
+    [answer],
+  );
+  const rest = useMemo(
+    () => (answer?.others ?? []).filter((r) => r.status !== "free"),
+    [answer],
   );
 
-  const totals = useMemo(() => {
-    const list = rows ?? [];
-    return {
-      free: list.filter((r) => r.status === "free").length,
-      taken: list.filter((r) => r.status === "taken").length,
-      unknown: list.filter((r) => r.status === "unknown").length,
-    };
-  }, [rows]);
+  async function search() {
+    const text = query.trim();
+    if (!text || busy) return;
 
-  /** What the cheapest free one costs, which is the figure people scan for. */
-  const cheapest = useMemo(() => {
-    const priced = (rows ?? []).filter(
-      (r): r is Checked & { price: number } => r.status === "free" && r.price !== null,
-    );
-    if (!priced.length) return null;
-    return priced.reduce((low, r) => (r.price < low.price ? r : low));
-  }, [rows]);
-
-  async function check() {
     setBusy(true);
     setError(null);
     try {
       const response = await fetch("/api/domains/check", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ names, tlds: chosen }),
+        body: JSON.stringify({ names: text, tlds }),
       });
       if (response.status === 401) {
         window.location.href = "/login";
@@ -128,11 +223,11 @@ export default function DomainCheck() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? `The check returned ${response.status}.`);
 
-      setRows(payload.rows as Checked[]);
-      setNote(String(payload.note ?? ""));
-      setOnly("all");
+      setAnswer(payload as Answer);
+      setAsked(text);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "The names could not be checked.");
+      setAnswer(null);
+      setError(e instanceof Error ? e.message : "The name could not be checked.");
     } finally {
       setBusy(false);
     }
@@ -140,192 +235,183 @@ export default function DomainCheck() {
 
   return (
     <div className="stack">
-      <div className="card">
-        <div className="card-head">
-          <div>
-            <h2>Availability</h2>
-            <p>
-              Whether a name can be bought, and what GoDaddy asks for it. Paste
-              a list, or type a word and pick the extensions to try it against.
-            </p>
-          </div>
-        </div>
+      {/* The search, and almost nothing else, because on arrival there is only
+          one thing to do here. The endings live behind the button beside it:
+          they are a setting somebody adjusts once, not part of asking. */}
+      <div className="dsearch">
+        <button
+          type="button"
+          className={settings ? "dsearch-tune is-on" : "dsearch-tune"}
+          aria-expanded={settings}
+          title="Which endings to offer when the name is taken"
+          onClick={() => setSettings((on) => !on)}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <path d="M4 8h9M17 8h3M4 16h3M11 16h9" />
+            <circle cx="15" cy="8" r="2" />
+            <circle cx="9" cy="16" r="2" />
+          </svg>
+        </button>
 
-        <div className="card-body">
-          {error ? <div className="notice bad">{error}</div> : null}
-
-          <div className="field">
-            <label htmlFor="check-names">Names</label>
-            <textarea
-              id="check-names"
-              className="url-list"
-              rows={4}
-              value={names}
-              placeholder="mystake.com, slotsireland, bonuscompare.co.uk"
-              onChange={(e) => setNames(e.target.value)}
-              onKeyDown={(e) => {
-                // Enter makes a new line, because the box is a list. The
-                // shortcut is the one every multi-line form uses.
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !busy) {
-                  e.preventDefault();
-                  void check();
-                }
-              }}
-            />
-            <div className="note">
-              One per line, or separated by commas. A whole address pasted out
-              of the browser is fine. A line with no extension is tried against
-              each one chosen below; a line that already carries one is checked
-              exactly as written.
-            </div>
-          </div>
-
-          <div className="field">
-            <label>Extensions for the bare words</label>
-            <div className="tldpick">
-              {COMMON.map((tld) => (
-                <button
-                  key={tld}
-                  type="button"
-                  className={tlds.includes(tld) ? "tld is-on" : "tld"}
-                  onClick={() =>
-                    setTlds((current) =>
-                      current.includes(tld)
-                        ? current.filter((t) => t !== tld)
-                        : [...current, tld],
-                    )
-                  }
-                >
-                  .{tld}
-                </button>
-              ))}
-            </div>
-            <input
-              type="text"
-              className="tld-extra"
-              placeholder="or type others: .ie .co.uk .gg"
-              value={extra}
-              onChange={(e) => setExtra(e.target.value)}
-            />
-            <div className="note">
-              Only used for lines that have no extension of their own.{" "}
-              {chosen.length} selected.
-            </div>
-          </div>
-
+        <div className="dsearch-box">
+          <svg className="dsearch-glass" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
+            <circle cx="11" cy="11" r="7" />
+            <path d="M16.5 16.5L21 21" />
+          </svg>
+          <input
+            type="search"
+            value={query}
+            placeholder="Type a name, with or without its ending"
+            aria-label="Domain to check"
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void search();
+              }
+            }}
+          />
           <button
             type="button"
-            className="btn btn-primary"
-            onClick={() => void check()}
-            disabled={busy || !names.trim() || !chosen.length}
+            className="dsearch-go"
+            onClick={() => void search()}
+            disabled={busy || !query.trim()}
           >
-            {busy ? "Checking…" : "Check availability"}
+            {busy ? "Searching…" : "Search domains"}
           </button>
         </div>
       </div>
 
-      {rows ? (
+      {settings ? (
         <div className="card">
-          <div className="card-head">
-            <div>
-              <h2>{rows.length} checked</h2>
-              <p>
-                {totals.free} free, {totals.taken} taken
-                {totals.unknown ? `, ${totals.unknown} not answered` : ""}
-                {cheapest ? ` · cheapest is ${cheapest.domain} at ${money(cheapest.price, cheapest.currency)}` : ""}
-              </p>
-            </div>
-          </div>
-
-          <div className="card-body tight">
-            {note ? <div className="notice warn">{note}</div> : null}
-
-            <div className="domain-bar">
-              <div className="seg seg-sm">
-                {(
-                  [
-                    ["all", `All ${rows.length}`],
-                    ["free", `Free ${totals.free}`],
-                    ["taken", `Taken ${totals.taken}`],
-                  ] as Array<[Only, string]>
-                ).map(([key, label]) => (
+          <div className="card-body">
+            <div className="field">
+              <label>Endings to offer</label>
+              <div className="tldpick">
+                {COMMON.map((tld) => (
                   <button
-                    key={key}
+                    key={tld}
                     type="button"
-                    className={only === key ? "seg-btn is-on" : "seg-btn"}
-                    onClick={() => setOnly(key)}
+                    className={tlds.includes(tld) ? "tld is-on" : "tld"}
+                    onClick={() =>
+                      setTlds((current) =>
+                        current.includes(tld)
+                          ? current.filter((t) => t !== tld)
+                          : [...current, tld],
+                      )
+                    }
                   >
-                    {label}
+                    .{tld}
                   </button>
                 ))}
               </div>
+              <div className="note">
+                These are the alternatives offered underneath the answer. A name
+                typed with its own ending is always checked exactly as written.
+              </div>
             </div>
+          </div>
+        </div>
+      ) : null}
 
-            {!shown.length ? (
-              <div className="empty">Nothing in this filter.</div>
-            ) : (
-              <table className="logs logs-middle">
-                <thead>
-                  <tr>
-                    <th>Domain</th>
-                    <th className="mid">Status</th>
-                    <th className="num">First year</th>
-                    <th className="num">Renews for</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {shown.map((row) => (
-                    <tr key={row.domain}>
-                      <td>
-                        <span className="domain-name">{row.domain}</span>
-                        {row.note ? <div className="app-sub">{row.note}</div> : null}
-                      </td>
-                      <td className="mid">
-                        <span className={`pill pill-${TONE[row.status]}`}>
-                          {LABEL[row.status]}
-                        </span>
-                      </td>
-                      {/* Both prices, because they are different numbers and
-                          the second is the one paid every year after this one.
-                          A first year discounted to nothing on a name that
-                          renews at ninety is the trap this column exists to
-                          show. */}
-                      <td className="num">{money(row.price, row.currency)}</td>
-                      <td className="num">{money(row.renewal, row.currency)}</td>
-                      <td className="row-actions">
-                        {row.status === "free" ? (
-                          <a
-                            className="btn btn-ghost btn-sm"
-                            href={`https://www.godaddy.com/domainsearch/find?domainToCheck=${encodeURIComponent(row.domain)}`}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                          >
-                            Buy at GoDaddy
-                          </a>
-                        ) : row.status === "taken" ? (
-                          <a
-                            className="btn btn-ghost btn-sm"
-                            href={`https://${row.domain}`}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                          >
-                            Visit
-                          </a>
-                        ) : null}
-                      </td>
+      {error ? <div className="notice bad">{error}</div> : null}
+
+      {answer && lead ? (
+        <>
+          <h2 className="dhead">
+            {lead.status === "free"
+              ? `${lead.domain} is yours to take`
+              : lead.status === "taken"
+                ? `${lead.domain} is already registered`
+                : `${lead.domain} could not be checked`}
+          </h2>
+
+          <div className="dcards">
+            {answer.asked.map((row, i) => (
+              <Card key={row.domain} row={row} lead={i === 0} />
+            ))}
+
+            {/* Beside the answer rather than below it when the answer was no.
+                The next thing wanted is the nearest thing available, and it
+                should not need a scroll. */}
+            {lead.status !== "free" && free.length ? <Card row={free[0]!} /> : null}
+          </div>
+
+          {free.length || rest.length ? (
+            <div className="card">
+              <div className="card-head">
+                <div>
+                  <h2>Other endings for {answer.stem}</h2>
+                  <p>
+                    {free.length
+                      ? `${free.length} of these can be bought right now.`
+                      : "None of these are free either."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="card-body tight">
+                <table className="logs logs-middle">
+                  <thead>
+                    <tr>
+                      <th>Domain</th>
+                      <th className="mid">Status</th>
+                      <th className="num">First year</th>
+                      <th className="num">Renews for</th>
+                      <th />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                  </thead>
+                  <tbody>
+                    {[...free, ...rest].map((row) => (
+                      <tr key={row.domain}>
+                        <td>
+                          <Name domain={row.domain} />
+                          {row.note ? <div className="app-sub">{row.note}</div> : null}
+                        </td>
+                        <td className="mid">
+                          <span className={`pill pill-${PILL[row.status]}`}>
+                            {BADGE[row.status].label}
+                          </span>
+                        </td>
+                        {/* Both prices, because they are different numbers and
+                            the second is the one paid every year after this. */}
+                        <td className="num">{money(row.price, row.currency)}</td>
+                        <td className="num">{money(row.renewal, row.currency)}</td>
+                        <td className="row-actions">
+                          {row.status === "free" ? (
+                            <a
+                              className="btn btn-ghost btn-sm"
+                              href={`https://www.godaddy.com/domainsearch/find?domainToCheck=${encodeURIComponent(row.domain)}`}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                            >
+                              Buy at GoDaddy
+                            </a>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
 
-            <p className="domain-note">
-              Prices are GoDaddy&rsquo;s published rate for the extension at the
-              moment of the check, before any discount, promotion or multi-year
-              term. Nothing here buys a name: a free row links to GoDaddy&rsquo;s
-              own page, where the price you are actually charged is the one shown
-              at checkout.
+                <p className="domain-note">
+                  Prices are GoDaddy&rsquo;s published rate for the ending at the
+                  moment of the check, before any discount, promotion or
+                  multi-year term. Nothing here buys a name: a free row links to
+                  GoDaddy&rsquo;s own page, where the price you are actually
+                  charged is the one shown at checkout.
+                </p>
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : !error ? (
+        <div className="card">
+          <div className="card-body">
+            <p className="quiet">
+              {asked
+                ? "Nothing came back for that one."
+                : "Type a name above. If it is taken, the same name on other endings appears underneath, with what each costs to buy and to keep."}
             </p>
           </div>
         </div>
