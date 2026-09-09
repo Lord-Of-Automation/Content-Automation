@@ -105,14 +105,23 @@ const BLANK: Draft = {
 /**
  * Whether a crawl limit means "the whole site".
  *
- * Zero means it on the way out and 1000 means it on the way back: the engine
- * resolves a zero to DataForSEO's ceiling, which IS the whole site, and stores
- * that. Ticking the box therefore saved correctly and then came back unticked
- * with 1000 in the number beside it, which reads exactly like a setting that
- * refused to save.
+ * Zero means it, and only zero. This used to count a thousand as well, and
+ * that was a workaround rather than a rule: the engine resolved a zero to a
+ * thousand before storing it, so a loop saved with the box ticked came back
+ * unticked with 1000 beside it, reading exactly like a setting that refused to
+ * save. The engine keeps the zero now, so the workaround is gone with the
+ * thing it was working around.
+ *
+ * A loop saved before that fix still holds 1000, and now shows as 1000 rather
+ * than as the whole site. That is what it holds and what it will crawl, so it
+ * is the honest reading; ticking the box again is what raises it to the
+ * engine's ceiling. The alternative — treating a stored 1000 as "the whole
+ * site" — would quietly turn every one of those loops into a ten thousand page
+ * crawl the next time somebody saved it, which is a surprise in the direction
+ * that costs money.
  */
 function isWholeSite(pages: number): boolean {
-  return pages === 0 || pages >= 1000;
+  return pages === 0;
 }
 
 /**
@@ -799,7 +808,7 @@ export default function LoopView() {
                     id="loop_crawl"
                     type="number"
                     min={1}
-                    max={1000}
+                    max={100000}
                     disabled={isWholeSite(draft.max_crawl_pages)}
                     value={isWholeSite(draft.max_crawl_pages) ? "" : draft.max_crawl_pages}
                     placeholder="all"
@@ -808,7 +817,7 @@ export default function LoopView() {
                 </div>
                 <div className="note">
                   {fillsGaps(draft.mode)
-                    ? "How much of OUR site is crawled to work out what we already have. Cap this and anything past the cap looks missing — which is how a gap run ends up writing over a page you already had. Leave it on the whole site unless you have a reason."
+                    ? "How much of OUR site is crawled to work out what we already have. Cap this and anything past the cap looks missing, which is how a gap run comes to write a page you already had. Leave it on the whole site unless you have a reason: the run says in its log if a crawl ever reaches the engine's ceiling."
                     : "How many pages are crawled to choose from."}
                 </div>
               </div>
@@ -822,7 +831,7 @@ export default function LoopView() {
                     id="loop_cap"
                     type="number"
                     min={0}
-                    max={1000}
+                    max={100000}
                     value={draft.pages_to_optimise}
                     onChange={(e) => set("pages_to_optimise", Number(e.target.value))}
                   />

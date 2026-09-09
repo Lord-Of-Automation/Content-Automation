@@ -87,7 +87,19 @@ export function validateRunInput(raw: unknown): ValidationResult {
     errors.language = "Unsupported language code.";
   }
 
-  // ---- max_crawl_pages (0 means every page; 1000 is DataForSEO's ceiling)
+  /*
+   * ---- max_crawl_pages (0 means every page)
+   *
+   * The ceiling used to be a thousand here, described as DataForSEO's own. It
+   * is not: their documentation gives no maximum for this, and a thousand is
+   * only the most one READ of a finished crawl may return, which the engine now
+   * pages around. The real ceiling is the engine's CRAWL_CEILING, a setting
+   * about how much crawling is worth buying.
+   *
+   * This form does not know that number, and should not: it is a decision made
+   * on the droplet. So it accepts anything sane and lets the engine clamp,
+   * which is what the engine does with every other number it is handed.
+   */
   const rawPages = input.max_crawl_pages;
   const pages =
     typeof rawPages === "number"
@@ -98,8 +110,8 @@ export function validateRunInput(raw: unknown): ValidationResult {
 
   if (!Number.isFinite(pages)) {
     errors.max_crawl_pages = "Required.";
-  } else if (pages < 0 || pages > 1000) {
-    errors.max_crawl_pages = "Use 0 for every page, or a number up to 1000.";
+  } else if (pages < 0 || pages > 100_000) {
+    errors.max_crawl_pages = "Use 0 for every page, or a number of pages.";
   }
 
   // ---- pages_to_optimise (0 means every crawled page)

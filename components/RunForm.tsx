@@ -357,15 +357,17 @@ export default function RunForm({
             id="max_crawl_pages"
             value={values.max_crawl_pages}
             min={1}
-            max={1000}
+            max={100000}
             placeholder="every page"
             onCommit={(n) => set("max_crawl_pages", n)}
           />
         </div>
         <div className="note">
-          Pages DataForSEO crawls. Leave it on Every page to crawl the whole
-          site, or untick and enter a number. 1000 is the API ceiling, so
-          Every page means every page up to that.
+          Pages the crawler visits. Every page means the whole site, up to the
+          engine&rsquo;s own ceiling of ten thousand, which it says in the run
+          log if a crawl ever reaches it. Untick to set a smaller number, which
+          is worth doing on a large site you only want a sample of: a crawl is
+          charged per page.
         </div>
       </div>
 
