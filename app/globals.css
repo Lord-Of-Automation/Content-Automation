@@ -6055,9 +6055,12 @@ body:has(.bulkbar) main {
   border-radius: 12px;
 }
 
+/* The box darkens its edge and nothing else. Every other input in the console
+   answers focus with a blue halo, which is right for a field in a form and
+   wrong here: this box is the page, so the halo drew a second rectangle around
+   the words rather than pointing at anything. */
 .dsearch-box:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: var(--ink-3);
 }
 
 .dsearch-glass {
@@ -6077,6 +6080,12 @@ body:has(.bulkbar) main {
   font: inherit;
   font-size: 17px;
   color: var(--ink);
+}
+
+/* The field inside carries no ring of its own. It has no border to colour and
+   the halo it inherits from every other input landed around the text. */
+.dsearch-box input:focus {
+  box-shadow: none;
 }
 
 /* The browser's own clear button, which draws itself in a colour of its
