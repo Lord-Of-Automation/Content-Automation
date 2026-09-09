@@ -14,7 +14,15 @@
 import { backend } from "./backend";
 import type { BodyClasses } from "./n8n";
 
-export type RunMode = "optimise" | "gap";
+/**
+ * What a loop does when it fires.
+ *
+ * The two fillers are one pipeline pointed at different things: one writes the
+ * game reviews a competitor has and we do not, the other the casino reviews.
+ * They share the crawl, the comparison and the publish, and differ in how a
+ * name is read out of a page title and in what is done to research one.
+ */
+export type RunMode = "optimise" | "gap" | "casino_gap";
 
 export type Schedule = {
   id: string;

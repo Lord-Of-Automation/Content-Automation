@@ -57,7 +57,7 @@ export type StartRunInput = {
    * caller written before there was a choice means.
    */
   /** Build joined these when a run stopped needing a site to start from. */
-  mode?: "optimise" | "gap" | "build";
+  mode?: "optimise" | "gap" | "casino_gap" | "build";
   /** The competitor crawl export a gap run works from. */
   ideas_sheet_id?: string;
 };

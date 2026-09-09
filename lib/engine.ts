@@ -134,7 +134,7 @@ type EngineRun = {
   cost?: CostBreakdown | null;
   /** Which pipeline ran it. Absent on a run from before there was a choice. */
   /** Build joined these when a run stopped needing a site to start from. */
-  mode?: "optimise" | "gap" | "build";
+  mode?: "optimise" | "gap" | "casino_gap" | "build";
   steps?: EngineStep[];
 };
 

@@ -52,7 +52,12 @@ on, researches each, rewrites it and publishes it back. This is the original
 job the platform was built for.
 
 **Loop** (/loop) is the same work on a schedule. A loop holds a site and its
-settings and starts a run every so often — four times a day through to weekly.
+settings and starts a run every so often, four times a day through to weekly.
+Its "what it does" setting picks one of three: the optimiser, which rewrites
+pages that exist; the game gap filler, which writes the game reviews a
+competitor has and we do not; and the casino gap filler, which does the same
+for casino reviews. The two fillers are one pipeline pointed at different
+things and both read the same competitor crawl export.
 
 Both live under the SEO menu in the header.
 

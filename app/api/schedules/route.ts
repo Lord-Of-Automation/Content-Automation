@@ -93,7 +93,13 @@ export async function POST(request: Request) {
     await record(
       actor,
       body.id ? "schedule-updated" : "schedule-created",
-      `${saved.name} — ${saved.mode === "gap" ? "gap filler" : "optimiser"} on ${saved.website_url}, ` +
+      `${saved.name} — ${
+        saved.mode === "gap"
+          ? "game gap filler"
+          : saved.mode === "casino_gap"
+            ? "casino gap filler"
+            : "optimiser"
+      } on ${saved.website_url}, ` +
         `every ${saved.everyHours}h`,
     );
 

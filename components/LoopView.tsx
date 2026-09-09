@@ -11,6 +11,23 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { SkeletonCards } from "@/components/Skeleton";
 
 /**
+ * What each mode is called, said once.
+ *
+ * The two gap modes are the same pipeline pointed at different things, and the
+ * only place that distinction is invisible is in a label, so each gets its own.
+ */
+const MODE_NAME: Record<"gap" | "casino_gap" | "optimise", string> = {
+  gap: "Game gap filler",
+  casino_gap: "Casino gap filler",
+  optimise: "Optimiser",
+};
+
+/** Whether a mode writes pages that do not exist, as opposed to rewriting ones that do. */
+function fillsGaps(mode: string): boolean {
+  return mode === "gap" || mode === "casino_gap";
+}
+
+/**
  * How often a loop looks, in the words someone would use.
  *
  * Not a free number of hours. "Every 37 hours" is a thing the engine will
@@ -45,7 +62,7 @@ const CLASS_FIELDS: Array<{ key: DeclarableClass; label: string; placeholder: st
 type Draft = {
   id?: string;
   name: string;
-  mode: "gap" | "optimise";
+  mode: "gap" | "casino_gap" | "optimise";
   website_url: string;
   market: string;
   language: string;
@@ -403,7 +420,7 @@ export default function LoopView() {
               runs in the log.
             </p>
             <p className="confirm-quiet">
-              {deleting?.mode === "gap" ? "Game gap filler" : "Optimiser"} on{" "}
+              {MODE_NAME[deleting?.mode ?? "optimise"]} on{" "}
               <strong>{deleting?.website_url}</strong>, every{" "}
               {EVERY.find((e) => e.hours === deleting?.everyHours)?.label.toLowerCase() ??
                 `${deleting?.everyHours} hours`}
@@ -466,7 +483,7 @@ export default function LoopView() {
                       </label>
                       <strong>{schedule.name}</strong>
                       <span className="pill pill-idle">
-                        {schedule.mode === "gap" ? "Game gap filler" : "Optimiser"}
+                        {MODE_NAME[schedule.mode]}
                       </span>
                     </div>
                     <div className="loop-actions">
@@ -605,18 +622,29 @@ export default function LoopView() {
                   value={draft.mode}
                   onChange={(v) => set("mode", v as Draft["mode"])}
                   options={[
-                    { value: "gap", label: "Game gap filler", hint: "writes pages we do not have" },
+                    {
+                      value: "gap",
+                      label: "Game gap filler",
+                      hint: "writes the game reviews we do not have",
+                    },
+                    {
+                      value: "casino_gap",
+                      label: "Casino gap filler",
+                      hint: "writes the casino reviews we do not have",
+                    },
                     { value: "optimise", label: "Optimiser", hint: "rewrites pages we do" },
                   ]}
                 />
                 <div className="note">
                   {draft.mode === "gap"
                     ? "Reads the competitor crawl in the ideas sheet, compares it against our own crawl, and writes a full review for each game we are missing. Nothing missing is a success, not an error."
-                    : "The same thing the Runs page does: crawls the site and rewrites the pages it finds."}
+                    : draft.mode === "casino_gap"
+                      ? "The same comparison against the same sheet, looking for casino reviews instead. Each one it writes starts with a visit to the operator's own site, so a casino that is not in the casino sheet is skipped: there is nowhere to go and look."
+                      : "The same thing the Runs page does: crawls the site and rewrites the pages it finds."}
                 </div>
               </div>
 
-              {draft.mode === "gap" ? (
+              {fillsGaps(draft.mode) ? (
                 <div className="field">
                   <label htmlFor="loop_ideas">Ideas sheet ID</label>
                   <input
@@ -743,7 +771,7 @@ export default function LoopView() {
                   />
                 </div>
                 <div className="note">
-                  {draft.mode === "gap"
+                  {fillsGaps(draft.mode)
                     ? "How much of OUR site is crawled to work out what we already have. Cap this and anything past the cap looks missing — which is how a gap run ends up writing over a page you already had. Leave it on the whole site unless you have a reason."
                     : "How many pages are crawled to choose from."}
                 </div>
@@ -751,7 +779,7 @@ export default function LoopView() {
 
               <div className="field">
                 <label htmlFor="loop_cap">
-                  {draft.mode === "gap" ? "New pages each time" : "Pages to optimise each time"}
+                  {fillsGaps(draft.mode) ? "New pages each time" : "Pages to optimise each time"}
                 </label>
                 <div className="limit-row">
                   <input
@@ -790,7 +818,7 @@ export default function LoopView() {
                 </div>
               </div>
 
-              {draft.mode === "gap" ? (
+              {fillsGaps(draft.mode) ? (
                 <div className="field">
                   <label className="check" htmlFor="loop_publish">
                     <input
