@@ -9,7 +9,7 @@ import { login, type LoginState } from "@/app/actions";
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className="btn-primary" disabled={pending}>
+    <button type="submit" className="btn-primary btn-block" disabled={pending}>
       {pending ? "Signing in…" : "Sign in"}
     </button>
   );

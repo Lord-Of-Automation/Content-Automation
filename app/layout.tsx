@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 
 import { auth } from "@/auth";
+import Ask from "@/components/Ask";
 import AskClaude from "@/components/AskClaude";
 import "./globals.css";
 
@@ -89,8 +90,11 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: noFlashTheme }} />
       </head>
       <body>
-        {children}
-        {session?.user ? <AskClaude /> : null}
+        {/* Above everything, because anything may need to ask something. */}
+        <Ask>
+          {children}
+          {session?.user ? <AskClaude /> : null}
+        </Ask>
       </body>
     </html>
   );

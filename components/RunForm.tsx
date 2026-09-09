@@ -558,7 +558,7 @@ export default function RunForm({
 
       <button
         type="submit"
-        className="btn-primary"
+        className="btn-primary btn-block"
         disabled={busy || (batch && urls.length === 0)}
       >
         {busy

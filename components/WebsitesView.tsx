@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Select } from "@/components/Select";
 import { SkeletonTable } from "@/components/Skeleton";
+import { useAsk } from "@/components/Ask";
 
 type Website = {
   id: string;
@@ -167,12 +168,19 @@ export default function WebsitesView() {
    * work that was paid for. Deleting is the one that loses the writing, so it
    * asks first.
    */
+  const ask = useAsk();
   async function act(site: Website, what: "stop" | "delete") {
     if (what === "delete") {
-      const sure = window.confirm(
-        `Delete ${site.name}? Its ${site.pages.length} page(s) go with it and ` +
-          "nothing here can bring them back.",
-      );
+      const sure = await ask.confirm({
+        title: `Delete ${site.name}?`,
+        body:
+          `Its ${site.pages.length} page${site.pages.length === 1 ? "" : "s"} go with it, ` +
+          "along with every saved version, and nothing here can bring them back. " +
+          "Anything already published to a site stays where it is.",
+        confirmLabel: "Delete it",
+        cancelLabel: "Keep it",
+        tone: "danger",
+      });
       if (!sure) return;
     }
 

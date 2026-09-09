@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import SitePreview from "@/components/SitePreview";
 import type { RevisionBody, RevisionSummary } from "@/lib/revisions";
 import type { Website } from "@/lib/websites";
+import { useAsk } from "@/components/Ask";
 
 /**
  * The site's earlier versions, and the way back to one.
@@ -119,12 +120,17 @@ export default function SiteVersions({
     [chosen, site.id],
   );
 
+  const ask = useAsk();
   async function restore(id: string) {
     const version = rows?.find((r) => r.id === id);
     const when = version ? new Date(version.at).toLocaleString() : "that version";
-    if (!window.confirm(`Put the site back to how it was on ${when}?\n\nWhat is there now is kept as a version, so this can be undone.`)) {
-      return;
-    }
+    const sure = await ask.confirm({
+      title: `Put the site back to how it was on ${when}?`,
+      body: "What is there now is kept as a version, so this can be undone.",
+      confirmLabel: "Restore it",
+      cancelLabel: "Leave it",
+    });
+    if (!sure) return;
 
     setBusy(true);
     setError(null);

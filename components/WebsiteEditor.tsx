@@ -868,10 +868,11 @@ export default function WebsiteEditor({ id }: { id: string }) {
                     * at. Editing by hand happens up in the page itself; this is
                     * the same content with the tags showing.
                     *
-                    * Shown when asked for, and whenever the page above is not
-                    * there to type into, so there is always a way in.
+                    * Only when the preview is hidden altogether. With the
+                    * preview showing, HTML swaps this content into the pane
+                    * above, where the toggle is and where somebody is looking.
                     */}
-                  {view === "code" || !showPreview ? (
+                  {!showPreview ? (
                     <>
                       <div className="editor-body-head">
                         <label className="field-label" htmlFor="page-body">
@@ -919,7 +920,11 @@ export default function WebsiteEditor({ id }: { id: string }) {
                 <aside className="editor-preview">
                   <div className="editor-body-head">
                     <span className="field-label">
-                      {editing ? "Editing the page" : "Live preview"}
+                      {view === "code"
+                        ? "The page's HTML"
+                        : editing
+                          ? "Editing the page"
+                          : "Live preview"}
                     </span>
                     <div className="seg seg-sm">
                       <button
@@ -945,84 +950,108 @@ export default function WebsiteEditor({ id }: { id: string }) {
                       Hide
                     </button>
                   </div>
-                  <VisualEditor
-                    key={`${site.id}-${at}-${editing ? "edit" : "read"}`}
-                    site={{
-                      name,
-                      tagline,
-                      language: site.language ?? "en",
-                      design,
-                      header: header ?? site.header,
-                      footer: footer ?? site.footer,
-                      theme: theme ?? site.theme,
-                    }}
-                    pages={pages}
-                    current={page.slug}
-                    editable={editing}
-                    onChange={(bodyHtml) => change({ bodyHtml })}
-                    onTitle={(title) => change({ title })}
-                    onSetting={(field, value, at) => {
-                      /*
-                       * The header and footer are drawn from settings, so what
-                       * is typed into them belongs to the settings rather than
-                       * to the page it was typed on.
-                       *
-                       * A link's label and a page's title say which one they
-                       * are: "footer:2" for the third link in the footer, or a
-                       * page's own address. The rest are one of a kind.
-                       */
-                      if (field === "name") setName(value);
-                      else if (field === "tagline") setTagline(value);
-                      else if (field === "footerText") {
-                        setFooter((f) => (f ? { ...f, text: value } : f));
-                      } else if (field === "linkLabel") {
-                        const [which, index] = String(at ?? "").split(":");
-                        const i = Number(index);
-                        const relabel = (links: SiteLink[]) =>
-                          links.map((l, n) => (n === i ? { ...l, label: value } : l));
-                        if (which === "footer") {
-                          setFooter((f) => (f ? { ...f, links: relabel(f.links) } : f));
-                        } else {
-                          setHeader((h) => (h ? { ...h, links: relabel(h.links) } : h));
+                  {/*
+                    * The page, or the page's markup, in the same place.
+                    *
+                    * The toggle above used to change only which of two
+                    * things elsewhere was editable: HTML left this pane
+                    * rendering the page exactly as before and put the
+                    * markup in the narrow column beside the page list,
+                    * below the fold. Pressing it looked like pressing a
+                    * button that did nothing, which is what it looked
+                    * like because that is what it did.
+                    *
+                    * A control labelled Edit and HTML means those two
+                    * things swap where you are looking.
+                    */}
+                  {view === "code" ? (
+                    <textarea
+                      className="editor-body editor-body-full"
+                      spellCheck
+                      value={page.bodyHtml}
+                      onChange={(e) => change({ bodyHtml: e.target.value })}
+                      readOnly={site.status === "building"}
+                    />
+                  ) : (
+                    <VisualEditor
+                      key={`${site.id}-${at}-${editing ? "edit" : "read"}`}
+                      site={{
+                        name,
+                        tagline,
+                        language: site.language ?? "en",
+                        design,
+                        header: header ?? site.header,
+                        footer: footer ?? site.footer,
+                        theme: theme ?? site.theme,
+                      }}
+                      pages={pages}
+                      current={page.slug}
+                      editable={editing}
+                      onChange={(bodyHtml) => change({ bodyHtml })}
+                      onTitle={(title) => change({ title })}
+                      onSetting={(field, value, at) => {
+                        /*
+                         * The header and footer are drawn from settings, so what
+                         * is typed into them belongs to the settings rather than
+                         * to the page it was typed on.
+                         *
+                         * A link's label and a page's title say which one they
+                         * are: "footer:2" for the third link in the footer, or a
+                         * page's own address. The rest are one of a kind.
+                         */
+                        if (field === "name") setName(value);
+                        else if (field === "tagline") setTagline(value);
+                        else if (field === "footerText") {
+                          setFooter((f) => (f ? { ...f, text: value } : f));
+                        } else if (field === "linkLabel") {
+                          const [which, index] = String(at ?? "").split(":");
+                          const i = Number(index);
+                          const relabel = (links: SiteLink[]) =>
+                            links.map((l, n) => (n === i ? { ...l, label: value } : l));
+                          if (which === "footer") {
+                            setFooter((f) => (f ? { ...f, links: relabel(f.links) } : f));
+                          } else {
+                            setHeader((h) => (h ? { ...h, links: relabel(h.links) } : h));
+                          }
+                        } else if (field === "pageTitle") {
+                          // The menu shows every page, so this may be the title
+                          // of one that is not on screen.
+                          setPages((rows) =>
+                            rows.map((p) => (p.slug === at ? { ...p, title: value } : p)),
+                          );
                         }
-                      } else if (field === "pageTitle") {
-                        // The menu shows every page, so this may be the title
-                        // of one that is not on screen.
-                        setPages((rows) =>
-                          rows.map((p) => (p.slug === at ? { ...p, title: value } : p)),
-                        );
-                      }
-                      touch();
-                    }}
-                    onChromeStyle={(selector, property, value) => {
-                      /*
-                       * A rule in the site's own stylesheet, against a name for
-                       * the thing that changed.
-                       *
-                       * The header and footer are rendered from a template, so
-                       * there is no markup to write an inline style onto that
-                       * would outlive the next render.
-                       */
-                      if (!selector) return;
-                      setDesign((d) => ({
-                        headerHtml: d?.headerHtml ?? "",
-                        footerHtml: d?.footerHtml ?? "",
-                        css: applyOverride(d?.css ?? "", selector, property, value),
-                      }));
-                      touch();
-                    }}
-                    onNavigate={(slug) => {
-                      const to = pages.findIndex((p) => p.slug === slug);
-                      if (to >= 0) setAt(to);
-                    }}
-                    // Full screen hides the rest of the editor, so it carries
-                    // its own way to save and to publish.
-                    websiteId={site.id}
-                    onSave={() => void save()}
-                    onPublish={() => setSection("publish")}
-                    dirty={dirty}
-                    saving={saving}
-                  />
+                        touch();
+                      }}
+                      onChromeStyle={(selector, property, value) => {
+                        /*
+                         * A rule in the site's own stylesheet, against a name for
+                         * the thing that changed.
+                         *
+                         * The header and footer are rendered from a template, so
+                         * there is no markup to write an inline style onto that
+                         * would outlive the next render.
+                         */
+                        if (!selector) return;
+                        setDesign((d) => ({
+                          headerHtml: d?.headerHtml ?? "",
+                          footerHtml: d?.footerHtml ?? "",
+                          css: applyOverride(d?.css ?? "", selector, property, value),
+                        }));
+                        touch();
+                      }}
+                      onNavigate={(slug) => {
+                        const to = pages.findIndex((p) => p.slug === slug);
+                        if (to >= 0) setAt(to);
+                      }}
+                      // Full screen hides the rest of the editor, so it carries
+                      // its own way to save and to publish.
+                      websiteId={site.id}
+                      onSave={() => void save()}
+                      onPublish={() => setSection("publish")}
+                      dirty={dirty}
+                      saving={saving}
+                    />
+                  )}
                   {/* Two states left, and neither explains the editor.
                       Read only says why nothing responds, and the preview
                       note says what is being looked at. Editing says

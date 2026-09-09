@@ -606,7 +606,23 @@ button,
 .btn-primary {
   background: var(--accent);
   color: var(--accent-ink);
+}
+
+/*
+ * A button that is the whole width of the thing it submits.
+ *
+ * This used to be what .btn-primary meant, which was backwards: most primary
+ * buttons sit in a row beside a Cancel, and a row of buttons where one of them
+ * fills the remaining space is not a row. Six places had already scoped the
+ * width back off, each one a small repair to a default that was wrong, and the
+ * seventh was the confirmation daryog stretching its Delete across the card.
+ *
+ * So it is opted into now, by the two forms that are genuinely one field after
+ * another and a bar at the bottom: signing in, and starting a run.
+ */
+.btn-block {
   width: 100%;
+  justify-content: center;
 }
 
 .btn-primary:disabled {
@@ -5228,13 +5244,7 @@ body:has(.bulkbar) main {
 }
 
 /* Saving and publishing from full screen, where the page carrying those two
-   is hidden behind the editor.
-
-   A primary button is full width by default, which is right in a form and
-   wrong in a toolbar, so in here it is only as wide as it reads. */
-.ve-bar .btn-primary {
-  width: auto;
-}
+   is hidden behind the editor. */
 
 .ve-save {
   margin-left: 10px;
@@ -5321,10 +5331,8 @@ body:has(.bulkbar) main {
   min-width: 0;
 }
 
-/* A primary button is full width by default, which in a row of two makes it
-   the row and leaves the search box a sliver. */
+/* Beside a search box that takes the rest of the row. */
 .media-tools .btn {
-  width: auto;
   flex: none;
 }
 
@@ -5423,10 +5431,6 @@ body:has(.bulkbar) main {
 
 .media-blocked-do {
   margin-bottom: 18px;
-}
-
-.media-blocked-do .btn {
-  width: auto;
 }
 
 /* The way through for a picture already on the web, which needs no library. */
@@ -5639,7 +5643,6 @@ body:has(.bulkbar) main {
 }
 
 .ask-compose .btn {
-  width: auto;
   flex: none;
 }
 
@@ -6332,7 +6335,6 @@ body:has(.bulkbar) main {
 }
 
 .dbuy {
-  width: auto;
   align-self: stretch;
   justify-content: center;
   padding: 11px 18px;
@@ -6864,7 +6866,6 @@ html {
  * this has now been scoped around in six places.
  */
 .head-do.is-new {
-  width: auto;
   padding: 8px 15px;
   box-shadow: 0 1px 2px color-mix(in srgb, var(--accent) 35%, transparent);
 }
@@ -6941,4 +6942,50 @@ html {
 code,
 .run-id {
   font-variant-numeric: slashed-zero;
+}
+
+
+/* The markup, standing where the page stood, so the toggle above swaps two
+   things of the same size rather than revealing one somewhere else. */
+.editor-body-full {
+  width: 100%;
+  height: 62vh;
+  min-height: 380px;
+  resize: vertical;
+}
+
+
+/* ------------------------------------------------------------ asking ---- */
+
+/*
+ * The dialog that replaced window.confirm and window.prompt.
+ *
+ * Borrows the confirmation's card, because it is the same object saying the
+ * same kind of thing and a second style for it would be a second thing to keep
+ * in step. What it adds is a field, for the one question that wants an answer
+ * rather than a yes.
+ */
+.ask-field {
+  margin-top: 4px;
+}
+
+.ask-field input {
+  font-size: 14px;
+}
+
+/*
+ * What is wrong with what was typed, under the box it was typed in.
+ *
+ * Not a colour on the border alone: a red edge says something is wrong and
+ * this says which thing, which is the difference between correcting it and
+ * guessing.
+ */
+.ask-note {
+  margin-top: 7px;
+  font-size: 12.5px;
+  color: var(--bad);
+}
+
+.ask-field:has(.ask-note) input {
+  border-color: color-mix(in srgb, var(--bad) 55%, var(--line-2));
 }

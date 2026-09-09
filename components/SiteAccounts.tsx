@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { useAsk } from "@/components/Ask";
+
 type Site = {
   domain: string;
   username: string;
@@ -83,6 +85,7 @@ export default function SiteAccounts() {
    * site it is about: a shared panel would show the last site's verdict under
    * the row somebody is now looking at.
    */
+  const ask = useAsk();
   const [checking, setChecking] = useState<string | null>(null);
   const [checked, setChecked] = useState<Record<string, Check>>({});
 
@@ -146,11 +149,16 @@ export default function SiteAccounts() {
   }
 
   async function remove(target: string) {
-    if (
-      !window.confirm("Remove the stored WordPress login for " + target + "?")
-    ) {
-      return;
-    }
+    const sure = await ask.confirm({
+      title: `Remove the login for ${target}?`,
+      body:
+        "A run against that site would then write its pages and stop before " +
+        "publishing them. The site itself is untouched.",
+      confirmLabel: "Remove it",
+      cancelLabel: "Keep it",
+      tone: "danger",
+    });
+    if (!sure) return;
     try {
       const response = await fetch(
         "/api/sites?domain=" + encodeURIComponent(target),

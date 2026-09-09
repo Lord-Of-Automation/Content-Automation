@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import MediaPicker from "@/components/MediaPicker";
 import { liveScripts, renderPage, type ShellPage, type ShellSite } from "@/lib/siteshell";
+import { useAsk } from "@/components/Ask";
 
 /**
  * Editing the page inside the page.
@@ -165,6 +166,7 @@ export default function VisualEditor({
   dirty: boolean;
   saving: boolean;
 }) {
+  const ask = useAsk();
   const frame = useRef<HTMLIFrameElement>(null);
   const [chosen, setChosen] = useState<Chosen | null>(null);
   const [tab, setTab] = useState<"type" | "box">("type");
@@ -390,8 +392,24 @@ export default function VisualEditor({
                 className="seg-btn"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
-                  const url = window.prompt("Link to where?");
-                  if (url) send({ do: "exec", command: "createLink", argument: url });
+                  // The dialog answers a promise, and an onClick cannot wait
+                  // for one, so the waiting happens beside it.
+                  void (async () => {
+                    const url = await ask.prompt({
+                      title: "Add a link",
+                      label: "Where should it go?",
+                      placeholder: "https://example.com/page/",
+                      confirmLabel: "Add the link",
+                      // Anything without a scheme becomes a link relative to
+                      // this page, which is almost never what somebody typing
+                      // a whole address meant.
+                      validate: (value) =>
+                        /^(https?:[/][/]|[/]|#|mailto:)/i.test(value)
+                          ? null
+                          : "Start with https://, or with / for a page on this site.",
+                    });
+                    if (url) send({ do: "exec", command: "createLink", argument: url });
+                  })();
                 }}
               >
                 Link
