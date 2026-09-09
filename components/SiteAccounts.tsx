@@ -10,6 +10,28 @@ type Site = {
   readable: boolean;
 };
 
+/**
+ * What the site said when asked.
+ *
+ * `reading` is the whole answer in a sentence, worked out on the server where
+ * the probes are. The rest is what it was worked out from, for the times the
+ * sentence is not enough.
+ */
+type Check = {
+  domain: string;
+  found: boolean;
+  username?: string;
+  passwordLength?: number;
+  bridge?: boolean;
+  identity?: {
+    name?: string;
+    roles?: string[];
+    publish_posts?: boolean;
+  } | null;
+  reading?: string;
+  note?: string;
+};
+
 function GlobeIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -42,6 +64,16 @@ export default function SiteAccounts() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  /*
+   * One check at a time, keyed by domain.
+   *
+   * Per row rather than one shared result, because the answer belongs to the
+   * site it is about: a shared panel would show the last site's verdict under
+   * the row somebody is now looking at.
+   */
+  const [checking, setChecking] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Record<string, Check>>({});
 
   const [domain, setDomain] = useState("");
   const [username, setUsername] = useState("");
@@ -122,6 +154,41 @@ export default function SiteAccounts() {
     }
   }
 
+  /**
+   * Ask the site whether this login works.
+   *
+   * Every probe behind it is a read, so this is safe to press as often as
+   * somebody likes. It answers the question a failed publish leaves open: was
+   * it the password, the plugin, or what this user is allowed to do.
+   */
+  async function test(site: string) {
+    setChecking(site);
+    setError(null);
+    try {
+      const response = await fetch(`/api/sites/check?site=${encodeURIComponent(site)}`, {
+        cache: "no-store",
+      });
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? `The check returned ${response.status}.`);
+      setChecked((all) => ({ ...all, [site]: payload as Check }));
+    } catch (e) {
+      setChecked((all) => ({
+        ...all,
+        [site]: {
+          domain: site,
+          found: false,
+          note: e instanceof Error ? e.message : "The site could not be checked.",
+        },
+      }));
+    } finally {
+      setChecking(null);
+    }
+  }
+
   return (
     <div className="card">
       <div className="card-head">
@@ -151,16 +218,58 @@ export default function SiteAccounts() {
               <li key={site.domain}>
                 <span className="site-domain">{site.domain}</span>
                 <span className="site-user">{site.username}</span>
-                {site.readable ? null : (
-                  <span className="pill pill-bad">unreadable</span>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => void remove(site.domain)}
-                >
-                  Remove
-                </button>
+                <div className="site-do">
+                  {site.readable ? null : (
+                    <span className="pill pill-bad">unreadable</span>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    disabled={checking === site.domain}
+                    title="Ask the site whether this login works. Nothing is written."
+                    onClick={() => void test(site.domain)}
+                  >
+                    {checking === site.domain ? "Testing…" : "Test connection"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => void remove(site.domain)}
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                {/* Under the row it belongs to, and only once asked. The
+                    sentence is the answer; the line under it is what the site
+                    said about this login, for when the sentence is not
+                    enough. */}
+                {checked[site.domain] ? (
+                  <div
+                    className={
+                      checked[site.domain]!.reading?.startsWith("The login works, the plugin")
+                        ? "site-check is-ok"
+                        : "site-check is-bad"
+                    }
+                  >
+                    <strong>
+                      {checked[site.domain]!.reading ??
+                        checked[site.domain]!.note ??
+                        "No answer."}
+                    </strong>
+                    {checked[site.domain]!.identity ? (
+                      <span className="site-check-who">
+                        {checked[site.domain]!.identity!.name}
+                        {checked[site.domain]!.identity!.roles?.length
+                          ? ` · ${checked[site.domain]!.identity!.roles!.join(", ")}`
+                          : ""}
+                        {typeof checked[site.domain]!.passwordLength === "number"
+                          ? ` · password ${checked[site.domain]!.passwordLength} characters`
+                          : ""}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

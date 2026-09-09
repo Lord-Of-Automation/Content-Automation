@@ -14,6 +14,18 @@ export const maxDuration = 60;
  * succeeded, which narrows it to capabilities rather than a bad password — but
  * only the site can settle that. This asks it directly.
  *
+ * Every probe is a read. It used to POST a "permission probe" to the plugin
+ * route to see whether the route accepted the login, which answered the
+ * question and asked a live site to consider creating a post to do it. Once
+ * there is a button for this, somebody will press it twice, and a diagnostic
+ * that writes to the site it is diagnosing is the wrong kind of tool. The
+ * plugin is now found by asking the site which namespaces it serves, and what
+ * the login may do comes from the capabilities the site reports for it.
+ *
+ * What that gives up is narrow and worth saying: a security plugin blocking
+ * the bridge route specifically, while leaving core REST alone, now shows as
+ * a working login rather than as a refusal. The reading below says so.
+ *
  * The password is never returned; only its length, so a truncated paste is
  * visible without exposing it.
  */
@@ -83,14 +95,17 @@ export async function GET(request: Request) {
 
     const me = await probe("who am I", "/wp-json/wp/v2/users/me?context=edit");
     const types = await probe("core REST", "/wp-json/wp/v2/types");
-    const plugin = await probe("plugin route", "/wp-json/n8n/v1/content", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id: 0, title: "permission probe", content: "" }),
-    });
+    // Every namespace the site serves. The content bridge registers n8n/v1,
+    // so its presence here is the plugin being installed and active, asked
+    // for without writing anything.
+    const root = await probe("the REST index", "/wp-json/");
 
     const meBody = (me.body ?? {}) as any;
     const caps = meBody.capabilities ?? {};
+    const namespaces: string[] = Array.isArray((root.body as any)?.namespaces)
+      ? (root.body as any).namespaces.map(String)
+      : [];
+    const bridge = namespaces.includes("n8n/v1");
 
     return NextResponse.json({
       domain,
@@ -108,15 +123,28 @@ export async function GET(request: Request) {
             manage_options: !!caps.manage_options,
           }
         : null,
-      probes: [me, types, plugin].map(({ body, ...rest }) => rest),
-      reading:
-        me.status === 401
+      bridge,
+      namespaces: namespaces.length,
+      probes: [me, types, root].map(({ body, ...rest }) => rest),
+      /*
+       * One sentence, in the order the failures actually happen.
+       *
+       * Reachability first, because a site that answers nothing makes every
+       * other reading meaningless. Then the login, then whether the plugin
+       * that does the publishing is even there, then whether this login is
+       * allowed to publish once it is.
+       */
+      reading: !me.status
+        ? `The site could not be reached: ${me.message ?? "no answer"}.`
+        : me.status === 401 || me.status === 403
           ? "The login itself is being rejected. Wrong username, or the application password was regenerated."
-          : plugin.status === 401 || plugin.status === 403
-            ? "The login works but the plugin route refuses it. That is a capability or a security plugin, not a bad password."
-            : plugin.status === 404
-              ? "The plugin route does not exist on this site. The content bridge plugin is missing or inactive."
-              : "The login works and the plugin route accepts it.",
+          : !me.ok
+            ? `The site answered ${me.status} to a signed-in request, so the login could not be confirmed.`
+            : !bridge
+              ? "The login works, but the content bridge plugin is not on this site. A run would write the article and stop before publishing."
+              : !caps.publish_posts
+                ? "The login works and the plugin is there, but this user may not publish. A run would create drafts at best."
+                : "The login works, the plugin is there, and this user may publish.",
     });
   } catch (error) {
     return errorResponse(error);
