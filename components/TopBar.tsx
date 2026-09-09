@@ -16,7 +16,7 @@ export default async function TopBar({
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <Link className="brand" href="/">
+        <Link className="brand" href="/runs">
           <span className="brand-dot" />
           <span>SEO Automation</span>
         </Link>
@@ -25,14 +25,6 @@ export default async function TopBar({
             live in the profile menu, where they stop reading as somewhere to
             go and start reading as something to change. */}
         <nav className="topnav">
-          {/* First, and named for what it answers rather than for a place.
-              It is the page you land on, so it is also the way back to it. */}
-          <Link
-            href="/"
-            className={current === "home" ? "topnav-link is-current" : "topnav-link"}
-          >
-            Overview
-          </Link>
 {/* The two ways of running the engine over a site, under the one word
               for what they are both for. Separately they read as two unrelated
               features; together they read as a choice between doing it now and
@@ -79,26 +71,37 @@ export default async function TopBar({
             ]}
           />
           {/* What this platform wrote, before anything hosts it. Ahead of
-              Applications because that is the order the work happens in. */}
+              Hosting because that is the order the work happens in.
+
+              AI Websites rather than Websites, which is every page on every
+              host in this console. These are the ones written here. */}
           <Link
             href="/websites"
             className={current === "websites" ? "topnav-link is-current" : "topnav-link"}
           >
-            Websites
+            AI Websites
           </Link>
-          {/* Between Websites and Performance on purpose: what is registered,
-              what is running on it, what it earns. */}
+          {/* Between Websites and Search Console on purpose: what is
+              registered, what is running on it, what it earns.
+
+              Hosting rather than Applications, which is Cloudways' word for a
+              site and nobody else's. The page lists what is hosted across two
+              hosts, and the row for a Hostinger site was never an application
+              in anybody's vocabulary. */}
           <Link
             href="/apps"
             className={current === "apps" ? "topnav-link is-current" : "topnav-link"}
           >
-            Applications
+            Hosting
           </Link>
+          {/* Named for the thing it reads rather than for what the numbers
+              are about. Everything in this console is performance; only this
+              page is Google's own report of it. */}
           <Link
             href="/performance"
             className={current === "performance" ? "topnav-link is-current" : "topnav-link"}
           >
-            Performance
+            Search Console
           </Link>
           <Link
             href="/logs"

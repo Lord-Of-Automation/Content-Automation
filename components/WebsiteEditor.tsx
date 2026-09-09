@@ -3,6 +3,36 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import SiteAssistant from "@/components/SiteAssistant";
+
+/**
+ * Claude's mark, at the size of a button label.
+ *
+ * Drawn rather than loaded, like the one on the assistant tab, so it takes the
+ * button's own colour. Eleven blades at uneven angles: spaced evenly they read
+ * as an asterisk instead.
+ */
+const BLADES: [number, number][] = [
+  [0, 9], [33, 7.4], [66, 8.6], [98, 7.1], [131, 8.9], [164, 7.6],
+  [196, 8.8], [229, 7.2], [262, 8.5], [295, 7.5], [328, 9],
+];
+
+function ClaudeMark() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="claude-mark" aria-hidden>
+      <g transform="translate(12 12)">
+        {BLADES.map(([turn, reach], i) => (
+          <path
+            key={i}
+            d={`M0 0 L-1.35 ${-reach} Q0 ${-reach - 1.35} 1.35 ${-reach} Z`}
+            transform={`rotate(${turn})`}
+          />
+        ))}
+      </g>
+    </svg>
+  );
+}
+
 import VisualEditor from "@/components/VisualEditor";
 import { hasBehaviour } from "@/lib/pagehtml";
 import SitePreview from "@/components/SitePreview";
@@ -172,6 +202,15 @@ export default function WebsiteEditor({ id }: { id: string }) {
    */
   const [showPreview, setShowPreview] = useState(true);
 
+  /*
+   * The panel that edits by description rather than by pointing.
+   *
+   * Closed by default. It is the answer to a particular kind of job — the same
+   * change across many pages — and a panel open on arrival would take a third
+   * of the width from the editor for a job most visits are not doing.
+   */
+  const [assist, setAssist] = useState(false);
+
   const load = useCallback(async () => {
     try {
       const response = await fetch(`/api/websites/${id}`, { cache: "no-store" });
@@ -315,7 +354,38 @@ export default function WebsiteEditor({ id }: { id: string }) {
   }
 
   return (
-    <div className="stack">
+    <div className={assist ? "stack we-with-claude" : "stack"}>
+      {assist ? (
+        <SiteAssistant
+          id={id}
+          siteName={site.name}
+          dirty={dirty}
+          onSave={save}
+          onEdited={(back) => {
+            /*
+             * What Claude wrote, adopted whole.
+             *
+             * The same assignment the editor's own save does, because it is the
+             * same thing: the server has written a new record and this is now
+             * showing an older one. Not dirty afterwards, since what is on
+             * screen is exactly what is stored.
+             */
+            setSite(back);
+            setPages(back.pages);
+            setName(back.name);
+            setTagline(back.tagline);
+            setHeader(back.header);
+            setFooter(back.footer);
+            setTheme(back.theme);
+            setDesign(back.design);
+            setDirty(false);
+            setSaved(true);
+            setSaves((n) => n + 1);
+          }}
+          onClose={() => setAssist(false)}
+        />
+      ) : null}
+
       <div className="card">
         <div className="card-head">
           <div>
@@ -350,6 +420,15 @@ export default function WebsiteEditor({ id }: { id: string }) {
                 {stopping ? "Stopping…" : "Stop writing"}
               </button>
             ) : null}
+            <button
+              type="button"
+              className={assist ? "btn btn-ghost bar-btn is-on" : "btn btn-ghost bar-btn"}
+              onClick={() => setAssist((on) => !on)}
+              title="Describe a change and have it made across the pages."
+            >
+              <ClaudeMark />
+              Edit with Claude
+            </button>
             <button
               type="button"
               className="btn btn-primary bar-btn"

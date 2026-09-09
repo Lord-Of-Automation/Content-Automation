@@ -20,10 +20,7 @@ export async function login(
 
   try {
     // On success this throws a redirect, which must reach Next untouched.
-    // Signing in lands on the overview, which is the page that answers what
-    // happened while you were away. It used to land on the form for starting
-    // more work, which answered nothing.
-    await signIn("credentials", { username, password, redirectTo: "/" });
+    await signIn("credentials", { username, password, redirectTo: "/runs" });
     return { error: null };
   } catch (error) {
     if (error instanceof AuthError) {

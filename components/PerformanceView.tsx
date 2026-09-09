@@ -221,7 +221,7 @@ export default function PerformanceView() {
       <div className="card">
         <div className="card-head">
           <div>
-            <h2>Performance</h2>
+            <h2>Search Console</h2>
           </div>
           <div className="perf-window">
             <div className="seg seg-sm">

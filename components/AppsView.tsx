@@ -338,7 +338,7 @@ export default function AppsView() {
       <div className="card">
         <div className="card-head">
           <div>
-            <h2>Applications</h2>
+            <h2>Hosting</h2>
           </div>
           <div className="app-head-actions">
             <button

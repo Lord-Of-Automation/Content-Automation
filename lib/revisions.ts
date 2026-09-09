@@ -83,7 +83,16 @@ export interface Revision {
   /** Who made it. */
   by: string;
   /** How it came to exist: somebody's edit, a restore, or the build itself. */
-  reason: "build" | "edit" | "restore";
+  /**
+   * What replaced this version.
+   *
+   * "claude" is separate from "edit" because it is the one worth finding again
+   * in a hurry. An edit somebody made by hand they remember making; an edit
+   * they described in a sentence and watched happen is the one they may want
+   * to walk back, and a list where it looks like every other save makes that
+   * harder than it needs to be.
+   */
+  reason: "build" | "edit" | "restore" | "claude";
   body: RevisionBody;
 }
 

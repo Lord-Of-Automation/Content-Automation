@@ -1,7 +1,7 @@
 import TopBar from "@/components/TopBar";
 import PerformanceView from "@/components/PerformanceView";
 
-export const metadata = { title: "Performance — SEO Automation" };
+export const metadata = { title: "Search Console — SEO Automation" };
 export const dynamic = "force-dynamic";
 
 export default function PerformancePage() {

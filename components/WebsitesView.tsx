@@ -204,7 +204,7 @@ export default function WebsitesView() {
       <div className="card">
         <div className="card-head">
           <div>
-            <h2>Websites</h2>
+            <h2>AI Websites</h2>
           </div>
           <button
             type="button"

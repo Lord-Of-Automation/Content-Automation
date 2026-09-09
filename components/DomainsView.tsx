@@ -9,7 +9,28 @@ import DomainDns from "@/components/DomainDns";
 import {
   orderDomains, pointsAt, statusTone, type Direction, type SortKey,
 } from "@/lib/domainsort";
+import { ColumnPicker, useColumns, type ColumnSpec } from "@/components/Columns";
 import { SkeletonBarRow, SkeletonStats, SkeletonTable } from "@/components/Skeleton";
+
+/**
+ * The columns, and which of them a reader may turn off.
+ *
+ * Eleven facts are worth having somewhere and rarely worth having at once.
+ * The three that cannot go are not facts about a domain: the tick box and the
+ * buttons are how you act on one, and the name is how you know which one.
+ */
+const COLUMNS: ColumnSpec[] = [
+  { key: "pick", label: "Select", fixed: true },
+  { key: "domain", label: "Domain", fixed: true },
+  { key: "provider", label: "Registrar" },
+  { key: "status", label: "Status" },
+  { key: "expires", label: "Expires" },
+  { key: "renewal", label: "Renewal" },
+  { key: "price", label: "Renews for" },
+  { key: "ns", label: "Name servers" },
+  { key: "cloudflare", label: "Cloudflare" },
+  { key: "actions", label: "Actions", fixed: true },
+];
 
 type Domain = {
   provider: string;
@@ -179,6 +200,7 @@ export default function DomainsView() {
   const [managing, setManaging] = useState<Domain | null>(null);
   /** The domain being added to Cloudflare, or null. */
   const [adding, setAdding] = useState<Domain | null>(null);
+  const columns = useColumns("domains", COLUMNS);
   /**
    * The domains ticked, by name.
    *
@@ -547,6 +569,8 @@ export default function DomainsView() {
                   </div>
                 ) : null}
 
+                <ColumnPicker specs={COLUMNS} chosen={columns} />
+
                 {shown.length !== domains.length ? (
                   <span className="domain-counts">
                     <span className="domain-count">
@@ -608,14 +632,16 @@ export default function DomainsView() {
                         ["ns", "Name servers", ""],
                         ["cloudflare", "Cloudflare", ""],
                       ] as Array<[SortKey, string, string]>
-                    ).map(([key, label, align]) => (
-                      <th key={key} className={align ? `${align} sortable` : "sortable"}>
-                        <button type="button" onClick={() => sortBy(key)}>
-                          {label}
-                          <Chevrons state={sortKey === key ? direction : "none"} />
-                        </button>
-                      </th>
-                    ))}
+                    )
+                      .filter(([key]) => columns.shown(key))
+                      .map(([key, label, align]) => (
+                        <th key={key} className={align ? `${align} sortable` : "sortable"}>
+                          <button type="button" onClick={() => sortBy(key)}>
+                            {label}
+                            <Chevrons state={sortKey === key ? direction : "none"} />
+                          </button>
+                        </th>
+                      ))}
                     <th />
                     <th />
                   </tr>
@@ -674,66 +700,79 @@ export default function DomainsView() {
                             </div>
                           ) : null}
                         </td>
-                        <td>
-                          <span className="registrar">{d.providerLabel}</span>
-                        </td>
-                        <td>
-                          <span className={`pill pill-${statusTone(d.status)}`}>
-                            {prettyStatus(d.status)}
-                          </span>
-                        </td>
-                        <td className="nowrap">
-                          <span className={`pill pill-${expiryTone(d.daysLeft, d.renewAuto)}`}>
-                            {expiryText(d.daysLeft, d.expires)}
-                          </span>
-                        </td>
-                        <td className="nowrap">
-                          {d.renewAuto ? (
-                            <span className="quiet">automatic</span>
-                          ) : (
-                            <span className="pill pill-warn">manual</span>
-                          )}
-                        </td>
-                        <td className="mid">
-                          {d.renewalPrice ? (
-                            money(d.renewalPrice, d.currency)
-                          ) : (
-                            <span className="quiet">not priced</span>
-                          )}
-                        </td>
-                        {/* One column, because it is one fact. The pill is
-                            the answer at a glance — Cloudflare, or parked and
-                            doing nothing — and the hosts beneath it are which
-                            record to go and change. Split across two columns
-                            they made the table wider to say the same thing
-                            twice. */}
-                        <td className="ns">
-                          {/* Stacked inside the cell rather than by making the
-                              cell a flex container. A flex <td> leaves the
-                              table's layout, so it stops sharing the row's
-                              height and every other column stops lining up
-                              with it. */}
-                          <div className="ns-stack">
-                            <span className={`pill pill-${where.tone}`}>{where.label}</span>
-                            {d.nameServers.length ? (
-                              d.nameServers.map((ns) => (
-                                <span className="ns-chip" key={ns}>
-                                  {ns}
-                                </span>
-                              ))
+                        {columns.shown("provider") ? (
+                          <td>
+                            <span className="registrar">{d.providerLabel}</span>
+                          </td>
+                        ) : null}
+                        {columns.shown("status") ? (
+                          <td>
+                            <span className={`pill pill-${statusTone(d.status)}`}>
+                              {prettyStatus(d.status)}
+                            </span>
+                          </td>
+                        ) : null}
+                        {columns.shown("expires") ? (
+                          <td className="nowrap">
+                            <span className={`pill pill-${expiryTone(d.daysLeft, d.renewAuto)}`}>
+                              {expiryText(d.daysLeft, d.expires)}
+                            </span>
+                          </td>
+                        ) : null}
+                        {columns.shown("renewal") ? (
+                          <td className="nowrap">
+                            {d.renewAuto ? (
+                              <span className="quiet">automatic</span>
                             ) : (
-                              <span className="quiet">none recorded</span>
+                              <span className="pill pill-warn">manual</span>
                             )}
-                          </div>
-                        </td>
-                        <td className="nowrap">
-                          <span
-                            className={`pill pill-${CLOUDFLARE_BADGE[d.cloudflare].tone}`}
-                            title={CLOUDFLARE_BADGE[d.cloudflare].text}
-                          >
-                            {CLOUDFLARE_BADGE[d.cloudflare].label}
-                          </span>
-                        </td>
+                          </td>
+                        ) : null}
+                        {columns.shown("price") ? (
+                          <td className="mid">
+                            {d.renewalPrice ? (
+                              money(d.renewalPrice, d.currency)
+                            ) : (
+                              <span className="quiet">not priced</span>
+                            )}
+                          </td>
+                        ) : null}
+                        {/* One column, because it is one fact. The pill is the
+                            answer at a glance — Cloudflare, or parked and doing
+                            nothing — and the hosts beneath it are which record
+                            to go and change. Split across two columns they made
+                            the table wider to say the same thing twice. */}
+                        {columns.shown("ns") ? (
+                          <td className="ns">
+                            {/* Stacked inside the cell rather than by making the
+                                cell a flex container. A flex <td> leaves the
+                                table's layout, so it stops sharing the row's
+                                height and every other column stops lining up
+                                with it. */}
+                            <div className="ns-stack">
+                              <span className={`pill pill-${where.tone}`}>{where.label}</span>
+                              {d.nameServers.length ? (
+                                d.nameServers.map((ns) => (
+                                  <span className="ns-chip" key={ns}>
+                                    {ns}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="quiet">none recorded</span>
+                              )}
+                            </div>
+                          </td>
+                        ) : null}
+                        {columns.shown("cloudflare") ? (
+                          <td className="nowrap">
+                            <span
+                              className={`pill pill-${CLOUDFLARE_BADGE[d.cloudflare].tone}`}
+                              title={CLOUDFLARE_BADGE[d.cloudflare].text}
+                            >
+                              {CLOUDFLARE_BADGE[d.cloudflare].label}
+                            </span>
+                          </td>
+                        ) : null}
                         <td className="row-actions">
                           {/* Greyed only when the domain really is on
                               Cloudflare. It used to be greyed for Unknown too,

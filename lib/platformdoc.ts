@@ -46,12 +46,6 @@ merged and still not be running.
 
 # The pages
 
-**Overview** (/) is the page you land on. It answers what happened without you:
-anything that failed in the past week or a website that was never written, the
-runs of the last day and what is running now, which loops fire next, and what
-the month has cost. Nothing on it is a control. Every row is a way into the
-page that owns the thing.
-
 **Optimize** (/runs) rewrites pages that already exist on a WordPress site. You
 give it a site, a market and a language, it crawls, picks pages worth working
 on, researches each, rewrites it and publishes it back. This is the original
@@ -62,8 +56,8 @@ settings and starts a run every so often — four times a day through to weekly.
 
 Both live under the SEO menu in the header.
 
-**Websites** (/websites) is different work: writing a site that does not exist
-yet. You describe it, name the topic and the keywords, choose WordPress or
+**AI Websites** (/websites) is different work: writing a site that does not
+exist yet. You describe it, name the topic and the keywords, choose WordPress or
 static HTML and how many pages, and the engine writes the whole thing. What
 comes back is editable here — see the editor below — and can then be published
 onto any connected host.
@@ -72,13 +66,15 @@ onto any connected host.
 Cloudflare, with DNS, groups and bulk edits. **Name generator**
 (/domains/generate) finds names that are free and prices them.
 
-**Applications** (/apps) lists what is hosted, across Cloudways and Hostinger
-together. Per application: its domain, its admin login, cache clearing, cloning,
+**Hosting** (/apps) lists what is hosted, across Cloudways and Hostinger
+together. Per site: its domain, its admin login, cache clearing, cloning,
 deleting, changing the primary domain. What a row can do depends on the host, so
-a Hostinger row simply lacks the things only Cloudways offers.
+a Hostinger row simply lacks the things only Cloudways offers. Its address is
+still /apps, and the word "application" is Cloudways' name for one of these.
 
-**Performance** (/performance) reports rankings and traffic from Google Search
-Console.
+**Search Console** (/performance) reports rankings and traffic from Google
+Search Console. Its address is still /performance, which is what it was called
+before it was named for what it reads.
 
 **Logs** (/logs) is the audit trail: who did what, when.
 
@@ -182,6 +178,4 @@ image, the FAQ schema, the SEO meta and copying a page's theme template.
 - Publishing needs an application password, never the login password.
 - Artifacts of a failed run are deleted after three days. The run record, its
   settings and its history are kept.
-- The money figure on the Overview arrives after the rest of the page. Pricing
-  reads each run in full and is the slowest call the console makes.
 `.trim();

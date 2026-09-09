@@ -157,6 +157,14 @@ a {
   flex: none;
 }
 
+/* The brand is a link to where the work starts, and a link that looks like a
+   link in the corner of every page reads as something other than the name of
+   the thing. */
+.brand {
+  color: inherit;
+  text-decoration: none;
+}
+
 .spacer {
   flex: 1;
 }
@@ -5692,141 +5700,261 @@ body:has(.bulkbar) main {
   padding: 20px 18px;
 }
 
-/* The same padding and divider as .ov-row, so the panel is already the height
-   it will be once the rows arrive. */
-.skel-stack-row {
+
+/* ------------------------------------------------------- edit with Claude */
+
+/* The mark on the button that opens the panel, at label size. */
+.claude-mark {
+  width: 14px;
+  height: 14px;
+  color: #d97757;
+  flex: none;
+}
+
+/* Docked rather than floating, and pushing the editor over rather than sitting
+   on top of it. Watching an edit happen is the point, so the pages must stay
+   visible while it does. */
+.we-with-claude {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 20px;
+  align-items: start;
+}
+
+.we-with-claude > .card {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.sa-panel {
+  grid-column: 2;
+  grid-row: 1;
+  position: sticky;
+  top: calc(var(--topbar-h) + 20px);
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  padding: 14px 18px;
-}
-
-.skel-stack-row + .skel-stack-row {
-  border-top: 1px solid var(--line);
-}
-
-.skel-stack-row .skel:last-child {
-  height: 9px;
-}
-
-
-/* ---------------------------------------------------------------- overview */
-
-/* The figures, borrowed from the domains table because they answer the same
-   kind of question and there is no reason for two of them. There they sit
-   inside a card; here they are the first thing on the page, so they bring the
-   card with them. */
-.ov-stats {
+  max-height: calc(100vh - var(--topbar-h) - 40px);
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
-  margin-bottom: 20px;
 }
 
-.ov-stats .domain-stat {
-  flex: 1;
-}
-
-.ov-stats .domain-stat:last-child {
-  border-right: 0;
-}
-
-/* Anything broken comes above the fold and full width, because it is the only
-   part of this page that asks something of the reader. */
-.ov-attention {
-  margin-bottom: 20px;
-  border-color: color-mix(in srgb, var(--bad) 40%, var(--line));
-}
-
-/* Two columns of roughly equal weight: what has happened, and what is coming.
-   Not the console's usual form-beside-panel split, which puts a narrow column
-   first and would read as a sidebar. */
-.ov-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 20px;
-  align-items: start;
-}
-
-@media (max-width: 1000px) {
-  .ov-grid {
+/* Under the editor once a column each leaves neither wide enough to work in. */
+@media (max-width: 1180px) {
+  .we-with-claude {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .we-with-claude > .card,
+  .sa-panel {
+    grid-column: 1;
+  }
+
+  .sa-panel {
+    grid-row: 2;
+    position: static;
+    max-height: 70vh;
   }
 }
 
-.ov-side .card + .card {
-  margin-top: 20px;
-}
-
-/* The button goes to the right edge rather than sitting against the end of the
-   sentence, where it reads as part of it. */
-.ov-grid .card-head > div:first-child {
-  flex: 1;
-  min-width: 0;
-}
-
-.ov-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.ov-list li + li .ov-row {
-  border-top: 1px solid var(--line);
-}
-
-/* The whole line is the link, not the name inside it. A row that is a link
-   only where the words are is a row people click and nothing happens. */
-.ov-row {
+.sa-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
-  padding: 12px 18px;
-  color: inherit;
-  text-decoration: none;
+  gap: 10px;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--line);
 }
 
-.ov-row:hover {
-  background: var(--panel-2);
-}
-
-.ov-row-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.ov-row-main strong {
-  font-weight: 600;
+.sa-head strong {
+  display: block;
   font-size: 13.5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.ov-row-sub {
-  font-size: 12px;
+.sa-sub {
+  display: block;
+  font-size: 11.5px;
   color: var(--ink-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.ov-when {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--ink-2);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+.sa-head-do {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
 }
 
-/* The brand is a link now, and a link that looks like a link in the corner of
-   every page reads as something other than the name of the thing. */
-.brand {
-  color: inherit;
-  text-decoration: none;
+.sa-notice {
+  margin: 12px 14px 0;
+}
+
+.sa-notice-do {
+  margin-top: 9px;
+}
+
+.sa-thread {
+  flex: 1;
+  min-height: 160px;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+/* What it changed, as a list rather than a sentence. This is the part somebody
+   checks against the pages, so it wants to be scannable in a way prose is not. */
+.sa-did {
+  list-style: none;
+  margin: 0 0 9px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sa-did li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+/* A tick, drawn rather than typed, so it keeps its colour and its size. */
+.sa-did li::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--ok);
+  border-width: 0 1.6px 1.6px 0;
+  transform: rotate(45deg);
+}
+
+/* What is happening right now, which is the line that makes a long edit
+   readable as work rather than as a hang. */
+.sa-doing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.sa-spin {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  border: 2px solid var(--line-2);
+  border-top-color: var(--ink-3);
+  border-radius: 50%;
+  animation: sa-turn 0.7s linear infinite;
+}
+
+@keyframes sa-turn {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sa-spin {
+    animation-duration: 2.4s;
+  }
+}
+
+/* The panel borrows the assistant's thread, prompt and compose styles, which
+   were written for exactly this shape. These are the few places where being
+   inside a card rather than against the window edge changes the measurements. */
+.sa-panel .ask-empty {
+  padding: 0;
+}
+
+.sa-panel .ask-compose {
+  border-top: 1px solid var(--line);
+}
+
+.sa-panel .ask-error {
+  margin: 0 14px 12px;
+}
+
+
+/* ------------------------------------------------------- choosing columns */
+
+.cols {
+  position: relative;
+}
+
+.cols .btn svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+/* How many are off, on the button rather than only inside the menu. A table
+   missing a column somebody forgot they hid is a table that looks broken. */
+.cols-count {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.cols-panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 200px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.cols-list {
+  padding: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.cols-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cols-item:hover {
+  background: var(--panel-2);
+}
+
+/* The last column standing. Disabled rather than hidden, so the reason is
+   visible: it is the one thing left, not a column that has gone missing. */
+.cols-item:has(input:disabled) {
+  cursor: default;
+  color: var(--ink-3);
+}
+
+.cols-item input {
+  flex: none;
+  accent-color: var(--accent);
+}
+
+.cols-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px;
+  border-top: 1px solid var(--line);
 }

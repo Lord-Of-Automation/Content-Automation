@@ -154,21 +154,3 @@ export function SkeletonLines({ count = 4 }: { count?: number }) {
     </div>
   );
 }
-
-/**
- * A list whose every row is a name over a smaller line, which is the shape of
- * all three panels on the overview. Padded and divided like the real rows, so
- * the panel is already the right height when the rows replace it.
- */
-export function SkeletonStack({ count = 4 }: { count?: number }) {
-  return (
-    <div className="skel-stack" aria-hidden>
-      {Array.from({ length: count }, (_, i) => (
-        <div className="skel-stack-row" key={i}>
-          <SkeletonBar seed={i * 4} w={`${[46, 34, 52, 40][i % 4]}%`} />
-          <SkeletonBar seed={i * 4 + 1} w={`${[62, 74, 55, 68][i % 4]}%`} />
-        </div>
-      ))}
-    </div>
-  );
-}

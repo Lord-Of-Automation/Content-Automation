@@ -27,6 +27,7 @@ const WHY: Record<RevisionSummary["reason"], string> = {
   build: "as written",
   edit: "edited",
   restore: "restored",
+  claude: "before Claude's edit",
 };
 
 /** "3 minutes ago". Exact dates are in the title attribute for when it matters. */
