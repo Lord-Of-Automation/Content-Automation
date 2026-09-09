@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { AuditAction } from "@/lib/audit";
+import { SkeletonTable } from "@/components/Skeleton";
 
 // The action type comes from the server rather than being copied here. The
 // copy had drifted: "keys-updated" existed on the server and not in this list,
@@ -213,7 +214,7 @@ export default function LogsView() {
           {error ? <div className="notice bad">{error}</div> : null}
 
           {loading ? (
-            <div className="empty">Loading…</div>
+            <SkeletonTable columns={5} rows={12} />
           ) : shown.length === 0 ? (
             <div className="empty">
               {filter === "all"

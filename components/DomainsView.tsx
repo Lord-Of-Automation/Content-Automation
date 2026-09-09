@@ -9,6 +9,7 @@ import DomainDns from "@/components/DomainDns";
 import {
   orderDomains, pointsAt, statusTone, type Direction, type SortKey,
 } from "@/lib/domainsort";
+import { SkeletonBarRow, SkeletonStats, SkeletonTable } from "@/components/Skeleton";
 
 type Domain = {
   provider: string;
@@ -419,7 +420,14 @@ export default function DomainsView() {
               </div>
             ))}
           {loading && !domains.length ? (
-            <div className="empty">Loading…</div>
+            /* Three registrars and Cloudflare, one after another, before the
+               first row can be drawn. This is the longest wait in the console
+               and the one that most needed a shape rather than a word. */
+            <>
+              <SkeletonStats count={4} />
+              <SkeletonBarRow />
+              <SkeletonTable columns={11} rows={10} />
+            </>
           ) : !domains.length && !error ? (
             <div className="empty">This account holds no domains.</div>
           ) : domains.length ? (

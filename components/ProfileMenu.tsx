@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import type { Section } from "@/lib/nav";
+
 type Theme = "light" | "dark";
 
 /** Read whatever the no-flash script in the layout already decided. */
@@ -49,10 +51,7 @@ export default function ProfileMenu({
   signOut,
 }: {
   name: string;
-  current:
-    | "runs" | "loop" | "logs"
-    | "domains" | "generator" | "websites" | "apps" | "performance"
-    | "accounts" | "keys";
+  current: Section;
   /** The logout server action, handed down from the server component. */
   signOut: () => void | Promise<void>;
 }) {

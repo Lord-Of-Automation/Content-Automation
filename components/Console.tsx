@@ -189,9 +189,22 @@ export default function Console() {
     void loadHistory();
     void loadPins();
 
+    /*
+     * A run named in the address wins over the one last looked at.
+     *
+     * The overview links here to open a particular run, and without this it
+     * would land on whichever run this browser was last reading, which is the
+     * one thing more confusing than landing on none.
+     *
+     * Read off location rather than through useSearchParams: the hook makes
+     * the whole page opt into a suspense boundary to say the same thing, and
+     * this only needs asking once, on arrival.
+     */
     let saved: string | null = null;
     try {
-      saved = window.localStorage.getItem(SELECTED_KEY);
+      saved =
+        new URLSearchParams(window.location.search).get("run") ||
+        window.localStorage.getItem(SELECTED_KEY);
     } catch {
       saved = null;
     }

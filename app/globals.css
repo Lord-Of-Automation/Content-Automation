@@ -28,6 +28,11 @@
   --pin: #6b3fd4;
   --pin-soft: #f1ebfe;
   --pin-line: #d9c9f7;
+  /* How far down the window a sticky table heading comes to rest: clear of the
+     top bar, with half a pixel of the heading tucked underneath it so no row
+     shows through the seam. The bar is 64.5px at every width where a heading
+     sticks; it grows to 70px when the brand wraps, far below that. */
+  --topbar-h: 64px;
 }
 
 /* Dark tokens apply in two situations: the viewer's OS asks for dark and they
@@ -154,6 +159,22 @@ a {
 
 .spacer {
   flex: 1;
+}
+
+/* The navigation is seven items wide and none of them shrink, so on a narrow
+   window it used to make the whole document wider than the screen and every
+   page scrolled sideways. It scrolls within itself instead. Adding Overview
+   made this worse, which is how it came to be noticed; it was already true. */
+@media (max-width: 1100px) {
+  .topnav {
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .topnav::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 
@@ -1319,9 +1340,47 @@ button,
   border: 1px solid var(--line);
 }
 
-/* The log table can overflow on a phone; scroll it rather than the page. */
-.card-body.tight:has(.logs) {
-  overflow-x: auto;
+/* A wide table scrolls inside its card rather than taking the page sideways
+   with it.
+
+   The width is load-bearing rather than tidy, and it was measured rather than
+   guessed. An element with overflow on one axis is a scroll container on both,
+   and a sticky heading inside one sticks to that container, which never scrolls
+   vertically, so it never moves. Turning the overflow off is therefore the
+   price of the sticky headings below.
+
+   1200px is where that price stops being worth paying. The domains table is
+   eleven columns and will not compress below about 1030px, so under roughly
+   1080px of window the page itself starts scrolling sideways, which is worse
+   than losing a heading. Above it the table fits and the heading follows you
+   down. */
+@media (max-width: 1200px) {
+  .card-body.tight:has(.logs) {
+    overflow-x: auto;
+  }
+}
+
+/* The column names stay put while the rows go by.
+   Domains runs to hundreds of lines and eight columns, and a screen into it
+   there was nothing left to say which column was which.
+
+   The rule draws its own bottom edge as an inset shadow. A collapsed border
+   belongs to the table rather than to the cell, so it stays behind at the top
+   of the table while the heading travels, and the heading arrives underlined
+   by nothing. */
+.logs thead th {
+  position: sticky;
+  top: var(--topbar-h);
+  z-index: 2;
+  background: var(--panel);
+  border-bottom: 0;
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+/* Inside a dialog the window is not what scrolls, the sheet body is, and it
+   starts under no top bar. */
+.sheet .logs thead th {
+  top: 0;
 }
 
 .limit-row {
@@ -5512,4 +5571,262 @@ body:has(.bulkbar) main {
 .ask-modes {
   margin: 12px 16px 0;
   align-self: flex-start;
+}
+
+
+/* ------------------------------------------------------- loading skeletons */
+
+/* A ghost of the thing being fetched, occupying the room it will need.
+   The point is not decoration. A centred word tells you to wait without
+   saying for how much, and leaves the page to jump when the rows land under
+   it; a shape does both jobs at once. */
+.skel {
+  display: block;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--line);
+  position: relative;
+  overflow: hidden;
+}
+
+/* The sweep, as a highlight passing over the bar rather than a colour cycling
+   underneath it. Drawn on a pseudo-element so the bar itself keeps one flat
+   colour and reads correctly in the instant before the animation begins. */
+.skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--panel) 85%, transparent),
+    transparent
+  );
+  animation: skel-sweep 1.5s ease-in-out infinite;
+}
+
+@keyframes skel-sweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Movement that says "working" to most people says something worse to anyone
+   who asked their system for less of it. The shape does the job without it. */
+@media (prefers-reduced-motion: reduce) {
+  .skel::after {
+    animation: none;
+  }
+}
+
+.skel-tall {
+  height: 20px;
+  border-radius: 6px;
+  margin-bottom: 7px;
+}
+
+.skel-small {
+  height: 9px;
+}
+
+.skel-box {
+  height: 34px;
+  border-radius: 8px;
+}
+
+/* Matching the real table's cell padding, so the ghost rows stand exactly as
+   tall as the rows that replace them. */
+.skel-table td,
+.skel-table th {
+  vertical-align: middle;
+}
+
+.skel-table td .skel {
+  margin: 3px 0;
+}
+
+.skel-table th .skel {
+  height: 8px;
+  opacity: 0.72;
+}
+
+.skel-row {
+  display: flex;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.skel-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+}
+
+.skel-card {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.skel-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 3px;
+}
+
+.skel-card-head .skel {
+  height: 14px;
+}
+
+.skel-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 18px;
+}
+
+/* The same padding and divider as .ov-row, so the panel is already the height
+   it will be once the rows arrive. */
+.skel-stack-row {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 14px 18px;
+}
+
+.skel-stack-row + .skel-stack-row {
+  border-top: 1px solid var(--line);
+}
+
+.skel-stack-row .skel:last-child {
+  height: 9px;
+}
+
+
+/* ---------------------------------------------------------------- overview */
+
+/* The figures, borrowed from the domains table because they answer the same
+   kind of question and there is no reason for two of them. There they sit
+   inside a card; here they are the first thing on the page, so they bring the
+   card with them. */
+.ov-stats {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.ov-stats .domain-stat {
+  flex: 1;
+}
+
+.ov-stats .domain-stat:last-child {
+  border-right: 0;
+}
+
+/* Anything broken comes above the fold and full width, because it is the only
+   part of this page that asks something of the reader. */
+.ov-attention {
+  margin-bottom: 20px;
+  border-color: color-mix(in srgb, var(--bad) 40%, var(--line));
+}
+
+/* Two columns of roughly equal weight: what has happened, and what is coming.
+   Not the console's usual form-beside-panel split, which puts a narrow column
+   first and would read as a sidebar. */
+.ov-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .ov-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ov-side .card + .card {
+  margin-top: 20px;
+}
+
+/* The button goes to the right edge rather than sitting against the end of the
+   sentence, where it reads as part of it. */
+.ov-grid .card-head > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.ov-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ov-list li + li .ov-row {
+  border-top: 1px solid var(--line);
+}
+
+/* The whole line is the link, not the name inside it. A row that is a link
+   only where the words are is a row people click and nothing happens. */
+.ov-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 18px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.ov-row:hover {
+  background: var(--panel-2);
+}
+
+.ov-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ov-row-main strong {
+  font-weight: 600;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-row-sub {
+  font-size: 12px;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-when {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The brand is a link now, and a link that looks like a link in the corner of
+   every page reads as something other than the name of the thing. */
+.brand {
+  color: inherit;
+  text-decoration: none;
 }

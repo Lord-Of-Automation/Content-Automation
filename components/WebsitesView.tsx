@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Select } from "@/components/Select";
+import { SkeletonTable } from "@/components/Skeleton";
 
 type Website = {
   id: string;
@@ -419,7 +420,7 @@ export default function WebsitesView() {
             </section>
           ) : null}
 
-          {loading && !sites ? <div className="empty">Reading the websites…</div> : null}
+          {loading && !sites ? <SkeletonTable columns={5} rows={4} /> : null}
 
           {sites && !sites.length && !loading ? (
             <div className="empty">

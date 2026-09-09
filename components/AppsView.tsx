@@ -8,6 +8,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import NewApplication from "@/components/NewApplication";
 import { Select } from "@/components/Select";
 import { HOSTS, type HostId } from "@/lib/hosts";
+import { SkeletonTable } from "@/components/Skeleton";
 
 type App = {
   host: HostId;
@@ -389,7 +390,7 @@ export default function AppsView() {
             </div>
           ))}
 
-          {loading && !data ? <div className="empty">Reading the hosts…</div> : null}
+          {loading && !data ? <SkeletonTable columns={5} rows={8} /> : null}
 
           {data && !data.apps.length && !error ? (
             <div className="notice warn">

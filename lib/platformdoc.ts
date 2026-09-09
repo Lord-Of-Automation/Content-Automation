@@ -46,6 +46,12 @@ merged and still not be running.
 
 # The pages
 
+**Overview** (/) is the page you land on. It answers what happened without you:
+anything that failed in the past week or a website that was never written, the
+runs of the last day and what is running now, which loops fire next, and what
+the month has cost. Nothing on it is a control. Every row is a way into the
+page that owns the thing.
+
 **Optimize** (/runs) rewrites pages that already exist on a WordPress site. You
 give it a site, a market and a language, it crawls, picks pages worth working
 on, researches each, rewrites it and publishes it back. This is the original
@@ -176,4 +182,6 @@ image, the FAQ schema, the SEO meta and copying a page's theme template.
 - Publishing needs an application password, never the login password.
 - Artifacts of a failed run are deleted after three days. The run record, its
   settings and its history are kept.
+- The money figure on the Overview arrives after the rest of the page. Pricing
+  reads each run in full and is the slowest call the console makes.
 `.trim();

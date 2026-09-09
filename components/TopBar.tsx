@@ -3,30 +3,36 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { logout } from "@/app/actions";
 import NavMenu from "@/components/NavMenu";
+import type { Section } from "@/lib/nav";
 import ProfileMenu from "@/components/ProfileMenu";
 
 export default async function TopBar({
   current,
 }: {
-  current:
-    | "runs" | "loop" | "logs"
-    | "domains" | "generator" | "websites" | "apps" | "performance"
-    | "accounts" | "keys";
+  current: Section;
 }) {
   const session = await auth();
 
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <div className="brand">
+        <Link className="brand" href="/">
           <span className="brand-dot" />
           <span>SEO Automation</span>
-        </div>
+        </Link>
 
         {/* Only the pages work happens on. Accounts and Keys are settings and
             live in the profile menu, where they stop reading as somewhere to
             go and start reading as something to change. */}
         <nav className="topnav">
+          {/* First, and named for what it answers rather than for a place.
+              It is the page you land on, so it is also the way back to it. */}
+          <Link
+            href="/"
+            className={current === "home" ? "topnav-link is-current" : "topnav-link"}
+          >
+            Overview
+          </Link>
 {/* The two ways of running the engine over a site, under the one word
               for what they are both for. Separately they read as two unrelated
               features; together they read as a choice between doing it now and

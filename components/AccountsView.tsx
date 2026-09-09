@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { SkeletonLines } from "@/components/Skeleton";
 
 type Added = {
   username: string;
@@ -120,7 +121,7 @@ export default function AccountsView() {
         <div className="card-body tight">
           {error ? <div className="notice bad">{error}</div> : null}
           {loading ? (
-            <div className="empty">Loading…</div>
+            <SkeletonLines count={3} />
           ) : accounts.length === 0 ? (
             <div className="empty">No accounts configured.</div>
           ) : (

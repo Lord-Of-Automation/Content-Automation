@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import DatePicker from "@/components/DatePicker";
 import { Select } from "@/components/Select";
+import { SkeletonTable } from "@/components/Skeleton";
 
 type Site = {
   siteUrl: string;
@@ -308,7 +309,7 @@ export default function PerformanceView() {
             <div className="empty">Choose both ends of the period.</div>
           ) : null}
 
-          {loading && !data ? <div className="empty">Loading…</div> : null}
+          {loading && !data ? <SkeletonTable columns={6} rows={8} /> : null}
 
           {data?.sites.length ? (
             <>

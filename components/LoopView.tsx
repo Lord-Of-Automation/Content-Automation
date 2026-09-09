@@ -8,6 +8,7 @@ import { DECLARABLE_CLASSES, type DeclarableClass } from "@/lib/validate";
 import { Select } from "@/components/Select";
 import { Toasts, useToasts } from "@/components/Toasts";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { SkeletonCards } from "@/components/Skeleton";
 
 /**
  * How often a loop looks, in the words someone would use.
@@ -435,7 +436,7 @@ export default function LoopView() {
           {error ? <div className="notice bad">{error}</div> : null}
 
           {loading ? (
-            <div className="empty">Loading…</div>
+            <SkeletonCards count={2} />
           ) : schedules.length === 0 && !draft ? (
             <div className="empty">
               No loops yet. A loop is the console doing what you would do by hand
