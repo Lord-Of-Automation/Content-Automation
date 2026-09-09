@@ -63,8 +63,12 @@ comes back is editable here — see the editor below — and can then be publish
 onto any connected host.
 
 **Domains** (/domains) lists every domain across the connected registrars and
-Cloudflare, with DNS, groups and bulk edits. **Name generator**
-(/domains/generate) finds names that are free and prices them.
+Cloudflare, with DNS, groups and bulk edits. **Availability**
+(/domains/check) says whether names you already have in mind are free and what
+GoDaddy asks for them, taken ones included. **Name generator**
+(/domains/generate) invents names, checks them the same way, and keeps the free
+ones. Both need a GoDaddy token, and neither buys anything: a free name links
+out to GoDaddy's own page.
 
 **Hosting** (/apps) lists what is hosted, across Cloudways and Hostinger
 together. Per site: its domain, its admin login, cache clearing, cloning,

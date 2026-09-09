@@ -5703,11 +5703,39 @@ body:has(.bulkbar) main {
 
 /* ------------------------------------------------------- edit with Claude */
 
-/* The mark on the button that opens the panel, at label size. */
+/* The button that opens the panel, in Claude's own colour, like the tab on
+   every other page. There are two ways into the same thing and they should
+   look like it.
+
+   Roomier than the buttons beside it because it carries a mark as well as a
+   label, and the pair of them against the ghost buttons' padding left both
+   touching the edges. */
+.btn-claude {
+  background: #d97757;
+  color: #fff;
+  border-color: transparent;
+  padding: 8px 18px;
+  font-size: 14px;
+  box-shadow: 0 1px 2px color-mix(in srgb, #d97757 40%, transparent);
+}
+
+.btn-claude:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+/* Pressed while the panel is open. Darker rather than tinted, because it is
+   the same button in the same colour, held down. */
+.btn-claude.is-on {
+  background: #c15f3f;
+  box-shadow: none;
+}
+
+/* The mark takes the button's ink, which is white here and Claude's orange
+   anywhere the mark stands on its own. */
 .claude-mark {
-  width: 14px;
-  height: 14px;
-  color: #d97757;
+  width: 15px;
+  height: 15px;
+  color: currentColor;
   flex: none;
 }
 

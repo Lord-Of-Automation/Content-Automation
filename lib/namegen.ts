@@ -16,11 +16,9 @@
  * Nothing here registers anything. Availability is a read.
  */
 
-import { credentialFor } from "./providers";
+import { BATCH, checkBatch, goDaddyAuthorization } from "./availability";
 
 const HOST = "https://api.godaddy.com";
-/** GoDaddy's ceiling for one bulk availability request. */
-const BATCH = 100;
 /** Enough to choose from, few enough to read. */
 export const MAX_CANDIDATES = 320;
 
@@ -141,68 +139,8 @@ async function suggested(
   }
 }
 
-/** Availability and price for up to a hundred names in one request. */
-async function checkBatch(
-  names: string[],
-  authorization: string,
-): Promise<Map<string, { available: boolean; price: number | null; renewal: number | null; currency: string }>> {
-  const out = new Map<
-    string,
-    { available: boolean; price: number | null; renewal: number | null; currency: string }
-  >();
-
-  try {
-    const response = await fetch(`${HOST}/v1/domains/available?checkType=FULL`, {
-      method: "POST",
-      headers: {
-        authorization,
-        accept: "application/json",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(names),
-      cache: "no-store",
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!response.ok) return out;
-
-    const body = (await response.json()) as {
-      domains?: Array<{
-        domain?: string;
-        available?: boolean;
-        price?: number;
-        renewalPrice?: number;
-        currency?: string;
-      }>;
-    };
-
-    for (const row of body.domains ?? []) {
-      const name = String(row.domain ?? "").toLowerCase();
-      if (!name) continue;
-      out.set(name, {
-        available: row.available === true,
-        price: typeof row.price === "number" ? row.price : null,
-        renewal: typeof row.renewalPrice === "number" ? row.renewalPrice : null,
-        currency: row.currency ?? "USD",
-      });
-    }
-  } catch {
-    // A batch that fails leaves its names unchecked rather than failing the
-    // search: nineteen good answers beat one error.
-  }
-
-  return out;
-}
-
 export async function generateNames(seed: string, tlds: string[]): Promise<GenerateResult> {
-  const credential = await credentialFor("godaddy");
-  const token = credential?.token?.trim();
-  if (!token) {
-    throw new Error(
-      "No GoDaddy token is set, and the availability check needs one. " +
-        "Add it on the Keys page.",
-    );
-  }
-  const authorization = `Bearer ${token}`;
+  const authorization = await goDaddyAuthorization();
 
   const wanted = [...new Set(tlds.map((t) => t.replace(/^\./, "").toLowerCase()).filter(Boolean))];
   if (!wanted.length) throw new Error("Choose at least one extension.");
@@ -226,11 +164,10 @@ export async function generateNames(seed: string, tlds: string[]): Promise<Gener
 
   const names = [...order.keys()].slice(0, MAX_CANDIDATES);
 
-  const found = new Map<string, Awaited<ReturnType<typeof checkBatch>> extends Map<string, infer V> ? V : never>();
+  const found = new Map<string, Awaited<ReturnType<typeof checkBatch>>["found"] extends Map<string, infer V> ? V : never>();
   for (let i = 0; i < names.length; i += BATCH) {
-    const batch = names.slice(i, i + BATCH);
-    const answers = await checkBatch(batch, authorization);
-    for (const [name, answer] of answers) found.set(name, answer);
+    const answers = await checkBatch(names.slice(i, i + BATCH), authorization);
+    for (const [name, answer] of answers.found) found.set(name, answer);
   }
 
   const refused = wanted.filter(

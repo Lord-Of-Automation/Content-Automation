@@ -54,13 +54,21 @@ export default async function TopBar({
               navigates and opens a menu makes you guess which it will do. */}
           <NavMenu
             label="Domains"
-            active={current === "domains" || current === "generator"}
+            active={
+              current === "domains" || current === "generator" || current === "check"
+            }
             items={[
               {
                 href: "/domains",
                 label: "My Domains",
                 note: "everything the accounts hold",
                 current: current === "domains",
+              },
+              {
+                href: "/domains/check",
+                label: "Availability",
+                note: "is a name free, and what does it cost",
+                current: current === "check",
               },
               {
                 href: "/domains/generate",

@@ -12,6 +12,7 @@ export type Section =
   | "logs"
   | "domains"
   | "generator"
+  | "check"
   | "websites"
   | "apps"
   | "performance"

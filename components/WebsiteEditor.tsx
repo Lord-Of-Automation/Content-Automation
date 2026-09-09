@@ -422,7 +422,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
             ) : null}
             <button
               type="button"
-              className={assist ? "btn btn-ghost bar-btn is-on" : "btn btn-ghost bar-btn"}
+              className={assist ? "btn btn-claude is-on" : "btn btn-claude"}
               onClick={() => setAssist((on) => !on)}
               title="Describe a change and have it made across the pages."
             >
