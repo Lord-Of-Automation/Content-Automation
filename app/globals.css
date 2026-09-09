@@ -1,5 +1,5 @@
 :root {
-  --bg: #f6f7f9;
+  --bg: #f2f4f7;
   --panel: #ffffff;
   --panel-2: #fbfcfd;
   --ink: #10141a;
@@ -28,6 +28,17 @@
   --pin: #6b3fd4;
   --pin-soft: #f1ebfe;
   --pin-line: #d9c9f7;
+  /*
+   * What a row looks like under the pointer.
+   *
+   * --panel-2 was doing this job and is #fbfcfd against a white panel, a one
+   * and a half percent difference: everywhere it was used as a hover it read
+   * as nothing having happened. Derived from the ink rather than written out,
+   * so the dark theme gets a lighter tint from the same line instead of a
+   * second value to keep in step.
+   */
+  --hover: color-mix(in srgb, var(--ink) 5%, var(--panel));
+  --pressed: color-mix(in srgb, var(--ink) 9%, var(--panel));
   /* How far down the window a sticky table heading comes to rest: clear of the
      top bar, with half a pixel of the heading tucked underneath it so no row
      shows through the seam. The bar is 64.5px at every width where a heading
@@ -6593,5 +6604,152 @@ html {
 
   .nav-pending {
     opacity: 0.9;
+  }
+}
+
+
+/* ------------------------------------------------------ under the pointer */
+
+/*
+ * A row you can follow across a wide table.
+ *
+ * There was no rule for this at all. The domains table is eleven columns and
+ * runs to hundreds of rows, and nothing tracked the eye along a line, which is
+ * the one thing a table of that shape most needs.
+ */
+.logs tbody tr:hover {
+  background: var(--hover);
+}
+
+/* Except where the row is already saying something louder. */
+.logs tbody tr.is-picked:hover {
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+}
+
+/*
+ * Hovers that changed only the colour of some text.
+ *
+ * Fourteen of them, and grey becoming darker grey is the weakest feedback a
+ * pointer can get. The text still darkens; it now happens on something.
+ */
+.navmenu-item:hover,
+.profile-item:hover,
+.ask-opener:hover,
+.cols-item:hover,
+.ov-row:hover,
+.seg-btn:hover:not(.is-on),
+.tld:hover:not(.is-on),
+.topnav-link:hover:not(.is-current),
+.run:hover,
+.sites li:hover,
+.btn-ghost:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+/*
+ * And something happens when you press.
+ *
+ * There was not one :active rule in the whole stylesheet, so nothing
+ * acknowledged a press. It matters more here than in most products: several of
+ * these buttons start work that takes a minute, and the gap between pressing
+ * and seeing anything was entirely unfilled.
+ *
+ * A pixel down and a shade darker. Enough to feel, too little to notice.
+ */
+:where(.btn, .seg-btn, .tld, .cols-item, .run, .ask-opener):active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+:where(.btn-ghost, .seg-btn, .tld, .run):active:not(:disabled) {
+  background: var(--pressed);
+}
+
+.btn-primary:active:not(:disabled),
+.btn-claude:active:not(:disabled),
+.btn-danger:active:not(:disabled),
+.dsearch-go:active:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+/*
+ * Where the keyboard is.
+ *
+ * Six focus-visible rules in five and a half thousand lines, and buttons were
+ * not among them: somebody working through this with a keyboard could not see
+ * where they were. One rule covers everything, written with :where() so its
+ * specificity is zero and every existing focus style still wins.
+ *
+ * An outline rather than a shadow, because an outline follows the border
+ * radius and is never clipped by an ancestor that hides its overflow.
+ */
+:where(a, button, summary, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The one place an offset outline would sit outside the row it belongs to. */
+.logs th button:focus-visible,
+.run:focus-visible {
+  outline-offset: -2px;
+}
+
+/*
+ * Selected text, in a colour from this palette.
+ *
+ * There was no rule, so highlighting anything produced the browser's own blue,
+ * which belongs to no part of this and is the sort of thing that reads as
+ * nobody having looked.
+ */
+::selection {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--ink);
+}
+
+/*
+ * A card is a card without a shadow.
+ *
+ * Every surface used the same one, so a dialog floating above the page and a
+ * card sitting on it read as the same height. Cards keep the border and lose
+ * the shadow; the things that genuinely float — menus, dialogs, the assistant
+ * panels — keep it, and now mean something by it.
+ *
+ * The page is a shade darker than it was to pay for this. A card with no
+ * shadow on a background one and a half percent from white is a card that
+ * disappears.
+ */
+.card,
+.ov-stats,
+.dcard {
+  box-shadow: none;
+}
+
+.dcard.is-lead {
+  border-color: var(--line-2);
+}
+
+/*
+ * The bottom corners of a card whose last thing is a list.
+ *
+ * The card is rounded and clips nothing, which was invisible while rows had no
+ * background of their own. Now that they do, a hovered last row would paint a
+ * square corner over a round one.
+ *
+ * Rounded here rather than by hiding the card's overflow: a card holds the
+ * column menu and the searchable selects, and those open downwards past its
+ * edge on purpose.
+ */
+.card > .card-body.tight:last-child > .logs tbody tr:last-child td:first-child,
+.card > .card-body.tight:last-child > .runs li:last-child > * {
+  border-bottom-left-radius: calc(var(--radius) - 1px);
+}
+
+.card > .card-body.tight:last-child > .logs tbody tr:last-child td:last-child,
+.card > .card-body.tight:last-child > .runs li:last-child > * {
+  border-bottom-right-radius: calc(var(--radius) - 1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.btn, .seg-btn, .tld, .cols-item, .run, .ask-opener):active:not(:disabled) {
+    transform: none;
   }
 }
