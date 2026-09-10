@@ -466,6 +466,247 @@ const EDIT_SCRIPT = `
   ];
 
   /*
+   * Styling one width at a time.
+   *
+   * The panel can preview the page at a phone's width, and until now every
+   * style set while looking at it applied at every width — so a heading sized
+   * to look right on a laptop was sized wrong on a phone, with no way to say
+   * otherwise. A page builder that shows you three widths and only lets you
+   * style one of them is showing you a problem it cannot solve.
+   *
+   * A style for a narrower width cannot be an inline attribute, because an
+   * inline style has no width to be conditional on. So it becomes a rule, and
+   * the rule needs a name for the element it applies to, which is what the
+   * marker is.
+   *
+   * The rules live in a stylesheet inside <main>, which means they are part of
+   * the body markup and are saved, exported and published with it like anything
+   * else on the page. Nothing new has to learn about them.
+   *
+   * They are marked important because the base style they override is inline,
+   * and an attribute selector loses to an inline style however specific it is.
+   * A narrower width is a deliberate exception and should win.
+   */
+  var media = 0;
+  var marks = 0;
+
+  var MARK = /^\\[data-r="[a-z0-9]+"\\]$/;
+
+  (function () {
+    // A page edited before, reopened. The counter carries on from the highest
+    // marker already on it rather than from nothing, or the next element
+    // styled would take a name another one is already answering to.
+    var already = main.querySelectorAll("[data-r]");
+    for (var i = 0; i < already.length; i++) {
+      var n = Number(String(already[i].getAttribute("data-r")).replace(/[^0-9]/g, ""));
+      if (n > marks) marks = n;
+    }
+  })();
+
+  function markerFor(el) {
+    var had = el.getAttribute("data-r");
+    if (had) return had;
+    marks += 1;
+    var name = "r" + marks;
+    el.setAttribute("data-r", name);
+    return name;
+  }
+
+  /** The stylesheet the editor keeps inside the page, so it travels with it. */
+  function holder() {
+    var el = main.querySelector("style[data-editor-css]");
+    if (!el) {
+      el = document.createElement("style");
+      el.setAttribute("data-editor-css", "");
+      main.insertBefore(el, main.firstChild);
+    }
+    return el;
+  }
+
+  function camel(name) {
+    return name.replace(/-([a-z])/g, function (_, c) { return c.toUpperCase(); });
+  }
+
+  function dashed(name) {
+    return name.replace(/[A-Z]/g, function (c) { return "-" + c.toLowerCase(); });
+  }
+
+  /*
+   * What is in that stylesheet, as something this can change.
+   *
+   * Read through the browser's own parser rather than by matching text, so
+   * whatever shape it was left in last time is understood. Anything this did
+   * not write is kept whole and put back untouched: the markup is the person's,
+   * and a hand-written rule in there must survive an unrelated edit.
+   */
+  var rules = {};
+  var raw = [];
+
+  function isOurs(rule) {
+    return !!rule && rule.type === 1 && MARK.test(String(rule.selectorText || "").trim());
+  }
+
+  /*
+   * The properties the panel offers as one box, and the ones they stand for.
+   *
+   * Padding is written as "padding:8px" and read back by the browser as four
+   * separate numbers, because that is what padding is. The panel has one box
+   * for it, so after a reopen that box found nothing under the name it knows
+   * and drew itself empty — a padding that was set, showing as unset, and
+   * cleared by anybody who then typed in it.
+   *
+   * Border's parts are listed rather than matched by their prefix on purpose.
+   * Corner radius begins with the same word and is a control of its own, and a
+   * prefix test would quietly swallow it.
+   */
+  var SHORTHAND = [
+    ["padding", ["padding-top", "padding-right", "padding-bottom", "padding-left"]],
+    ["margin", ["margin-top", "margin-right", "margin-bottom", "margin-left"]],
+    ["border", [
+      "border-top-width", "border-right-width", "border-bottom-width", "border-left-width",
+      "border-top-style", "border-right-style", "border-bottom-style", "border-left-style",
+      "border-top-color", "border-right-color", "border-bottom-color", "border-left-color",
+      "border-width", "border-style", "border-color",
+      "border-image-source", "border-image-slice", "border-image-width",
+      "border-image-outset", "border-image-repeat"
+    ]]
+  ];
+
+  function absorb(px, rule) {
+    var name = String(rule.selectorText).trim().slice(9, -2);
+    var bag = rules[px] || (rules[px] = {});
+    var one = bag[name] || (bag[name] = {});
+
+    for (var i = 0; i < rule.style.length; i++) {
+      one[camel(rule.style[i])] = rule.style.getPropertyValue(rule.style[i]);
+    }
+
+    for (var s = 0; s < SHORTHAND.length; s++) {
+      var short = SHORTHAND[s][0];
+      var whole = rule.style.getPropertyValue(short);
+      if (!whole) continue;
+      var parts = SHORTHAND[s][1];
+      for (var p = 0; p < parts.length; p++) delete one[camel(parts[p])];
+      one[camel(short)] = whole;
+    }
+  }
+
+  function readRules() {
+    rules = {};
+    raw = [];
+
+    // Never creates one. Reading is not a reason to leave an empty stylesheet
+    // in somebody's markup, and a selection reads.
+    var el = main.querySelector("style[data-editor-css]");
+    var sheet = null;
+    try {
+      sheet = el ? el.sheet : null;
+    } catch (e) {
+      sheet = null;
+    }
+    if (!sheet) return;
+
+    for (var i = 0; i < sheet.cssRules.length; i++) {
+      var rule = sheet.cssRules[i];
+
+      if (rule.type === 4) {
+        var px = Number(String(rule.conditionText || rule.media.mediaText || "")
+          .replace(/[^0-9]/g, ""));
+        var ours = px > 0 && rule.cssRules.length > 0;
+        for (var j = 0; ours && j < rule.cssRules.length; j++) {
+          if (!isOurs(rule.cssRules[j])) ours = false;
+        }
+        if (!ours) { raw.push(rule.cssText); continue; }
+        for (var k = 0; k < rule.cssRules.length; k++) absorb(px, rule.cssRules[k]);
+      } else if (isOurs(rule)) {
+        absorb(0, rule);
+      } else {
+        raw.push(rule.cssText);
+      }
+    }
+  }
+
+  function declText(one, important) {
+    var parts = [];
+    for (var key in one) {
+      if (one[key]) parts.push(dashed(key) + ":" + one[key] + (important ? "!important" : ""));
+    }
+    return parts.join(";");
+  }
+
+  function writeRules() {
+    var out = raw.slice();
+
+    var base = rules[0];
+    for (var name in base) {
+      var flat = declText(base[name], false);
+      if (flat) out.push('[data-r="' + name + '"]{' + flat + '}');
+    }
+
+    // Narrowest last, so a phone rule wins over a tablet one that also matches.
+    var widths = [];
+    for (var px in rules) if (Number(px) > 0) widths.push(Number(px));
+    widths.sort(function (a, b) { return b - a; });
+
+    for (var w = 0; w < widths.length; w++) {
+      var inner = [];
+      var bag = rules[widths[w]];
+      for (var one in bag) {
+        var text = declText(bag[one], true);
+        if (text) inner.push('[data-r="' + one + '"]{' + text + '}');
+      }
+      if (inner.length) {
+        out.push("@media (max-width:" + widths[w] + "px){" + inner.join("") + "}");
+      }
+    }
+
+    var el = holder();
+    // An empty stylesheet is removed rather than left as a blank tag in the
+    // markup: undoing every width-specific style should leave the page as it
+    // would have been if none had ever been set.
+    if (out.length) el.textContent = out.join("\\n");
+    else el.remove();
+  }
+
+  function styleAt(el, key, value) {
+    readRules();
+    var name = markerFor(el);
+    var bag = rules[media] || (rules[media] = {});
+    var one = bag[name] || (bag[name] = {});
+
+    if (value) one[key] = value;
+    else delete one[key];
+
+    var anything = false;
+    for (var k in one) { anything = true; break; }
+    if (!anything) delete bag[name];
+
+    writeRules();
+  }
+
+  /** What this element is set to at the width being edited, and nothing else. */
+  function setAtWidth(el) {
+    var out = {};
+    if (!media || !el) return out;
+    var name = el.getAttribute("data-r");
+    if (!name) return out;
+    readRules();
+    var bag = rules[media];
+    var one = bag ? bag[name] : null;
+    for (var key in one) out[key] = one[key];
+    return out;
+  }
+
+  /** The block of the page this lives in, which is what gets moved and copied. */
+  function topOf(el) {
+    var node = el;
+    while (node && node.parentElement && node.parentElement !== main) {
+      node = node.parentElement;
+    }
+    return node && node.parentElement === main ? node : null;
+  }
+
+  /*
    * A selector for something in the header or footer.
    *
    * The chrome is not markup that gets saved — it is a template rendered afresh
@@ -543,6 +784,7 @@ const EDIT_SCRIPT = `
      */
     if (!chosen || !document.body.contains(chosen)) {
       parent.postMessage({ preview: "selected", element: null }, "*");
+      outline();
       return;
     }
 
@@ -583,6 +825,17 @@ const EDIT_SCRIPT = `
       path.unshift(describe(node));
     }
 
+    /*
+     * What it says and what it is made of, for the assistant beside the page.
+     *
+     * "Rewrite this paragraph" is the most natural thing to ask about something
+     * you have just clicked on, and the panel that takes that request had no
+     * idea anything was selected. Both are capped: this travels on every
+     * selection, and a whole section of markup on every click is a cost for a
+     * feature most clicks are not using.
+     */
+    var words = (chosen.textContent || "").trim().replace(/\\s+/g, " ");
+
     parent.postMessage({
       preview: "selected",
       element: {
@@ -596,9 +849,46 @@ const EDIT_SCRIPT = `
         src: chosen.getAttribute("src") || "",
         alt: chosen.getAttribute("alt") || "",
         href: chosen.getAttribute("href") || "",
-        styles: styles
+        styles: styles,
+        atWidth: setAtWidth(chosen),
+        text: words.slice(0, 600),
+        html: chosen.outerHTML.slice(0, 4000)
       }
     }, "*");
+
+    outline();
+  }
+
+  /*
+   * The page as a list of what it is made of.
+   *
+   * The breadcrumbs only walk upward, so on a long page there was no way to see
+   * the sections or move between them without scrolling and aiming. This is the
+   * same page from the side.
+   *
+   * Only the top level. A tree of everything is a tree nobody reads, and the
+   * things people move, copy and delete are blocks rather than the spans inside
+   * them.
+   */
+  function outline() {
+    var rows = [];
+    for (var i = 0; i < main.children.length; i++) {
+      var el = main.children[i];
+      if (el.tagName === "STYLE" || el.tagName === "SCRIPT") continue;
+
+      var head = /^H[1-6]$/.test(el.tagName) ? el : el.querySelector("h1,h2,h3,h4,h5,h6");
+      var words = ((head ? head.textContent : el.textContent) || "")
+        .trim().replace(/\\s+/g, " ");
+
+      rows.push({
+        at: i,
+        label: describe(el),
+        heading: head ? head.tagName.toLowerCase() : "",
+        text: words.slice(0, 80),
+        here: !!chosen && (el === chosen || el.contains(chosen))
+      });
+    }
+    parent.postMessage({ preview: "outline", rows: rows }, "*");
   }
 
   /*
@@ -968,19 +1258,149 @@ const EDIT_SCRIPT = `
     var m = e.data;
     if (!m || m.preview !== "edit") return;
 
-    if (m.do === "style" && chosen) {
-      // Set here for the sake of seeing it immediately; kept by the rule.
-      chosen.style[m.key] = m.value;
+    if (m.do === "media") {
+      media = Number(m.px) || 0;
+    } else if (m.do === "style" && chosen) {
+      /*
+       * A style for one width goes in the stylesheet; a style for every width
+       * stays where it always was.
+       *
+       * The header and footer are never width-specific here. They are rendered
+       * from a template, so there is no markup on them to hang a marker off,
+       * and a rule naming an element that is built afresh every render has
+       * nothing dependable to point at. The panel says so rather than letting
+       * the change quietly go to the wrong width.
+       */
+      if (media && main.contains(chosen)) {
+        styleAt(chosen, m.key, m.value);
+      } else {
+        // Set here for the sake of seeing it immediately; kept by the rule.
+        chosen.style[m.key] = m.value;
 
-      if (!main.contains(chosen)) {
-        var selector = selectorFor(chosen);
-        if (selector) {
-          parent.postMessage(
-            { preview: "chrome", selector: selector, key: m.key, value: m.value },
-            "*",
-          );
+        if (!main.contains(chosen)) {
+          var selector = selectorFor(chosen);
+          if (selector) {
+            parent.postMessage(
+              { preview: "chrome", selector: selector, key: m.key, value: m.value },
+              "*",
+            );
+          }
         }
       }
+    } else if (m.do === "insert") {
+      /*
+       * Something new in the page.
+       *
+       * Everything else here changes what is already there. Until now the only
+       * way to add anything was to type, or to place a picture, so a page could
+       * be restyled and reordered and pruned but never grown.
+       *
+       * It lands after the block containing whatever is selected, which is
+       * where somebody who clicked a section and then reached for a new one
+       * means it to go. With nothing selected it goes at the end.
+       */
+      var slot = document.createElement("div");
+      slot.innerHTML = String(m.html || "");
+
+      var chosenMarks = slot.querySelectorAll("[data-chosen]");
+      for (var c = 0; c < chosenMarks.length; c++) chosenMarks[c].removeAttribute("data-chosen");
+
+      /*
+       * Markers, renamed rather than kept or thrown away.
+       *
+       * A marker names a rule in one page's stylesheet. Kept, it either collides
+       * with an element already answering to that name or points at a rule that
+       * is not on this page. Thrown away, the block arrives having quietly lost
+       * every width-specific style somebody set on it, which is the worse of the
+       * two because nothing says so.
+       *
+       * So a copy travels with its rules, and they are written back in here
+       * under names minted for this page.
+       */
+      var carried = m.styles && typeof m.styles === "object" ? m.styles : null;
+      if (carried) readRules();
+
+      var stamped = slot.querySelectorAll("[data-r]");
+      var rewrote = false;
+      for (var s = 0; s < stamped.length; s++) {
+        var was = stamped[s].getAttribute("data-r");
+        var mine = carried ? carried[was] : null;
+        if (!mine) {
+          stamped[s].removeAttribute("data-r");
+          continue;
+        }
+
+        marks += 1;
+        var now = "r" + marks;
+        stamped[s].setAttribute("data-r", now);
+
+        for (var px in mine) {
+          var bag = rules[px] || (rules[px] = {});
+          var fresh = {};
+          for (var key in mine[px]) fresh[key] = mine[px][key];
+          bag[now] = fresh;
+        }
+        rewrote = true;
+      }
+      if (rewrote) writeRules();
+
+      var landing = document.createDocumentFragment();
+      var arrived = null;
+      while (slot.firstChild) {
+        if (!arrived && slot.firstChild.nodeType === 1) arrived = slot.firstChild;
+        landing.appendChild(slot.firstChild);
+      }
+
+      var anchor = chosen && main.contains(chosen) ? topOf(chosen) : null;
+      if (anchor) anchor.after(landing);
+      else main.appendChild(landing);
+
+      if (arrived) {
+        pick(arrived);
+        arrived.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    } else if (m.do === "copy" && chosen) {
+      var taken = chosen.cloneNode(true);
+      taken.removeAttribute("data-chosen");
+      var alsoChosen = taken.querySelectorAll("[data-chosen]");
+      for (var t = 0; t < alsoChosen.length; t++) alsoChosen[t].removeAttribute("data-chosen");
+
+      /*
+       * The rules that belong to it, taken along.
+       *
+       * Markup alone would arrive on the other page having lost every style set
+       * for a narrower width, and lost it silently, which is the kind of thing
+       * somebody discovers on a phone a week later.
+       */
+      readRules();
+      var mine = [];
+      if (taken.getAttribute("data-r")) mine.push(taken.getAttribute("data-r"));
+      var within = taken.querySelectorAll("[data-r]");
+      for (var w = 0; w < within.length; w++) mine.push(within[w].getAttribute("data-r"));
+
+      var packed = {};
+      for (var at in rules) {
+        for (var n = 0; n < mine.length; n++) {
+          var one = rules[at][mine[n]];
+          if (!one) continue;
+          if (!packed[mine[n]]) packed[mine[n]] = {};
+          packed[mine[n]][at] = one;
+        }
+      }
+
+      parent.postMessage(
+        { preview: "copied", html: taken.outerHTML, label: describe(chosen), styles: packed },
+        "*",
+      );
+      // Nothing on the page changed, so nothing below needs to run.
+      return;
+    } else if (m.do === "choose") {
+      var wanted = main.children[Number(m.at)];
+      if (wanted) {
+        pick(wanted);
+        wanted.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+      return;
     } else if (m.do === "attr" && chosen) {
       if (m.value) chosen.setAttribute(m.name, m.value);
       else chosen.removeAttribute(m.name);
@@ -1070,11 +1490,41 @@ const EDIT_SCRIPT = `
    * which the cursor is in here. So the frame says so and the console decides
    * what leaving means.
    */
+  /*
+   * Undo, redo and save, sent outward for the same reason Escape is.
+   *
+   * The console keeps the history, because the console is what knows what the
+   * page said before this keystroke and what it will be saved as. But the
+   * cursor is in here, so this is where the keys land.
+   *
+   * The browser's own undo has to be stopped, not merely ignored. It rewinds
+   * the editable region on its own and the console's history knows nothing
+   * about it, so the two drift apart and the next real undo puts back a version
+   * that never existed.
+   */
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") parent.postMessage({ preview: "escape" }, "*");
+    if (e.key === "Escape") {
+      parent.postMessage({ preview: "escape" }, "*");
+      return;
+    }
+
+    if (!e.metaKey && !e.ctrlKey) return;
+    var key = String(e.key || "").toLowerCase();
+
+    if (key === "z") {
+      e.preventDefault();
+      parent.postMessage({ preview: "history", back: !e.shiftKey }, "*");
+    } else if (key === "y") {
+      e.preventDefault();
+      parent.postMessage({ preview: "history", back: false }, "*");
+    } else if (key === "s") {
+      e.preventDefault();
+      parent.postMessage({ preview: "save" }, "*");
+    }
   });
 
   parent.postMessage({ preview: "ready" }, "*");
+  outline();
 })();
 `;
 

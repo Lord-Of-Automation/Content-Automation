@@ -33,11 +33,12 @@ function ClaudeMark() {
   );
 }
 
-import VisualEditor from "@/components/VisualEditor";
+import VisualEditor, { type Clip, type Selected } from "@/components/VisualEditor";
 import SitePreview from "@/components/SitePreview";
 import SitePublish from "@/components/SitePublish";
 import SiteVersions from "@/components/SiteVersions";
 import { Select } from "@/components/Select";
+import { checkSite } from "@/lib/pagecheck";
 import { applyOverride } from "@/lib/styleoverrides";
 import type {
   SiteDesign as Design,
@@ -152,7 +153,26 @@ export default function WebsiteEditor({ id }: { id: string }) {
    */
   const [design, setDesign] = useState<Design | null>(null);
   /** Which page, or the site furniture that surrounds all of them. */
-  const [section, setSection] = useState<"pages" | "design" | "versions" | "publish">("pages");
+  const [section, setSection] =
+    useState<"pages" | "design" | "check" | "versions" | "publish">("pages");
+
+  /**
+   * A block copied out of a page, waiting to be put into one.
+   *
+   * Held here rather than in the editor because the editor is thrown away and
+   * rebuilt whenever the page changes, and taking a section from one page to
+   * another is the whole reason for copying it.
+   */
+  const [clip, setClip] = useState<Clip | null>(null);
+
+  /**
+   * What is selected in the page, so the assistant can be asked about it.
+   *
+   * "Rewrite this paragraph" is the most natural thing to ask about something
+   * you have just clicked on, and until now the panel that takes that request
+   * had no idea anything had been clicked.
+   */
+  const [selected, setSelected] = useState<Selected | null>(null);
 
   /*
    * The tab the address asks for.
@@ -163,7 +183,12 @@ export default function WebsiteEditor({ id }: { id: string }) {
    */
   useEffect(() => {
     const wanted = new URLSearchParams(window.location.search).get("tab");
-    if (wanted === "publish" || wanted === "versions" || wanted === "design") {
+    if (
+      wanted === "publish" ||
+      wanted === "versions" ||
+      wanted === "design" ||
+      wanted === "check"
+    ) {
       setSection(wanted);
     }
   }, []);
@@ -341,6 +366,48 @@ export default function WebsiteEditor({ id }: { id: string }) {
     [page],
   );
 
+  /*
+   * What is wrong with the site as it stands.
+   *
+   * Worked out here, from what is on screen rather than from what is saved, so
+   * a link fixed a moment ago stops being reported a moment ago. It runs over
+   * every page on every edit, which sounds expensive and is not: a generated
+   * site is a handful of pages and the browser's own parser does the reading.
+   */
+  const findings = useMemo(() => checkSite(pages), [pages]);
+  const broken = findings.filter((f) => f.level === "bad").length;
+
+  /*
+   * Selection, kept only when it changes.
+   *
+   * The frame describes what is selected on every keystroke that moves the
+   * caret, and storing an identical description each time would re-render the
+   * whole editor while somebody types.
+   */
+  const onSelect = useCallback((found: Selected | null) => {
+    setSelected((was) => {
+      if (!was && !found) return was;
+      if (was && found && was.label === found.label && was.text === found.text) return was;
+      return found;
+    });
+  }, []);
+
+  const onClip = useCallback((taken: Clip | null) => {
+    setClip(taken);
+  }, []);
+
+  /*
+   * Nothing is selected on a page you have just opened.
+   *
+   * The editor is rebuilt when the page changes and starts with nothing
+   * selected, but it only says what is selected when something is, so the last
+   * thing clicked on the page before would otherwise still be what the
+   * assistant thought it was being asked about.
+   */
+  useEffect(() => {
+    setSelected(null);
+  }, [at]);
+
   if (loading) return <div className="empty">Reading the website…</div>;
   if (!site) {
     return (
@@ -359,6 +426,24 @@ export default function WebsiteEditor({ id }: { id: string }) {
           id={id}
           siteName={site.name}
           dirty={dirty}
+          /*
+           * What is being pointed at, so it can be asked about.
+           *
+           * Only while the pages are on screen. A selection made before
+           * switching to the Publish tab is still technically selected and is
+           * no longer what anybody is looking at, and an assistant claiming to
+           * be about a paragraph nobody can see is worse than one claiming
+           * nothing.
+           */
+          selection={
+            section === "pages" && selected && page
+              ? {
+                  ...selected,
+                  page: page.slug,
+                  pageTitle: page.title,
+                }
+              : null
+          }
           onSave={save}
           onEdited={(back) => {
             /*
@@ -514,6 +599,18 @@ export default function WebsiteEditor({ id }: { id: string }) {
               </button>
               <button
                 type="button"
+                className={section === "check" ? "seg-btn is-on" : "seg-btn"}
+                onClick={() => setSection("check")}
+              >
+                Check
+                {findings.length ? (
+                  <span className={broken ? "seg-count is-bad" : "seg-count"}>
+                    {findings.length}
+                  </span>
+                ) : null}
+              </button>
+              <button
+                type="button"
                 className={section === "versions" ? "seg-btn is-on" : "seg-btn"}
                 onClick={() => setSection("versions")}
               >
@@ -554,6 +651,63 @@ export default function WebsiteEditor({ id }: { id: string }) {
                   setSite(back);
                 }}
               />
+            </div>
+          ) : null}
+
+          {/*
+            * What is wrong with the site, before anybody else finds out.
+            *
+            * A broken link and a picture nobody can describe both look exactly
+            * like a working page in a preview, which is why they survive to
+            * publication. This is the list of them, and every line is something
+            * that can be fixed in the editor in under a minute.
+            */}
+          {section === "check" ? (
+            <div className="editor-sections editor-versions">
+              {!findings.length ? (
+                <div className="notice ok">
+                  <strong>Nothing to fix.</strong> Every picture is described,
+                  every link goes somewhere, the headings run in order and each
+                  page has its own title and description.
+                </div>
+              ) : (
+                <>
+                  <p className="quiet findings-summary">
+                    {broken ? `${broken} broken` : "Nothing broken"}
+                    {broken && findings.length - broken ? ", " : ""}
+                    {findings.length - broken
+                      ? `${findings.length - broken} worth a look`
+                      : ""}
+                    . Nothing here stops the site being published.
+                  </p>
+
+                  <ul className="findings">
+                    {findings.map((finding, i) => (
+                      <li key={i} className={finding.level === "bad" ? "finding is-bad" : "finding"}>
+                        <button
+                          type="button"
+                          className="finding-where"
+                          title="Open this page"
+                          onClick={() => {
+                            const to = pages.findIndex((p) => p.slug === finding.page);
+                            if (to >= 0) setAt(to);
+                            setSection("pages");
+                          }}
+                        >
+                          {finding.pageTitle || "Untitled"}
+                        </button>
+                        <span className="finding-kind">{finding.kind}</span>
+                        <span className="finding-what">
+                          {finding.what}
+                          {finding.detail ? (
+                            <em className="finding-detail">{finding.detail}</em>
+                          ) : null}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </div>
           ) : null}
 
@@ -1048,6 +1202,9 @@ export default function WebsiteEditor({ id }: { id: string }) {
                       websiteId={site.id}
                       onSave={() => void save()}
                       onPublish={() => setSection("publish")}
+                      onSelect={onSelect}
+                      clip={clip}
+                      onClip={onClip}
                       dirty={dirty}
                       saving={saving}
                     />

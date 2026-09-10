@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import MediaPicker from "@/components/MediaPicker";
+import { BLOCK_GROUPS, BLOCKS } from "@/lib/blocks";
 import { liveScripts, renderPage, type ShellPage, type ShellSite } from "@/lib/siteshell";
 import { useAsk } from "@/components/Ask";
 
@@ -34,6 +35,15 @@ import { useAsk } from "@/components/Ask";
 const SETTINGS = ["name", "tagline", "footerText", "linkLabel", "pageTitle"] as const;
 export type Setting = (typeof SETTINGS)[number];
 
+/** What is selected, for anything outside this that wants to know. */
+export interface Selected {
+  label: string;
+  path: string[];
+  where: "page" | "chrome";
+  text: string;
+  html: string;
+}
+
 interface Chosen {
   label: string;
   path: string[];
@@ -49,6 +59,32 @@ interface Chosen {
   alt: string;
   href: string;
   styles: Record<string, string>;
+  /** Only what is set for the width being edited, when that is not every width. */
+  atWidth: Record<string, string>;
+  text: string;
+  html: string;
+}
+
+/**
+ * A block taken off a page, with whatever it was wearing.
+ *
+ * The markup alone would arrive on the other page having silently lost every
+ * style set for a narrower width, so the rules travel with it and are written
+ * back under names minted for wherever it lands.
+ */
+export interface Clip {
+  html: string;
+  label: string;
+  styles: Record<string, Record<string, Record<string, string>>> | null;
+}
+
+/** One top-level block of the page, as the outline lists them. */
+interface Row {
+  at: number;
+  label: string;
+  heading: string;
+  text: string;
+  here: boolean;
 }
 
 const FONTS: Array<[string, string]> = [
@@ -99,6 +135,26 @@ const BOX: Control[] = [
   { key: "border", label: "Border", kind: "text" },
 ];
 
+/**
+ * The widths the page can be looked at, and the width a style set there means.
+ *
+ * The two are deliberately different numbers. The preview width is a screen to
+ * imagine; the breakpoint is where the rule starts applying, and it has to be
+ * wide enough to cover every screen of that kind rather than the one being
+ * drawn. A style meant for phones that only applied at exactly 390 pixels would
+ * miss almost every phone.
+ *
+ * Fit and Laptop have no breakpoint of their own. Fit is whatever the pane
+ * happens to be, which is not a screen size, and Laptop is the width the page
+ * is designed at, which is what "every width" already means.
+ */
+const WIDTHS: Array<{ label: string; preview: number; breakpoint: number }> = [
+  { label: "Fit", preview: 0, breakpoint: 0 },
+  { label: "Phone", preview: 390, breakpoint: 640 },
+  { label: "Tablet", preview: 820, breakpoint: 900 },
+  { label: "Laptop", preview: 1280, breakpoint: 0 },
+];
+
 /** "18" becomes "18px"; "2rem" and "auto" are left alone. */
 function withUnit(value: string, unit?: string): string {
   const raw = value.trim();
@@ -113,6 +169,31 @@ function toHex(value: string): string {
   return `#${[m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, "0")).join("")}`;
 }
 
+/** Six digits, or nothing, so mixing never has to guess. */
+function hexOf(value: string): string | null {
+  const raw = String(value ?? "").trim();
+  const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(raw);
+  if (short) {
+    return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`.toLowerCase();
+  }
+  return /^#[0-9a-f]{6}$/i.test(raw) ? raw.toLowerCase() : null;
+}
+
+/** The same mix the site's own stylesheet makes, worked out here as a number. */
+function blend(front: string, back: string, share: number): string {
+  const one = hexOf(front);
+  const two = hexOf(back);
+  if (!one || !two) return one ?? two ?? "#000000";
+  const part = (at: number) => {
+    const x = parseInt(one.slice(at, at + 2), 16);
+    const y = parseInt(two.slice(at, at + 2), 16);
+    return Math.round(x * share + y * (1 - share))
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${part(1)}${part(3)}${part(5)}`;
+}
+
 export default function VisualEditor({
   site,
   pages,
@@ -125,6 +206,9 @@ export default function VisualEditor({
   onNavigate,
   onSave,
   onPublish,
+  onSelect,
+  clip,
+  onClip,
   websiteId,
   dirty,
   saving,
@@ -161,6 +245,22 @@ export default function VisualEditor({
    */
   onSave: () => void;
   onPublish: () => void;
+  /**
+   * What is selected, passed outward.
+   *
+   * So that the panel which edits by description can be told what is being
+   * pointed at. "Rewrite this paragraph" is the most natural thing to ask about
+   * something you have just clicked, and it needs to know which paragraph.
+   */
+  onSelect?: (chosen: Selected | null) => void;
+  /**
+   * A block copied from a page, kept above this so it survives changing pages.
+   *
+   * The whole point of copying one is to put it on a different page, and this
+   * component is rebuilt from nothing when the page changes.
+   */
+  clip: Clip | null;
+  onClip: (clip: Clip | null) => void;
   /** Which website this is, so its own picture library can be opened. */
   websiteId: string;
   dirty: boolean;
@@ -172,10 +272,25 @@ export default function VisualEditor({
   const [tab, setTab] = useState<"type" | "box">("type");
   const [full, setFull] = useState(false);
   const [size, setSize] = useState(0);
-  /** Snapshots for undo, newest last. A rescue, not a history. */
+  /**
+   * Which width a style set now applies to. Zero is every width.
+   *
+   * Off by default, even while looking at a phone. A style that silently
+   * applied to one width only would be a style somebody sets, scrolls away
+   * from, and never sees again on the width they were designing for.
+   */
+  const [width, setWidth] = useState(0);
+  /** Snapshots either side of where we are. A rescue, not a history. */
   const [past, setPast] = useState<string[]>([]);
+  const [future, setFuture] = useState<string[]>([]);
+  /** The page's top-level blocks, as the frame last described them. */
+  const [rows, setRows] = useState<Row[]>([]);
   /** Whether the picture library is open, and where what it returns should go. */
   const [picking, setPicking] = useState(false);
+  /** Whether the block library is open. */
+  const [adding, setAdding] = useState(false);
+
+  const blocks = useRef<HTMLDialogElement>(null);
 
   const page = useMemo(
     () => pages.find((p) => p.slug === current) ?? pages[0],
@@ -251,6 +366,32 @@ export default function VisualEditor({
     frame.current?.contentWindow?.postMessage({ preview: "edit", ...message }, "*");
   }, []);
 
+  /*
+   * Stepping back, and stepping forward again.
+   *
+   * Redo was the missing half. Undo without it is a trapdoor: one press too
+   * many and the only way back is to type it again, which is why people stop
+   * using undo to look at what something was and start using it only when they
+   * are certain.
+   */
+  const undo = useCallback(() => {
+    if (!past.length) return;
+    const previous = past[past.length - 1]!;
+    setFuture((rows) => [...rows, page?.bodyHtml ?? ""].slice(-40));
+    setPast(past.slice(0, -1));
+    send({ do: "replace", html: previous });
+    onChange(previous);
+  }, [onChange, page?.bodyHtml, past, send]);
+
+  const redo = useCallback(() => {
+    if (!future.length) return;
+    const next = future[future.length - 1]!;
+    setPast((rows) => [...rows, page?.bodyHtml ?? ""].slice(-40));
+    setFuture(future.slice(0, -1));
+    send({ do: "replace", html: next });
+    onChange(next);
+  }, [future, onChange, page?.bodyHtml, send]);
+
   useEffect(() => {
     function onMessage(event: MessageEvent) {
       if (event.source !== frame.current?.contentWindow) return;
@@ -258,7 +399,58 @@ export default function VisualEditor({
       if (!data) return;
 
       if (data.preview === "selected") {
-        setChosen((data.element as Chosen | null) ?? null);
+        const found = (data.element as Chosen | null) ?? null;
+        setChosen(found);
+        onSelect?.(
+          found
+            ? {
+                label: found.label,
+                path: found.path,
+                where: found.where ?? "page",
+                text: found.text ?? "",
+                html: found.html ?? "",
+              }
+            : null,
+        );
+        return;
+      }
+
+      if (data.preview === "outline") {
+        const next = (data.rows as Row[]) ?? [];
+        // The frame describes the page on every selection, and a selection
+        // happens on every keystroke that moves the caret. A new array each
+        // time would redraw the outline continuously while somebody types.
+        setRows((was) => (JSON.stringify(was) === JSON.stringify(next) ? was : next));
+        return;
+      }
+
+      if (data.preview === "copied") {
+        onClip({
+          html: String(data.html ?? ""),
+          label: String(data.label ?? "block"),
+          // The rules the block was wearing, so it arrives on the other page
+          // looking the way it looked on this one.
+          styles: (data.styles as Clip["styles"]) ?? null,
+        });
+        return;
+      }
+
+      // The frame is new, so it knows nothing about which width is being
+      // styled. Told rather than assumed, because the default is every width
+      // and a stale frame would write to the wrong one silently.
+      if (data.preview === "ready") {
+        send({ do: "media", px: width });
+        return;
+      }
+
+      if (data.preview === "history") {
+        if (data.back) undo();
+        else redo();
+        return;
+      }
+
+      if (data.preview === "save") {
+        if (dirty && !saving) onSave();
         return;
       }
 
@@ -303,6 +495,9 @@ export default function VisualEditor({
         const next = liveScripts(String(data.html ?? ""));
         if (next !== page?.bodyHtml) {
           setPast((rows) => [...rows, page?.bodyHtml ?? ""].slice(-40));
+          // A fresh edit is a new branch. Anything that was ahead of here is
+          // no longer ahead of anything.
+          setFuture([]);
           onChange(next);
         }
         return;
@@ -327,7 +522,24 @@ export default function VisualEditor({
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [onChange, onChromeStyle, onNavigate, onSetting, onTitle, page?.bodyHtml, pages]);
+  }, [
+    dirty,
+    onChange,
+    onChromeStyle,
+    onClip,
+    onNavigate,
+    onSave,
+    onSelect,
+    onSetting,
+    onTitle,
+    page?.bodyHtml,
+    pages,
+    redo,
+    saving,
+    send,
+    undo,
+    width,
+  ]);
 
   useEffect(() => {
     if (!full) return;
@@ -338,25 +550,95 @@ export default function VisualEditor({
     return () => document.removeEventListener("keydown", onKey);
   }, [full]);
 
-  const undo = useCallback(() => {
-    setPast((rows) => {
-      if (!rows.length) return rows;
-      const previous = rows[rows.length - 1]!;
-      send({ do: "replace", html: previous });
-      onChange(previous);
-      return rows.slice(0, -1);
-    });
-  }, [onChange, send]);
+  /*
+   * The same keys, pressed outside the frame.
+   *
+   * Half the time the cursor is in the page and the frame hears them; half the
+   * time it is in a field in the panel and this does. A shortcut that works
+   * only when you last clicked in the right place is a shortcut nobody trusts.
+   *
+   * Except in a field, where the browser's own undo is the right one: rewinding
+   * the whole page because somebody mistyped a colour would be a surprise.
+   */
+  useEffect(() => {
+    if (!editable) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.metaKey && !e.ctrlKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+
+      const key = e.key.toLowerCase();
+      if (key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if (key === "y") {
+        e.preventDefault();
+        redo();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [editable, redo, undo]);
+
+  // Told whenever it changes, rather than sent along with each style, so the
+  // frame is the one place that knows which width is being written to.
+  useEffect(() => {
+    send({ do: "media", px: width });
+  }, [send, width]);
+
+  useEffect(() => {
+    const el = blocks.current;
+    if (!el) return;
+    if (adding && !el.open) el.showModal();
+    else if (!adding && el.open) el.close();
+  }, [adding]);
 
   if (!page) return <div className="empty">Nothing to edit yet.</div>;
 
   const controls = tab === "type" ? TYPE : BOX;
+  const scoped = width > 0;
+  /** The header and footer are rendered from a template, so no rule can be hung on them. */
+  const scopable = chosen?.where !== "chrome";
+
+  /*
+   * The site's own colours, offered before any others.
+   *
+   * A colour picker full of every colour is a colour picker that produces a
+   * page in colours the site does not use. These are the three the site was
+   * built from and the mixes its own stylesheet makes from them, so picking one
+   * keeps the page on the palette rather than near it.
+   */
+  const swatches = ([
+    [site.theme.accent, "Accent"],
+    [site.theme.ink, "Text"],
+    [site.theme.background, "Background"],
+    [blend(site.theme.ink, site.theme.background, 0.62), "Muted text"],
+    [blend(site.theme.accent, site.theme.background, 0.08), "Accent tint"],
+    [blend(site.theme.ink, site.theme.background, 0.05), "Panel"],
+    [blend(site.theme.ink, site.theme.background, 0.13), "Hairline"],
+    ["#ffffff", "White"],
+    ["#000000", "Black"],
+  ] as Array<[string, string]>).filter(
+    // Most sites are on a white background, and two identical white squares
+    // side by side read as one of them being broken.
+    (one, at, all) => all.findIndex(([colour]) => hexOf(colour) === hexOf(one[0])) === at,
+  );
 
   return (
     <div className={full ? "ve preview-shell is-full" : "ve preview-shell"}>
       <div className="ve-bar">
         {editable ? (
           <>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm ve-add"
+              onClick={() => setAdding(true)}
+              title="Put a new section into the page"
+            >
+              <span aria-hidden>+</span> Add
+            </button>
+
             <div className="seg seg-sm">
               {(["bold", "italic", "underline"] as const).map((command, i) => (
                 <button
@@ -424,30 +706,81 @@ export default function VisualEditor({
               </button>
             </div>
 
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={undo}
-              disabled={!past.length}
-            >
-              Undo
-            </button>
+            {/*
+              * Taking a block from one page to another.
+              *
+              * Duplicate has always worked in place. Getting a section onto a
+              * different page meant opening the markup, finding where it
+              * started and where it ended, and moving it by hand — which is the
+              * one job this editor exists to make unnecessary.
+              */}
+            <div className="seg seg-sm">
+              <button
+                type="button"
+                className="seg-btn"
+                disabled={!chosen}
+                title={chosen ? "Copy this, to paste on any page" : "Select something first"}
+                onClick={() => send({ do: "copy" })}
+              >
+                Copy
+              </button>
+              <button
+                type="button"
+                className="seg-btn"
+                disabled={!clip}
+                title={clip ? `Paste the ${clip.label} you copied` : "Nothing copied yet"}
+                onClick={() =>
+                  clip && send({ do: "insert", html: clip.html, styles: clip.styles })
+                }
+              >
+                Paste
+              </button>
+            </div>
+
+            <div className="seg seg-sm">
+              <button
+                type="button"
+                className="seg-btn"
+                onClick={undo}
+                disabled={!past.length}
+                title="Undo (Ctrl+Z)"
+              >
+                Undo
+              </button>
+              <button
+                type="button"
+                className="seg-btn"
+                onClick={redo}
+                disabled={!future.length}
+                title="Redo (Ctrl+Shift+Z)"
+              >
+                Redo
+              </button>
+            </div>
           </>
         ) : null}
 
         <div className="seg seg-sm ve-widths">
-          {([["Fit", 0], ["Phone", 390], ["Tablet", 820], ["Laptop", 1280]] as const).map(
-            ([label, width]) => (
-              <button
-                key={label}
-                type="button"
-                className={size === width ? "seg-btn is-on" : "seg-btn"}
-                onClick={() => setSize(width)}
-              >
-                {label}
-              </button>
-            ),
-          )}
+          {WIDTHS.map((one) => (
+            <button
+              key={one.label}
+              type="button"
+              className={size === one.preview ? "seg-btn is-on" : "seg-btn"}
+              onClick={() => {
+                setSize(one.preview);
+                /*
+                 * Always back to every width, not only when the new one has no
+                 * breakpoint of its own. Going from Phone to Tablet without
+                 * this left the panel writing phone rules while showing a
+                 * tablet, which is a change landing at a width nobody is
+                 * looking at.
+                 */
+                setWidth(0);
+              }}
+            >
+              {one.label}
+            </button>
+          ))}
         </div>
 
         {full && editable ? (
@@ -516,6 +849,74 @@ export default function VisualEditor({
         />
       ) : null}
 
+      {/*
+        * The block library.
+        *
+        * A dialog rather than a dropdown, because it is also reachable from
+        * full screen, where a menu anchored to a toolbar has nothing behind it
+        * to sit on. Everything in it is made from the site's own classes, so
+        * what arrives is already the right colour and the right typeface.
+        */}
+      <dialog
+        ref={blocks}
+        className="confirm ve-blocks"
+        aria-labelledby="ve-blocks-title"
+        onClose={() => setAdding(false)}
+        onClick={(event) => {
+          if (event.target === blocks.current) setAdding(false);
+        }}
+      >
+        <div className="confirm-card ve-blocks-card">
+          <div className="ve-blocks-head">
+            <div>
+              <h3 id="ve-blocks-title" className="confirm-title">
+                Add to the page
+              </h3>
+              <p className="quiet">
+                {chosen
+                  ? "It goes in after whatever is selected."
+                  : "It goes in at the end of the page."}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="ask-close"
+              title="Close"
+              aria-label="Close"
+              onClick={() => setAdding(false)}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="ve-blocks-body">
+            {BLOCK_GROUPS.map((group) => (
+              <section key={group} className="ve-blocks-group">
+                <h4>{group}</h4>
+                <div className="ve-blocks-grid">
+                  {BLOCKS.filter((b) => b.group === group).map((block) => (
+                    <button
+                      key={block.key}
+                      type="button"
+                      className="ve-block"
+                      onClick={() => {
+                        send({ do: "insert", html: block.html });
+                        setAdding(false);
+                      }}
+                    >
+                      <strong>{block.name}</strong>
+                      <span>{block.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        </div>
+      </dialog>
+
       <div className="ve-body">
         <div className={size ? "preview-stage is-sized" : "preview-stage"}>
           <iframe
@@ -532,6 +933,36 @@ export default function VisualEditor({
 
         {editable ? (
           <aside className="ve-panel">
+            {/*
+              * The page from the side.
+              *
+              * The breadcrumbs walk upward only, so on a long page there was no
+              * way to see what the page is made of or move between its parts
+              * without scrolling and aiming. Open by default when nothing is
+              * selected, which is exactly when somebody is looking for
+              * something.
+              */}
+            <details className="ve-outline" open={!chosen}>
+              <summary>
+                Page outline <span className="ve-outline-count">{rows.length}</span>
+              </summary>
+              <ol className="ve-outline-list">
+                {rows.map((row) => (
+                  <li key={row.at}>
+                    <button
+                      type="button"
+                      className={row.here ? "ve-outline-row is-on" : "ve-outline-row"}
+                      onClick={() => send({ do: "choose", at: row.at })}
+                    >
+                      <span className="ve-outline-tag">{row.heading || row.label}</span>
+                      <span className="ve-outline-text">{row.text || "…"}</span>
+                    </button>
+                  </li>
+                ))}
+                {!rows.length ? <li className="quiet">Nothing on the page yet.</li> : null}
+              </ol>
+            </details>
+
             {!chosen ? (
               <p className="provider-hint">
                 Click anything in the page to change how it looks. Typing works
@@ -569,6 +1000,43 @@ export default function VisualEditor({
                     </button>
                   ))}
                 </div>
+
+                {/*
+                  * Which width the next change applies to.
+                  *
+                  * Only offered where the width being previewed has a
+                  * breakpoint to hang a rule on, and only inside the page: the
+                  * header and footer are built from a template every render, so
+                  * there is no element there for a rule to keep pointing at.
+                  */}
+                {WIDTHS.some((w) => w.preview === size && w.breakpoint) && scopable ? (
+                  <div className="ve-at">
+                    <div className="seg seg-sm">
+                      <button
+                        type="button"
+                        className={!scoped ? "seg-btn is-on" : "seg-btn"}
+                        onClick={() => setWidth(0)}
+                      >
+                        Every width
+                      </button>
+                      <button
+                        type="button"
+                        className={scoped ? "seg-btn is-on" : "seg-btn"}
+                        onClick={() =>
+                          setWidth(WIDTHS.find((w) => w.preview === size)?.breakpoint ?? 0)
+                        }
+                      >
+                        This width down
+                      </button>
+                    </div>
+                    {scoped ? (
+                      <p className="ve-note">
+                        Changes now apply below {width} pixels only, and override
+                        what is set for every width.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div className="seg seg-sm ve-tabs">
                   <button
@@ -623,7 +1091,21 @@ export default function VisualEditor({
                 ) : null}
 
                 {controls.map((control) => {
-                  const value = chosen.styles[control.key] ?? "";
+                  /*
+                   * What the box shows.
+                   *
+                   * Styling every width shows what the element actually looks
+                   * like, set or inherited. Styling one width shows only what
+                   * is set for that width, because that is the only thing the
+                   * box can change and the only thing clearing it removes.
+                   * Showing the inherited value there would read as a value set
+                   * at this width and never cleared.
+                   */
+                  const value = scoped
+                    ? chosen.atWidth?.[control.key] ?? ""
+                    : chosen.styles[control.key] ?? "";
+                  const inherited = chosen.styles[control.key] ?? "";
+
                   return (
                     <div className="ve-field" key={control.key}>
                       <label className="field-label">{control.label}</label>
@@ -656,7 +1138,7 @@ export default function VisualEditor({
                               value={toHex(
                                 control.key === "backgroundColor" && !chosen.ownBackground
                                   ? chosen.backdrop
-                                  : value,
+                                  : value || inherited,
                               )}
                               onChange={(e) =>
                                 send({ do: "style", key: control.key, value: e.target.value })
@@ -671,6 +1153,23 @@ export default function VisualEditor({
                               Clear
                             </button>
                           </div>
+
+                          <div className="ve-swatches">
+                            {swatches.map(([colour, name]) => (
+                              <button
+                                key={`${control.key}-${name}`}
+                                type="button"
+                                className="ve-swatch"
+                                style={{ background: colour }}
+                                title={`${name} — ${colour}`}
+                                aria-label={name}
+                                onClick={() =>
+                                  send({ do: "style", key: control.key, value: colour })
+                                }
+                              />
+                            ))}
+                          </div>
+
                           {control.key === "backgroundColor" && !chosen.ownBackground ? (
                             <p className="ve-note">
                               None of its own. This is what shows through from
@@ -682,8 +1181,8 @@ export default function VisualEditor({
                         <input
                           type="text"
                           defaultValue={value}
-                          key={`${chosen.label}-${control.key}-${value}`}
-                          placeholder="inherit"
+                          key={`${chosen.label}-${control.key}-${width}-${value}`}
+                          placeholder={scoped ? inherited || "inherit" : "inherit"}
                           onBlur={(e) =>
                             send({
                               do: "style",

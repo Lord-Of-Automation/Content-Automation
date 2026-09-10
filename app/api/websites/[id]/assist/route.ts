@@ -69,6 +69,77 @@ interface Turn {
   content: string;
 }
 
+/**
+ * What the person is pointing at in the editor, if anything.
+ *
+ * The visual editor is where somebody says "this one" and this is where they
+ * say what to do with it, and until now the two had no way of meaning the same
+ * thing: every request arrived as though nothing were selected, so "rewrite
+ * this paragraph" was a question about a paragraph nobody had named.
+ */
+interface Pointed {
+  label: string;
+  path: string[];
+  where: "page" | "chrome";
+  text: string;
+  html: string;
+  page: string;
+  pageTitle: string;
+}
+
+/** The selection, as something the model can act on, or nothing. */
+function pointedAt(value: unknown): Pointed | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+
+  const label = String(raw.label ?? "").slice(0, 80);
+  if (!label) return null;
+
+  return {
+    label,
+    path: (Array.isArray(raw.path) ? raw.path : [])
+      .slice(0, 12)
+      .map((p) => String(p).slice(0, 80)),
+    where: raw.where === "chrome" ? "chrome" : "page",
+    text: String(raw.text ?? "").slice(0, 2_000),
+    html: String(raw.html ?? "").slice(0, 8_000),
+    page: String(raw.page ?? "").slice(0, 200),
+    pageTitle: String(raw.pageTitle ?? "").slice(0, 200),
+  };
+}
+
+/**
+ * How to describe it to the model.
+ *
+ * Deliberately not an instruction to edit it. Somebody who selects a heading
+ * and asks for the page to be shorter means the page, and a system block that
+ * said "edit this element" would turn every request into an edit of whatever
+ * happened to be clicked. It says what is being pointed at and leaves what to
+ * do about it to the words the person actually typed.
+ */
+function describePointed(at: Pointed): string {
+  const lines = [
+    "The person is pointing at something in the editor while they ask. " +
+      "Take words like this, it, that and here as meaning this, unless what " +
+      "they asked for plainly means something else.",
+    "",
+    `Page: ${at.page ? `/${at.page}` : "the front page"}${at.pageTitle ? ` (${at.pageTitle})` : ""}`,
+    `Element: ${at.label}${at.path.length > 1 ? `, inside ${at.path.slice(0, -1).join(" > ")}` : ""}`,
+  ];
+
+  if (at.where === "chrome") {
+    lines.push(
+      "It is in the header or footer, which are site settings rather than page " +
+        "content, so changing it means set_header, set_footer or set_site.",
+    );
+  }
+
+  if (at.text) lines.push("", `What it says:\n${at.text}`);
+  if (at.html) lines.push("", `Its markup:\n${at.html}`);
+
+  return lines.join("\n");
+}
+
 /** One line of the stream. The client reads these as they arrive. */
 type Event =
   | { t: "text"; v: string }
@@ -108,12 +179,14 @@ export async function POST(
   const { id } = await params;
   if (!idOf(id)) return NextResponse.json({ error: "Bad id." }, { status: 400 });
 
-  let body: { messages?: Turn[] };
+  let body: { messages?: Turn[]; selection?: unknown };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
+
+  const pointed = pointedAt(body.selection);
 
   const turns = (Array.isArray(body.messages) ? body.messages : [])
     .filter((t) => t && (t.role === "user" || t.role === "assistant"))
@@ -176,6 +249,12 @@ export async function POST(
               // Outside the cache breakpoint: the site changes as it is edited,
               // and a cached description would describe the site as it was.
               { type: "text", text: `The site as it stands:\n\n${describeSite(working)}` },
+              // Outside it for the same reason, and for one more: what is being
+              // pointed at belongs to the request rather than to the
+              // conversation, and it changes with every click.
+              ...(pointed
+                ? [{ type: "text" as const, text: describePointed(pointed) }]
+                : []),
             ],
             messages: history,
             tools: SITE_TOOLS,

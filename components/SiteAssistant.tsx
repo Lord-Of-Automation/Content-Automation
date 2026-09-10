@@ -35,10 +35,29 @@ const OPENERS = [
   "Change the accent colour to a deep green",
 ];
 
+/** What to try when something in the page is selected, which is a different job. */
+const ABOUT_THIS = [
+  "Rewrite this so it is shorter",
+  "Make this less breathless",
+  "Expand this with a concrete example",
+];
+
+/** What is selected in the page, as the editor describes it. */
+export interface Pointed {
+  label: string;
+  path: string[];
+  where: "page" | "chrome";
+  text: string;
+  html: string;
+  page: string;
+  pageTitle: string;
+}
+
 export default function SiteAssistant({
   id,
   siteName,
   dirty,
+  selection,
   onSave,
   onEdited,
   onClose,
@@ -47,6 +66,15 @@ export default function SiteAssistant({
   siteName: string;
   /** Whether the editor is holding changes that are not written down yet. */
   dirty: boolean;
+  /**
+   * What is being pointed at in the page, when anything is.
+   *
+   * The visual editor is where you say "this one" and this is where you say
+   * what to do with it, and the two used to have no way of meaning the same
+   * thing. Sent with the question rather than pasted into it, so the words a
+   * person types stay the words they typed.
+   */
+  selection: Pointed | null;
   onSave: () => Promise<void> | void;
   /** The site as it stands after an edit, so the editor can show it. */
   onEdited: (site: Website) => void;
@@ -57,6 +85,14 @@ export default function SiteAssistant({
   const [busy, setBusy] = useState(false);
   const [doing, setDoing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Whether the question is about what is selected.
+   *
+   * On whenever something is, and turned off by hand. A request that quietly
+   * carried a selection somebody had forgotten they made would answer a
+   * question nobody asked, so it is always visible and always dismissable.
+   */
+  const [about, setAbout] = useState(true);
 
   const thread = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
@@ -65,6 +101,17 @@ export default function SiteAssistant({
   useEffect(() => {
     box.current?.focus();
   }, []);
+
+  /** One string, so a changed selection is one dependency rather than four. */
+  const pointing = selection
+    ? `${selection.page}|${selection.label}|${selection.text}`
+    : "";
+
+  // A new selection is a new thing to talk about, so it comes back switched on
+  // however the last one was dismissed.
+  useEffect(() => {
+    if (pointing) setAbout(true);
+  }, [pointing]);
 
   useEffect(() => {
     const el = thread.current;
@@ -106,7 +153,18 @@ export default function SiteAssistant({
         const response = await fetch(`/api/websites/${id}/assist`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ messages: history }),
+          /*
+           * The selection travels beside the question rather than inside it.
+           *
+           * Folded into the text it would become part of the conversation for
+           * good, so a follow-up three turns later would still be about a
+           * paragraph nobody is pointing at any more. Sent separately, it
+           * describes the moment the question was asked and nothing else.
+           */
+          body: JSON.stringify({
+            messages: history,
+            selection: about && selection ? selection : null,
+          }),
           signal: stop.signal,
         });
 
@@ -184,7 +242,7 @@ export default function SiteAssistant({
         setBusy(false);
       }
     },
-    [busy, dirty, id, onEdited, turns],
+    [about, busy, dirty, id, onEdited, selection, turns],
   );
 
   return (
@@ -251,7 +309,7 @@ export default function SiteAssistant({
               version it replaced, so anything here undoes on the Versions tab.
             </p>
             <div className="ask-openers">
-              {OPENERS.map((line) => (
+              {(selection && about ? ABOUT_THIS : OPENERS).map((line) => (
                 <button
                   key={line}
                   type="button"
@@ -300,6 +358,39 @@ export default function SiteAssistant({
 
       {error ? <p className="notice bad ask-error">{error}</p> : null}
 
+      {/*
+        * What the question is about, when it is about something in particular.
+        *
+        * Sits directly above the box rather than at the top of the panel,
+        * because it is part of the question being composed and not part of the
+        * conversation that has already happened.
+        */}
+      {selection && about ? (
+        <div className="sa-about">
+          <div className="sa-about-what">
+            <span className="sa-about-tag">{selection.label}</span>
+            <span className="sa-about-text">
+              {selection.text
+                ? selection.text.slice(0, 120)
+                : selection.where === "chrome"
+                  ? "in the header or footer"
+                  : "no words in it"}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="ask-close sa-about-drop"
+            title="Ask about the whole site instead"
+            aria-label="Ask about the whole site instead"
+            onClick={() => setAbout(false)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+      ) : null}
+
       <form
         className="ask-compose"
         onSubmit={(e) => {
@@ -312,7 +403,13 @@ export default function SiteAssistant({
           rows={2}
           value={draft}
           disabled={dirty}
-          placeholder={dirty ? "Save your changes first" : "Describe the change"}
+          placeholder={
+            dirty
+              ? "Save your changes first"
+              : selection && about
+                ? `What should happen to this ${selection.label}?`
+                : "Describe the change"
+          }
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {

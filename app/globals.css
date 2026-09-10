@@ -6989,3 +6989,428 @@ code,
 .ask-field:has(.ask-note) input {
   border-color: color-mix(in srgb, var(--bad) 55%, var(--line-2));
 }
+
+/* ==========================================================================
+   The visual editor's new parts
+
+   Six things arrived at once and they share a look: the outline down the side
+   of the panel, the library of blocks, the width a style applies to, the site's
+   own colours as swatches, what has been copied, and the list of what is wrong
+   with the site. All of them are lists of small choices, so all of them are
+   drawn as rows rather than as cards. A card grid of fourteen options reads as
+   a shop, and none of this is a shop.
+   ========================================================================== */
+
+/* -------------------------------------------------------------- the outline
+
+   The page from the side. Collapsed once something is selected, because then
+   the panel below it is what somebody is reading, and open when nothing is,
+   because then finding something is the only thing they can be doing. */
+.ve-outline {
+  margin: -4px -4px 12px;
+  padding: 0 4px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ve-outline > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  font-size: 11px;
+  font-weight: 640;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  cursor: pointer;
+  list-style: none;
+}
+
+.ve-outline > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Drawn rather than written, so it turns with the section without a second
+   element to keep in step. */
+.ve-outline > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  transition: transform var(--quick, 120ms) var(--ease, ease);
+}
+
+.ve-outline[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.ve-outline-count {
+  margin-left: auto;
+  padding: 0 5px;
+  border-radius: 20px;
+  background: var(--panel);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.ve-outline-list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.ve-outline-list > li.quiet {
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.ve-outline-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ve-outline-row:hover {
+  background: var(--hover);
+}
+
+.ve-outline-row.is-on {
+  background: var(--accent-soft);
+}
+
+.ve-outline-tag {
+  flex: none;
+  font-family: var(--font-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+.ve-outline-row.is-on .ve-outline-tag {
+  color: var(--accent);
+}
+
+/* One line, because the outline is for finding a section rather than for
+   reading it. */
+.ve-outline-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ----------------------------------------------------- which width, and Add */
+.ve-add {
+  gap: 5px;
+}
+
+.ve-add span {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.ve-at {
+  margin-bottom: 12px;
+}
+
+.ve-at .seg {
+  width: 100%;
+}
+
+/* --------------------------------------------------------------- swatches
+
+   The site's own colours, offered before the whole spectrum. Small, because
+   this is a shortcut to the right answer rather than the picker itself. */
+.ve-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.ve-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: transform var(--quick, 120ms) var(--ease, ease);
+}
+
+.ve-swatch:hover {
+  transform: scale(1.12);
+  border-color: var(--ink-3);
+}
+
+/* ---------------------------------------------------------- block library
+
+   Wider than a confirmation and shorter than the window, because it is a
+   list to scan rather than a question to answer. */
+/* The confirmation dialogs this borrows from are 440 pixels wide, which is
+   right for a question and half a screen too narrow for a list of fifteen
+   things to choose between. */
+.ve-blocks {
+  max-width: min(760px, calc(100vw - 32px));
+}
+
+.ve-blocks::backdrop {
+  background: color-mix(in srgb, #0b0e13 55%, transparent);
+}
+
+.ve-blocks-card {
+  width: min(720px, 92vw);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+}
+
+.ve-blocks-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ve-blocks-head .confirm-title {
+  margin: 0 0 2px;
+}
+
+.ve-blocks-head .quiet {
+  margin: 0;
+  font-size: 12px;
+}
+
+.ve-blocks-head .ask-close {
+  margin-left: auto;
+}
+
+.ve-blocks-body {
+  padding: 6px 20px 20px;
+  overflow-y: auto;
+}
+
+.ve-blocks-group {
+  margin-top: 16px;
+}
+
+.ve-blocks-group h4 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 640;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.ve-blocks-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+.ve-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  /* The base button rule centres its label and keeps it on one line, which is
+     what a button wants and the opposite of what a two-line card wants. */
+  white-space: normal;
+  gap: 3px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--quick, 120ms) var(--ease, ease),
+    background var(--quick, 120ms) var(--ease, ease),
+    transform var(--quick, 120ms) var(--ease, ease);
+}
+
+.ve-block:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+
+.ve-block strong {
+  font-size: 13px;
+  font-weight: 620;
+  color: var(--ink);
+}
+
+.ve-block span {
+  font-size: 11.5px;
+  text-align: left;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+/* ------------------------------------------- what the question is about
+
+   Between the thread and the box, because it belongs to the question being
+   written rather than to the conversation already had. */
+.sa-about {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 14px 8px;
+  padding: 7px 8px 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+
+.sa-about-what {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+
+.sa-about-tag {
+  flex: none;
+  font-family: var(--font-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.sa-about-text {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sa-about-drop {
+  margin-left: auto;
+  flex: none;
+}
+
+/* ------------------------------------------------------------- the check
+
+   A count on the tab, and the findings as rows. The count is the part that
+   gets looked at, so it is the part that changes colour. */
+.seg-count {
+  margin-left: 5px;
+  padding: 0 5px;
+  border-radius: 20px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  font-size: 10px;
+  font-weight: 640;
+  font-variant-numeric: tabular-nums;
+}
+
+.seg-count.is-bad {
+  color: var(--bad);
+  background: var(--bad-soft);
+}
+
+.findings-summary {
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.findings {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.finding {
+  display: grid;
+  grid-template-columns: minmax(90px, 150px) 108px 1fr;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid var(--warn);
+  background: var(--panel);
+}
+
+.finding:last-child {
+  border-bottom: 0;
+}
+
+.finding.is-bad {
+  border-left-color: var(--bad);
+}
+
+.finding-where {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finding-where:hover {
+  text-decoration: underline;
+}
+
+.finding-kind {
+  font-size: 11px;
+  font-weight: 640;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.finding-what {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+/* The offending address or words, on their own line, because quoting them
+   inside the sentence makes both hard to read. */
+.finding-detail {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--font-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  font-style: normal;
+  color: var(--ink-3);
+  word-break: break-word;
+}
+
+@media (max-width: 720px) {
+  .finding {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+}
