@@ -128,6 +128,24 @@ export default function MailingView() {
     })();
   }, [loadStatus, loadThreads]);
 
+  /**
+   * Disconnect and connect again, in one press.
+   *
+   * The two-step version is what the error message tells somebody to do, and
+   * it is two presses in two places with a Google screen in between. This is
+   * the same thing without the first half being somebody's job.
+   */
+  async function reconnect() {
+    setBusy(true);
+    try {
+      await fetch("/api/mail/connect", { method: "DELETE" });
+    } catch {
+      // Not worth stopping for. The consent that follows replaces whatever is
+      // stored anyway, and this only tidies up first.
+    }
+    window.location.href = "/api/mail/connect";
+  }
+
   async function disconnect() {
     const sure = await ask.confirm({
       title: "Disconnect this mailbox?",
@@ -311,6 +329,28 @@ export default function MailingView() {
         </div>
 
         <div className="card-body tight">
+          {/* Connected, and not permitted to do the thing a campaign needs.
+              Said here rather than discovered at the end of a run, after every
+              article has been written and paid for. */}
+          {connected && status?.canDraft === false ? (
+            <div className="notice warn">
+              <strong>This connection cannot create drafts.</strong> It was
+              granted before campaigns existed, so it can send and read mail but
+              not put an article in a document. Campaigns will write every
+              article and then fail at the last step.
+              <div className="sa-notice-do">
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  disabled={busy}
+                  onClick={() => void reconnect()}
+                >
+                  Reconnect and grant it
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {!ready ? (
             <div className="notice warn">
               <strong>There is no Google OAuth client to connect through.</strong>{" "}

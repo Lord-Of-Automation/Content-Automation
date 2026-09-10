@@ -52,6 +52,15 @@ export type MailStatus = {
   consoleConfigured?: boolean;
   /** The exact address to register against the OAuth client. */
   redirectUri?: string;
+  /**
+   * Whether this connection can put a draft in Drive.
+   *
+   * A mailbox connected before campaigns existed sends mail perfectly and
+   * fails at the document, at the end of a run, after every article has been
+   * written and paid for. Said here so the page can offer a reconnect first.
+   */
+  canDraft?: boolean;
+  scopes?: string[];
 };
 
 export type Contact = {
