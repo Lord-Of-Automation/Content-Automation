@@ -7695,3 +7695,12 @@ code,
   color: var(--ok);
   background: var(--ok-soft);
 }
+
+/* The conversations, on their own. Writing to one publisher by hand is what
+   the campaign does per publisher and with an article attached, so this half
+   of the page is now the whole of it. */
+.mail-only {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

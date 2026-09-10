@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAsk } from "@/components/Ask";
 import OutreachCampaign from "@/components/OutreachCampaign";
 import { useToasts } from "@/components/Toasts";
-import type { Contact, MailStatus, Thread } from "@/lib/mail";
+import type { MailStatus, Thread } from "@/lib/mail";
 
 /**
  * Writing to link prospects, and reading what comes back.
@@ -21,17 +21,6 @@ import type { Contact, MailStatus, Thread } from "@/lib/mail";
  * because "connect your Gmail" is a big thing to ask and the answer to "what
  * can it see" should not be "trust us".
  */
-
-/** What a first email says, until somebody writes a better one. */
-const OPENER = {
-  subject: "Quick question about {domain}",
-  body: `Hi,
-
-I came across {domain} and had a quick question about it.
-
-Best,
-`,
-};
 
 function when(value: string | null | undefined): string {
   if (!value) return "never";
@@ -50,7 +39,6 @@ export default function MailingView() {
   const { push } = useToasts();
 
   const [status, setStatus] = useState<MailStatus | null>(null);
-  const [contacts, setContacts] = useState<Contact[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   /** Which half of the page. Conversations first: it is what you come back to. */
@@ -58,12 +46,6 @@ export default function MailingView() {
   /** Show only the replies that name a way to be paid, which is the answer. */
   const [paidOnly, setPaidOnly] = useState(false);
 
-  const [sheet, setSheet] = useState("");
-  const [tab, setTab] = useState("");
-  const [to, setTo] = useState("");
-  const [domain, setDomain] = useState("");
-  const [subject, setSubject] = useState(OPENER.subject);
-  const [body, setBody] = useState(OPENER.body);
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -102,16 +84,6 @@ export default function MailingView() {
     if (!response.ok) throw new Error(payload.error ?? "The conversations could not be read.");
     setThreads(payload.threads ?? []);
   }, []);
-
-  const loadContacts = useCallback(async () => {
-    const asked = new URLSearchParams();
-    if (sheet) asked.set("sheet", sheet);
-    if (tab) asked.set("tab", tab);
-    const response = await fetch(`/api/mail/contacts?${asked}`, { cache: "no-store" });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error ?? "The prospects could not be read.");
-    setContacts(payload.contacts ?? []);
-  }, [sheet, tab]);
 
   useEffect(() => {
     void (async () => {
@@ -171,56 +143,6 @@ export default function MailingView() {
       push("ok", "Disconnected.");
     } catch (e) {
       push("bad", e instanceof Error ? e.message : "It could not be disconnected.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function send() {
-    const address = to.trim().toLowerCase();
-    if (!address) return push("bad", "Nobody to write to.");
-
-    const already = contacts.find((c) => c.email === address && c.sent > 0);
-    const sure = await ask.confirm({
-      title: already ? `Write to ${address} again?` : `Send to ${address}?`,
-      body: (
-        <>
-          {already ? (
-            <>
-              This address has already had {already.sent} message
-              {already.sent === 1 ? "" : "s"}, the first on {when(already.sentAt)}. A
-              second goes into the same conversation.{" "}
-            </>
-          ) : null}
-          It goes from the connected mailbox and cannot be taken back.
-        </>
-      ),
-      confirmLabel: "Send it",
-    });
-    if (!sure) return;
-
-    setBusy(true);
-    try {
-      const response = await fetch("/api/mail/send", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          to: address,
-          domain: domain.trim(),
-          // Filled in here rather than on the server, so what is sent is
-          // exactly what was on screen when the button was pressed.
-          subject: subject.replaceAll("{domain}", domain.trim() || address),
-          body: body.replaceAll("{domain}", domain.trim() || address),
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "It could not be sent.");
-
-      push("ok", `Sent to ${address}.`);
-      await loadThreads();
-      if (contacts.length) await loadContacts().catch(() => {});
-    } catch (e) {
-      push("bad", e instanceof Error ? e.message : "It could not be sent.");
     } finally {
       setBusy(false);
     }
@@ -394,244 +316,108 @@ export default function MailingView() {
               }}
             />
           ) : connected ? (
-            <div className="editor-split has-preview">
-              {/* ------------------------------------------------ writing */}
-              <div className="editor-panel">
-                <h3>Write to a prospect</h3>
-
-                <label className="field-label" htmlFor="mail-to">
-                  To
-                </label>
-                <input
-                  id="mail-to"
-                  type="email"
-                  className="mono"
-                  value={to}
-                  placeholder="someone@example.com"
-                  onChange={(e) => setTo(e.target.value)}
-                />
-
-                <label className="field-label" htmlFor="mail-domain">
-                  Their domain
-                </label>
-                <input
-                  id="mail-domain"
-                  type="text"
-                  className="mono"
-                  value={domain}
-                  placeholder="example.com"
-                  onChange={(e) => setDomain(e.target.value)}
-                />
-
-                <label className="field-label" htmlFor="mail-subject">
-                  Subject
-                </label>
-                <input
-                  id="mail-subject"
-                  type="text"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                />
-
-                <label className="field-label" htmlFor="mail-body">
-                  Message
-                </label>
-                <textarea
-                  id="mail-body"
-                  className="editor-body"
-                  rows={10}
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                />
-                <p className="provider-hint">
-                  Plain text, deliberately: an outreach email that arrives as
-                  styled HTML from an address nobody knows reads as a mailshot.
-                  Write {"{domain}"} anywhere and it becomes their domain.
-                </p>
-
-                <div className="ve-actions">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={busy || !to.trim()}
-                    onClick={() => void send()}
-                  >
-                    {busy ? "Sending…" : "Send"}
-                  </button>
-                </div>
-
-                <section className="sheet-section">
-                  <h3>From the prospects sheet</h3>
-                  <div className="site-row">
-                    <div>
-                      <label className="field-label" htmlFor="mail-sheet">
-                        Sheet ID
-                      </label>
-                      <input
-                        id="mail-sheet"
-                        type="text"
-                        className="mono"
-                        value={sheet}
-                        placeholder="Blank uses the engine's own"
-                        onChange={(e) => setSheet(e.target.value.trim())}
-                      />
-                    </div>
-                    <div>
-                      <label className="field-label" htmlFor="mail-tab">
-                        Tab
-                      </label>
-                      <input
-                        id="mail-tab"
-                        type="text"
-                        className="mono"
-                        value={tab}
-                        placeholder="First tab"
-                        onChange={(e) => setTab(e.target.value.trim())}
-                      />
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    disabled={busy}
-                    onClick={() =>
-                      void loadContacts().catch((e) => push("bad", String(e.message)))
-                    }
-                  >
-                    Load the addresses
-                  </button>
-
-                  {contacts.length ? (
-                    <ul className="findings" style={{ marginTop: 12 }}>
-                      {contacts.map((one) => (
-                        <li className="finding" key={`${one.row}-${one.email}`}>
-                          <button
-                            type="button"
-                            className="finding-where"
-                            title="Put this address in the form"
-                            onClick={() => {
-                              setTo(one.email);
-                              setDomain(one.domain);
-                            }}
-                          >
-                            {one.email}
-                          </button>
-                          <span className="finding-kind">{one.domain || "—"}</span>
-                          <span className="finding-what">
-                            {one.sent
-                              ? `written to ${one.sent} time${one.sent === 1 ? "" : "s"}, first on ${when(one.sentAt)}`
-                              : "not written to"}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </section>
-              </div>
-
-              {/* ----------------------------------------- conversations */}
-              <aside className="editor-preview">
+            <div className="mail-only">
                 <div className="editor-body-head">
-                  <span className="field-label">
-                    Conversations{threads.length ? ` (${showing.length})` : ""}
-                  </span>
-                  {/* The one filter worth having on an outreach inbox. A
-                      publisher quoting a price and saying where to send it has
-                      agreed; everything else is still a conversation. */}
-                  {threads.some((one) => one.paypal) ? (
-                    <label className="check" htmlFor="mail-paid">
-                      <input
-                        id="mail-paid"
-                        type="checkbox"
-                        checked={paidOnly}
-                        onChange={(e) => setPaidOnly(e.target.checked)}
-                      />
-                      With a PayPal link
-                    </label>
-                  ) : null}
+                <span className="field-label">
+                  Conversations{threads.length ? ` (${showing.length})` : ""}
+                </span>
+                {/* The one filter worth having on an outreach inbox. A
+                    publisher quoting a price and saying where to send it has
+                    agreed; everything else is still a conversation. */}
+                {threads.some((one) => one.paypal) ? (
+                  <label className="check" htmlFor="mail-paid">
+                    <input
+                      id="mail-paid"
+                      type="checkbox"
+                      checked={paidOnly}
+                      onChange={(e) => setPaidOnly(e.target.checked)}
+                    />
+                    With a PayPal link
+                  </label>
+                ) : null}
                 </div>
 
                 {!showing.length ? (
-                  <p className="provider-hint">
-                    {paidOnly
-                      ? "No reply has named a way to be paid yet."
-                      : "Nothing sent yet. Conversations appear here once this platform has written to somebody, and only those."}
-                  </p>
+                <p className="provider-hint">
+                  {paidOnly
+                    ? "No reply has named a way to be paid yet."
+                    : "Nothing sent yet. Conversations appear here once this platform has written to somebody, and only those."}
+                </p>
                 ) : (
-                  <ul className="mail-threads">
-                    {showing.map((thread) => {
-                      const showing = open === thread.email;
-                      return (
-                        <li
-                          key={thread.email}
-                          className={thread.replies ? "mail-thread has-reply" : "mail-thread"}
+                <ul className="mail-threads">
+                  {showing.map((thread) => {
+                    const showing = open === thread.email;
+                    return (
+                      <li
+                        key={thread.email}
+                        className={thread.replies ? "mail-thread has-reply" : "mail-thread"}
+                      >
+                        <button
+                          type="button"
+                          className="mail-thread-head"
+                          onClick={() => setOpen(showing ? null : thread.email)}
                         >
-                          <button
-                            type="button"
-                            className="mail-thread-head"
-                            onClick={() => setOpen(showing ? null : thread.email)}
-                          >
-                            <span className="mail-who">{thread.email}</span>
-                            <span className="mail-subject">{thread.subject}</span>
-                            <span className="mail-count">
-                              {thread.replies
-                                ? `${thread.replies} repl${thread.replies === 1 ? "y" : "ies"}`
-                                : "no reply yet"}
-                            </span>
-                            <span className="mail-at">{when(thread.lastAt ?? thread.sentAt)}</span>
-                          </button>
+                          <span className="mail-who">{thread.email}</span>
+                          <span className="mail-subject">{thread.subject}</span>
+                          <span className="mail-count">
+                            {thread.replies
+                              ? `${thread.replies} repl${thread.replies === 1 ? "y" : "ies"}`
+                              : "no reply yet"}
+                          </span>
+                          <span className="mail-at">{when(thread.lastAt ?? thread.sentAt)}</span>
+                        </button>
 
-                          {thread.note ? (
-                            <p className="notice warn mail-note">{thread.note}</p>
-                          ) : null}
+                        {thread.note ? (
+                          <p className="notice warn mail-note">{thread.note}</p>
+                        ) : null}
 
-                          {showing ? (
-                            <div className="mail-messages">
-                              {thread.messages.map((message) => (
-                                <article
-                                  key={message.id}
-                                  className={message.mine ? "mail-message is-mine" : "mail-message"}
-                                >
-                                  <header>
-                                    <strong>{message.mine ? "You" : message.from}</strong>
-                                    <span>{when(message.at)}</span>
-                                  </header>
-                                  {/* As text, never as markup. What is in here
-                                      was written by somebody outside this
-                                      platform, and a page that renders their
-                                      HTML renders whatever they felt like
-                                      sending. */}
-                                  <pre>{message.text.trim() || "(no words in it)"}</pre>
-                                </article>
-                              ))}
-                              <div className="ve-actions">
-                                <button
-                                  type="button"
-                                  className="btn btn-ghost btn-sm"
-                                  onClick={() => {
-                                    setTo(thread.email);
-                                    setDomain(thread.domain);
-                                  }}
-                                >
-                                  Reply to this
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn btn-danger btn-sm"
-                                  disabled={busy}
-                                  onClick={() => void forget(thread.email)}
-                                >
-                                  Forget
-                                </button>
-                              </div>
+                        {showing ? (
+                          <div className="mail-messages">
+                            {thread.messages.map((message) => (
+                              <article
+                                key={message.id}
+                                className={message.mine ? "mail-message is-mine" : "mail-message"}
+                              >
+                                <header>
+                                  <strong>{message.mine ? "You" : message.from}</strong>
+                                  <span>{when(message.at)}</span>
+                                </header>
+                                {/* As text, never as markup. What is in here
+                                    was written by somebody outside this
+                                    platform, and a page that renders their
+                                    HTML renders whatever they felt like
+                                    sending. */}
+                                <pre>{message.text.trim() || "(no words in it)"}</pre>
+                              </article>
+                            ))}
+                            <div className="ve-actions">
+                              {/* Answering happens in the mailbox. A reply to a publisher is a
+                                  conversation, and a one-line box on a dashboard is the wrong
+                                  place to hold one. */}
+                              <a
+                                className="btn btn-ghost btn-sm"
+                                href={`https://mail.google.com/mail/u/0/#all/${thread.threadId}`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Open in Gmail
+                              </a>
+                              <button
+                                type="button"
+                                className="btn btn-danger btn-sm"
+                                disabled={busy}
+                                onClick={() => void forget(thread.email)}
+                              >
+                                Forget
+                              </button>
                             </div>
-                          ) : null}
-                        </li>
-                      );
-                    })}
-                  </ul>
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
                 )}
-              </aside>
             </div>
           ) : null}
         </div>
