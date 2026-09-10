@@ -7592,3 +7592,106 @@ code,
   user-select: all;
   word-break: break-all;
 }
+
+/* ==========================================================================
+   The campaign
+
+   Four decisions down the page in the order they happen: which sheet, narrow
+   it, choose, then what the link and the email say. Sections rather than a
+   wizard, because every one of them is worth changing after seeing the next.
+   ========================================================================== */
+
+.campaign-count {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.campaign-filter {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  align-items: end;
+}
+
+/* Two boxes and the word between them, which is shorter to read than two
+   labelled fields saying Minimum and Maximum. */
+.campaign-range {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.campaign-range input {
+  min-width: 0;
+  flex: 1;
+}
+
+.campaign-range span {
+  flex: none;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.campaign-bulk {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.campaign-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.campaign-table th {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 640;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.campaign-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+/* The whole row is the target. Aiming at a checkbox to pick a publisher out of
+   forty of them is a lot of aiming. */
+.campaign-table tbody tr {
+  cursor: pointer;
+}
+
+.campaign-table tbody tr:hover {
+  background: var(--hover);
+}
+
+.campaign-table tbody tr.is-chosen {
+  background: var(--accent-soft);
+}
+
+.campaign-table tbody tr.is-chosen td {
+  color: var(--ink);
+}
+
+/* Listed rather than hidden: a publisher worth a link and missing an address
+   is a thing to go and find an address for. */
+.campaign-noaddress {
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+/* A reply that names a way to be paid is the outcome, so its count is the one
+   thing on the tab strip that is not grey. */
+.seg-count.is-paid {
+  color: var(--ok);
+  background: var(--ok-soft);
+}

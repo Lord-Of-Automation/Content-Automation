@@ -30,6 +30,16 @@ import { oauthClient } from "./googleoauth";
 export const MAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/gmail.readonly",
+  /*
+   * Drafts, in the sender's own Drive.
+   *
+   * The narrow Drive scope: it reaches files this application created and no
+   * others, so connecting a mailbox does not hand over a Drive. A campaign
+   * needs it because a publisher will not read an article pasted into an
+   * email, and the service account cannot stand in — it has read access to
+   * Drive, and a document it owned would sit in an account nobody can open.
+   */
+  "https://www.googleapis.com/auth/drive.file",
 ];
 
 export type MailStatus = {
@@ -70,9 +80,34 @@ export type Thread = {
   sentAt: string;
   sent: number;
   replies: number;
+  /** Whether anything they wrote back names a way to be paid. */
+  paypal?: boolean;
   lastAt?: string;
   messages: ThreadMessage[];
   note?: string;
+};
+
+/** One row of the prospects sheet, as something to filter and choose from. */
+export type Opportunity = {
+  row: number;
+  domain: string;
+  email: string;
+  rating: number | null;
+  traffic: number | null;
+  price: number | null;
+  geo: string;
+  language: string;
+  countries: string;
+  sentAt: string | null;
+  sent: number;
+};
+
+/** Which columns the sheet actually has, so a filter can say when it has none. */
+export type SheetHas = {
+  email: boolean;
+  price: boolean;
+  geo: boolean;
+  language: boolean;
 };
 
 export class NotOnThisBackend extends Error {}
@@ -287,4 +322,20 @@ export async function mailThreads(): Promise<{ threads: Thread[]; address: strin
 
 export async function forgetThread(email: string): Promise<void> {
   await call(`/mail/threads/${encodeURIComponent(email)}`, { method: "DELETE" });
+}
+
+export async function mailOpportunities(
+  sheet: string,
+  tab: string,
+): Promise<{ opportunities: Opportunity[]; has: SheetHas }> {
+  const asked = new URLSearchParams();
+  if (sheet) asked.set("sheet", sheet);
+  if (tab) asked.set("tab", tab);
+  const answer = await call<{ opportunities: Opportunity[]; has: SheetHas }>(
+    `/mail/opportunities${asked.toString() ? `?${asked}` : ""}`,
+  );
+  return {
+    opportunities: answer.opportunities ?? [],
+    has: answer.has ?? { email: false, price: false, geo: false, language: false },
+  };
 }

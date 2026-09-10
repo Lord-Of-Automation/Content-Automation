@@ -28,6 +28,7 @@ export type AuditAction =
   | "mail-connected"
   | "mail-sent"
   | "mail-forgotten"
+  | "mail-campaign"
   /** Loops: runs that start themselves. */
   | "schedule-created"
   | "schedule-updated"

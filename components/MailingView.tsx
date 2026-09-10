@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { useAsk } from "@/components/Ask";
+import OutreachCampaign from "@/components/OutreachCampaign";
 import { useToasts } from "@/components/Toasts";
 import type { Contact, MailStatus, Thread } from "@/lib/mail";
 
@@ -52,6 +53,10 @@ export default function MailingView() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [open, setOpen] = useState<string | null>(null);
+  /** Which half of the page. Conversations first: it is what you come back to. */
+  const [view, setView] = useState<"conversations" | "campaign">("conversations");
+  /** Show only the replies that name a way to be paid, which is the answer. */
+  const [paidOnly, setPaidOnly] = useState(false);
 
   const [sheet, setSheet] = useState("");
   const [tab, setTab] = useState("");
@@ -235,6 +240,8 @@ export default function MailingView() {
     }
   }
 
+  const showing = paidOnly ? threads.filter((one) => one.paypal) : threads;
+
   if (loading) return <div className="empty">Reading the mailbox…</div>;
 
   const connected = !!status?.connected;
@@ -255,6 +262,27 @@ export default function MailingView() {
             </p>
           </div>
           <div className="app-head-actions">
+            <div className="seg seg-sm">
+              <button
+                type="button"
+                className={view === "conversations" ? "seg-btn is-on" : "seg-btn"}
+                onClick={() => setView("conversations")}
+              >
+                Conversations
+                {threads.filter((one) => one.paypal).length ? (
+                  <span className="seg-count is-paid">
+                    {threads.filter((one) => one.paypal).length}
+                  </span>
+                ) : null}
+              </button>
+              <button
+                type="button"
+                className={view === "campaign" ? "seg-btn is-on" : "seg-btn"}
+                onClick={() => setView("campaign")}
+              >
+                Campaign
+              </button>
+            </div>
             {connected ? (
               <>
                 <button
@@ -315,7 +343,17 @@ export default function MailingView() {
             </div>
           ) : null}
 
-          {connected ? (
+          {view === "campaign" ? (
+            <OutreachCampaign
+              connected={connected}
+              onStarted={() => {
+                // The first email lands within a minute or two, so the list is
+                // worth another look shortly. Switching tabs is the cue.
+                setView("conversations");
+                void loadThreads().catch(() => {});
+              }}
+            />
+          ) : connected ? (
             <div className="editor-split has-preview">
               {/* ------------------------------------------------ writing */}
               <div className="editor-panel">
@@ -455,18 +493,33 @@ export default function MailingView() {
               <aside className="editor-preview">
                 <div className="editor-body-head">
                   <span className="field-label">
-                    Conversations{threads.length ? ` (${threads.length})` : ""}
+                    Conversations{threads.length ? ` (${showing.length})` : ""}
                   </span>
+                  {/* The one filter worth having on an outreach inbox. A
+                      publisher quoting a price and saying where to send it has
+                      agreed; everything else is still a conversation. */}
+                  {threads.some((one) => one.paypal) ? (
+                    <label className="check" htmlFor="mail-paid">
+                      <input
+                        id="mail-paid"
+                        type="checkbox"
+                        checked={paidOnly}
+                        onChange={(e) => setPaidOnly(e.target.checked)}
+                      />
+                      With a PayPal link
+                    </label>
+                  ) : null}
                 </div>
 
-                {!threads.length ? (
+                {!showing.length ? (
                   <p className="provider-hint">
-                    Nothing sent yet. Conversations appear here once this
-                    platform has written to somebody, and only those.
+                    {paidOnly
+                      ? "No reply has named a way to be paid yet."
+                      : "Nothing sent yet. Conversations appear here once this platform has written to somebody, and only those."}
                   </p>
                 ) : (
                   <ul className="mail-threads">
-                    {threads.map((thread) => {
+                    {showing.map((thread) => {
                       const showing = open === thread.email;
                       return (
                         <li
