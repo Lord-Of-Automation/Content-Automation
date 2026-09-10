@@ -71,6 +71,17 @@ const GROUPS: Array<{ title: string; blurb: string; names: string[] }> = [
       "account with edit rights, since this one is written to and not only read.",
     names: ["SHEET_PROSPECTS_ID", "AHREFS_API_KEY"],
   },
+  {
+    title: "Mailing",
+    blurb:
+      "The Google OAuth client a mailbox is connected through. Make one at Google Auth Platform " +
+      "under Clients, as a Web application, with the Gmail API enabled on the project. These two " +
+      "have to be set in a second place as well — as environment variables on the console, which " +
+      "is the half that runs the consent screen — and the Mailing page says which half is missing. " +
+      "The refresh token itself is not here and never will be: it is written when somebody " +
+      "connects an account and is not something to paste.",
+    names: ["GOOGLE_MAIL_CLIENT_ID", "GOOGLE_MAIL_CLIENT_SECRET"],
+  },
 ];
 
 /** Long values get a textarea; a key on one line gets an input. */
