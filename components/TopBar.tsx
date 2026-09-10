@@ -122,12 +122,10 @@ export default async function TopBar({
           >
             Search Console
           </NavLink>
-          <NavLink
-            href="/logs"
-            className={current === "logs" ? "topnav-link is-current" : "topnav-link"}
-          >
-            Logs
-          </NavLink>
+          {/* Logs is not here. It is a record of what this console did rather
+              than a place work happens, which is the same reason Accounts and
+              Keys sit under the profile — and it is read when something has
+              gone wrong, not on the way to doing something. */}
         </nav>
 
         <div className="spacer" />

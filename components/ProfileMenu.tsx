@@ -36,11 +36,12 @@ function Chevron() {
  * Everything about the person using the console, behind one control.
  *
  * The header was five navigation links, a name, a theme button and a sign-out
- * button competing for the same row. Two of those links — Accounts and Keys —
- * are settings rather than places you work, and sat beside Runs and Loop as if
- * they were the same kind of thing. They live here now, with the theme and the
- * way out, which leaves the navigation showing only the three pages a run
- * actually happens on.
+ * button competing for the same row. Three of those links — Accounts, Keys and
+ * the activity log — are not places you work: two are settings, and the third
+ * is a record you read when something has already gone wrong. They sat beside
+ * Runs and Loop as if they were the same kind of thing. They live here now,
+ * with the theme and the way out, which leaves the navigation showing only the
+ * pages work actually happens on.
  *
  * Sign out stays a form posting to the server action, so it works with
  * JavaScript disabled and cannot be triggered by a stray click being replayed.
@@ -145,6 +146,20 @@ export default function ProfileMenu({
               <path d="M21 2l-2 2m-7.6 7.6a5 5 0 1 1-7 7 5 5 0 0 1 7-7Zm0 0L15 8m0 0 3 3 3-3-3-3" />
             </svg>
             Keys
+          </Link>
+
+          <Link
+            href="/logs"
+            role="menuitem"
+            className={current === "logs" ? "profile-item is-current" : "profile-item"}
+            onClick={() => setOpen(false)}
+          >
+            {/* A list with a tick beside it: this is the record of what was
+                done and by whom, not a stack of error output. */}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M9 5h10M9 12h10M9 19h10M4.5 5.5l1 1 2-2M4.5 12.5l1 1 2-2M4.5 19.5l1 1 2-2" />
+            </svg>
+            Activity log
           </Link>
 
           <div className="profile-sep" />
