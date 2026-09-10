@@ -21,8 +21,16 @@ import type { BodyClasses } from "./n8n";
  * game reviews a competitor has and we do not, the other the casino reviews.
  * They share the crawl, the comparison and the publish, and differ in how a
  * name is read out of a page title and in what is done to research one.
+ *
+ * The fourth is not like the other three. It touches no website at all: it
+ * reads a list of link prospects, asks what each domain is worth, and writes
+ * the answers back into the sheet. No crawl, no model, no publish, which is
+ * what makes it cheap enough to leave running on a fortnightly loop.
  */
-export type RunMode = "optimise" | "gap" | "casino_gap";
+export type RunMode = "optimise" | "gap" | "casino_gap" | "prospects";
+
+/** Who to ask what a domain is worth. The two answer on different scales. */
+export type StatsProvider = "ahrefs" | "dataforseo";
 
 export type Schedule = {
   id: string;
@@ -41,6 +49,13 @@ export type Schedule = {
   body_classes: BodyClasses;
   /** The competitor crawl export a gap loop works from. */
   ideas_sheet_id: string;
+  /** The list of link prospects a prospects loop checks. */
+  prospects_sheet_id: string;
+  /** Which tab of it, by name or by gid. Blank means the first. */
+  prospects_sheet_tab: string;
+  stats_provider: StatsProvider;
+  /** Markets to measure traffic in, for DataForSEO only. Blank uses a shortlist. */
+  markets: string[];
   /** A page whose look new pages copy. Blank lets the run find its own. */
   style_reference_url: string;
   /** Whether pages this loop creates go live, or wait as drafts. */

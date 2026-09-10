@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { LANGUAGES, MARKETS } from "@/lib/markets";
-import type { Schedule } from "@/lib/schedules";
+import type { Schedule, StatsProvider } from "@/lib/schedules";
 import { DECLARABLE_CLASSES, type DeclarableClass } from "@/lib/validate";
 import { Select } from "@/components/Select";
 import { Toasts, useToasts } from "@/components/Toasts";
@@ -16,15 +16,28 @@ import { SkeletonCards } from "@/components/Skeleton";
  * The two gap modes are the same pipeline pointed at different things, and the
  * only place that distinction is invisible is in a label, so each gets its own.
  */
-const MODE_NAME: Record<"gap" | "casino_gap" | "optimise", string> = {
+const MODE_NAME: Record<"gap" | "casino_gap" | "optimise" | "prospects", string> = {
   gap: "Game gap filler",
   casino_gap: "Casino gap filler",
   optimise: "Optimiser",
+  prospects: "Prospect checker",
 };
 
 /** Whether a mode writes pages that do not exist, as opposed to rewriting ones that do. */
 function fillsGaps(mode: string): boolean {
   return mode === "gap" || mode === "casino_gap";
+}
+
+/**
+ * Whether a mode has a website at all.
+ *
+ * Three of the four crawl a site and publish to it. The fourth reads a
+ * spreadsheet of link prospects and writes numbers back into it, and every
+ * field about crawling, publishing and page classes is meaningless there — so
+ * they are hidden rather than left on screen to be answered pointlessly.
+ */
+function touchesSite(mode: string): boolean {
+  return mode !== "prospects";
 }
 
 /**
@@ -40,6 +53,13 @@ const EVERY = [
   { hours: 24, label: "Daily" },
   { hours: 48, label: "Every other day" },
   { hours: 168, label: "Weekly" },
+  // Past a week only makes sense for a loop that does not crawl: a crawl older
+  // than a week has stopped describing the site. A prospect list moves on a
+  // scale of months, so a fortnight between checks is the natural cadence and
+  // was not offerable until the engine's ceiling went up from one week.
+  { hours: 336, label: "Every two weeks" },
+  { hours: 504, label: "Every three weeks" },
+  { hours: 720, label: "Monthly" },
 ];
 
 /**
@@ -62,7 +82,7 @@ const CLASS_FIELDS: Array<{ key: DeclarableClass; label: string; placeholder: st
 type Draft = {
   id?: string;
   name: string;
-  mode: "gap" | "casino_gap" | "optimise";
+  mode: "gap" | "casino_gap" | "optimise" | "prospects";
   website_url: string;
   market: string;
   language: string;
@@ -77,6 +97,11 @@ type Draft = {
   enabled: boolean;
   body_classes: Record<DeclarableClass, string>;
   ideas_sheet_id: string;
+  prospects_sheet_id: string;
+  prospects_sheet_tab: string;
+  stats_provider: StatsProvider;
+  /** Typed as a list, sent as one. DataForSEO only. */
+  markets: string;
   style_reference_url: string;
   publish_new_pages: boolean;
 };
@@ -98,6 +123,10 @@ const BLANK: Draft = {
   enabled: true,
   body_classes: { casino_review: "", game_review: "", promocodes: "", blog: "" },
   ideas_sheet_id: DEFAULT_IDEAS_SHEET_ID,
+  prospects_sheet_id: "",
+  prospects_sheet_tab: "",
+  stats_provider: "ahrefs",
+  markets: "",
   style_reference_url: "",
   publish_new_pages: false,
 };
@@ -172,6 +201,10 @@ function draftOf(schedule: Schedule): Draft {
     // means "use the host's sheet", and filling the default in over the top
     // would quietly change which competitor it chases.
     ideas_sheet_id: schedule.ideas_sheet_id ?? "",
+    prospects_sheet_id: schedule.prospects_sheet_id ?? "",
+    prospects_sheet_tab: schedule.prospects_sheet_tab ?? "",
+    stats_provider: schedule.stats_provider ?? "ahrefs",
+    markets: (schedule.markets ?? []).join(", "),
     style_reference_url: schedule.style_reference_url ?? "",
     publish_new_pages: schedule.publish_new_pages ?? false,
     body_classes: {
@@ -559,8 +592,32 @@ export default function LoopView() {
                     </div>
                   </div>
 
+                  {/* What this loop is, in one line. Three of the four are
+                      described by a site and a page count; the fourth has
+                      neither, so it is described by what it reads and who it
+                      asks. A row of blanks and "up to 3 pages" would be a
+                      summary of a different loop. */}
                   <div className="loop-facts">
-                    <span>{schedule.website_url}</span>
+                    {touchesSite(schedule.mode) ? (
+                      <>
+                        <span>{schedule.website_url}</span>
+                        <span>
+                          up to {schedule.pages_to_optimise || "no cap on"} page
+                          {schedule.pages_to_optimise === 1 ? "" : "s"} each time
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span>
+                          {schedule.prospects_sheet_id
+                            ? `sheet ${schedule.prospects_sheet_id.slice(0, 12)}…`
+                            : "the engine's own sheet"}
+                        </span>
+                        <span>
+                          via {schedule.stats_provider === "dataforseo" ? "DataForSEO" : "Ahrefs"}
+                        </span>
+                      </>
+                    )}
                     <span>
                       {EVERY.find((e) => e.hours === schedule.everyHours)?.label ??
                         `Every ${schedule.everyHours}h`}
@@ -569,16 +626,14 @@ export default function LoopView() {
                         : ` at :${String(schedule.atMinute).padStart(2, "0")}`}
                     </span>
                     <span>
-                      up to {schedule.pages_to_optimise || "no cap on"} page
-                      {schedule.pages_to_optimise === 1 ? "" : "s"} each time
-                    </span>
-                    <span>
                       next {when(schedule.nextRunAt)} ({untilNext(schedule.nextRunAt)})
                     </span>
                     <span>last {when(schedule.lastRunAt)}</span>
-                    {schedule.wp_password_set ? null : (
+                    {/* Only where it matters. A loop that publishes nothing is
+                        not missing a password. */}
+                    {touchesSite(schedule.mode) && !schedule.wp_password_set ? (
                       <span className="loop-warn">no WordPress login — it will publish nothing</span>
-                    )}
+                    ) : null}
                   </div>
 
                   {schedule.lastNote ? (
@@ -627,37 +682,39 @@ export default function LoopView() {
                 />
               </div>
 
-              <div className="field">
-                <label id="loop_site_label">Website</label>
-                {/* A list rather than a box.
-                    A loop publishes to the site it names, and publishing needs
-                    a WordPress login — which only exists for a site registered
-                    on the Website Accounts page. Typed by hand, a URL that was
-                    one character out, or simply not registered, produced a loop
-                    that fired on schedule and failed at the last step every
-                    time. Choosing from the registered sites makes that
-                    impossible to get wrong. */}
-                {siteOptions.length ? (
-                  <Select
-                    id="loop_site"
-                    labelledBy="loop_site_label"
-                    value={chosenSite}
-                    onChange={(v) => set("website_url", v)}
-                    options={siteOptions}
-                  />
-                ) : (
-                  <div className="notice warn">
-                    <strong>No websites are registered.</strong> A loop
-                    publishes with a stored WordPress login, so add the site
-                    under Website Accounts first.
+              {touchesSite(draft.mode) ? (
+                <div className="field">
+                  <label id="loop_site_label">Website</label>
+                  {/* A list rather than a box.
+                      A loop publishes to the site it names, and publishing needs
+                      a WordPress login — which only exists for a site registered
+                      on the Website Accounts page. Typed by hand, a URL that was
+                      one character out, or simply not registered, produced a loop
+                      that fired on schedule and failed at the last step every
+                      time. Choosing from the registered sites makes that
+                      impossible to get wrong. */}
+                  {siteOptions.length ? (
+                    <Select
+                      id="loop_site"
+                      labelledBy="loop_site_label"
+                      value={chosenSite}
+                      onChange={(v) => set("website_url", v)}
+                      options={siteOptions}
+                    />
+                  ) : (
+                    <div className="notice warn">
+                      <strong>No websites are registered.</strong> A loop
+                      publishes with a stored WordPress login, so add the site
+                      under Website Accounts first.
+                    </div>
+                  )}
+                  <div className="note">
+                    Our site &mdash; the one pages are published to, chosen from
+                    the logins on the Website Accounts page. On a gap fill the
+                    competitor comes from the ideas sheet, not from here.
                   </div>
-                )}
-                <div className="note">
-                  Our site &mdash; the one pages are published to, chosen from
-                  the logins on the Website Accounts page. On a gap fill the
-                  competitor comes from the ideas sheet, not from here.
                 </div>
-              </div>
+              ) : null}
 
               <div className="field">
                 <label id="loop_mode_label">What it does</label>
@@ -678,6 +735,11 @@ export default function LoopView() {
                       hint: "writes the casino reviews we do not have",
                     },
                     { value: "optimise", label: "Optimiser", hint: "rewrites pages we do" },
+                    {
+                      value: "prospects",
+                      label: "Prospect checker",
+                      hint: "keeps a link prospect list up to date",
+                    },
                   ]}
                 />
                 <div className="note">
@@ -685,9 +747,105 @@ export default function LoopView() {
                     ? "Reads the competitor crawl in the ideas sheet, compares it against our own crawl, and writes a full review for each game we are missing. Nothing missing is a success, not an error."
                     : draft.mode === "casino_gap"
                       ? "The same comparison against the same sheet, looking for casino reviews instead. Each one it writes starts with a visit to the operator's own site, so a casino that is not in the casino sheet is skipped: there is nowhere to go and look."
-                      : "The same thing the Runs page does: crawls the site and rewrites the pages it finds."}
+                      : draft.mode === "prospects"
+                        ? "Reads a column of domains, asks what each one is currently worth, and writes the Domain Rating, organic traffic and top countries back beside it. It touches no website, crawls nothing and publishes nothing, so it costs a handful of API calls and finishes in seconds."
+                        : "The same thing the Runs page does: crawls the site and rewrites the pages it finds."}
                 </div>
               </div>
+
+              {/*
+                * The prospect list, and who to ask about it.
+                *
+                * Both settings sit together because they are one decision: the
+                * sheet says which domains, the provider says whose numbers go
+                * into it, and changing the provider halfway through changes
+                * what the column means.
+                */}
+              {draft.mode === "prospects" ? (
+                <>
+                  <div className="row-2">
+                    <div className="field">
+                      <label htmlFor="loop_prospects">Prospects sheet ID</label>
+                      <input
+                        id="loop_prospects"
+                        type="text"
+                        className="mono"
+                        value={draft.prospects_sheet_id}
+                        placeholder="Drive file ID of the list of domains"
+                        onChange={(e) => set("prospects_sheet_id", e.target.value.trim())}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="loop_prospects_tab">Tab</label>
+                      <input
+                        id="loop_prospects_tab"
+                        type="text"
+                        className="mono"
+                        value={draft.prospects_sheet_tab}
+                        placeholder="Blank for the first tab"
+                        onChange={(e) => set("prospects_sheet_tab", e.target.value.trim())}
+                      />
+                    </div>
+                  </div>
+                  <div className="note" style={{ marginTop: -4 }}>
+                    One column headed Domain, and the first row naming the
+                    columns. The figures are written back into columns beside it,
+                    which are created if they are not there. Nothing else in the
+                    sheet is touched, and no rows are ever added. Share it with
+                    the service account with edit rights, or it can be read and
+                    not written.
+                  </div>
+
+                  <div className="field">
+                    <label id="loop_provider_label">Ask</label>
+                    <Select
+                      id="loop_provider"
+                      labelledBy="loop_provider_label"
+                      value={draft.stats_provider}
+                      onChange={(v) => set("stats_provider", v as StatsProvider)}
+                      options={[
+                        {
+                          value: "ahrefs",
+                          label: "Ahrefs",
+                          hint: "the numbers in your Ahrefs tab",
+                        },
+                        {
+                          value: "dataforseo",
+                          label: "DataForSEO",
+                          hint: "already paid for, different scale",
+                        },
+                      ]}
+                    />
+                    <div className="note">
+                      {draft.stats_provider === "ahrefs"
+                        ? "Domain Rating on the 0 to 100 scale you already read, organic traffic, and the real top countries. Needs an Ahrefs API key on the Keys page, which is billed separately from an Ahrefs seat."
+                        : "Already configured, so nothing to buy. Its rank is its own, computed from its own link index, and a domain Ahrefs puts at 62 will not come back as 62. Top countries are worked out by asking each market below in turn, so that column is only as wide as the list."}
+                    </div>
+                  </div>
+
+                  {draft.stats_provider === "dataforseo" ? (
+                    <div className="field">
+                      <label htmlFor="loop_markets">Markets to measure</label>
+                      <input
+                        id="loop_markets"
+                        type="text"
+                        className="mono"
+                        value={draft.markets}
+                        placeholder="us, gb, ca, au, de"
+                        onChange={(e) => set("markets", e.target.value)}
+                      />
+                      <div className="note">
+                        Two-letter codes, separated by commas. Each one is
+                        another API call per check, and the traffic figure is the
+                        sum of these markets rather than a worldwide total: a
+                        domain whose audience is entirely outside this list comes
+                        back as nothing. Leave it blank for a shortlist of the
+                        big English-speaking markets and three European ones.
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
 
               {fillsGaps(draft.mode) ? (
                 <div className="field">
@@ -709,25 +867,27 @@ export default function LoopView() {
                 </div>
               ) : null}
 
-              <div className="field">
-                <label htmlFor="loop_style_ref">Design reference page</label>
-                <input
-                  id="loop_style_ref"
-                  type="url"
-                  className="mono"
-                  value={draft.style_reference_url}
-                  placeholder="https://example.com/game/an-existing-page/"
-                  onChange={(e) => set("style_reference_url", e.target.value.trim())}
-                />
-                <div className="note">
-                  Optional. An existing page whose look new pages should copy —
-                  one you have checked and are happy with. Leave it blank and the
-                  run picks an example itself, which is whichever page happened
-                  to match the competitor and is not always one you would choose.
-                  Either way the template comes from what the post type agrees
-                  on; this only settles the details the type disagrees about.
+              {touchesSite(draft.mode) ? (
+                <div className="field">
+                  <label htmlFor="loop_style_ref">Design reference page</label>
+                  <input
+                    id="loop_style_ref"
+                    type="url"
+                    className="mono"
+                    value={draft.style_reference_url}
+                    placeholder="https://example.com/game/an-existing-page/"
+                    onChange={(e) => set("style_reference_url", e.target.value.trim())}
+                  />
+                  <div className="note">
+                    Optional. An existing page whose look new pages should copy —
+                    one you have checked and are happy with. Leave it blank and the
+                    run picks an example itself, which is whichever page happened
+                    to match the competitor and is not always one you would choose.
+                    Either way the template comes from what the post type agrees
+                    on; this only settles the details the type disagrees about.
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div className="row-2">
                 <div className="field">
@@ -793,75 +953,81 @@ export default function LoopView() {
                 </div>
               </div>
 
-              <div className="field">
-                <label htmlFor="loop_crawl">Crawl limit</label>
-                <div className="limit-row">
-                  <label className="check">
+              {touchesSite(draft.mode) ? (
+                <div className="field">
+                  <label htmlFor="loop_crawl">Crawl limit</label>
+                  <div className="limit-row">
+                    <label className="check">
+                      <input
+                        type="checkbox"
+                        checked={isWholeSite(draft.max_crawl_pages)}
+                        onChange={(e) => set("max_crawl_pages", e.target.checked ? 0 : 200)}
+                      />
+                      Crawl the whole site
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={isWholeSite(draft.max_crawl_pages)}
-                      onChange={(e) => set("max_crawl_pages", e.target.checked ? 0 : 200)}
+                      id="loop_crawl"
+                      type="number"
+                      min={1}
+                      max={100000}
+                      disabled={isWholeSite(draft.max_crawl_pages)}
+                      value={isWholeSite(draft.max_crawl_pages) ? "" : draft.max_crawl_pages}
+                      placeholder="all"
+                      onChange={(e) => set("max_crawl_pages", Number.parseInt(e.target.value, 10) || 0)}
                     />
-                    Crawl the whole site
+                  </div>
+                  <div className="note">
+                    {fillsGaps(draft.mode)
+                      ? "How much of OUR site is crawled to work out what we already have. Cap this and anything past the cap looks missing, which is how a gap run comes to write a page you already had. Leave it on the whole site unless you have a reason: the run says in its log if a crawl ever reaches the engine's ceiling."
+                      : "How many pages are crawled to choose from."}
+                  </div>
+                </div>
+              ) : null}
+
+              {touchesSite(draft.mode) ? (
+                <div className="field">
+                  <label htmlFor="loop_cap">
+                    {fillsGaps(draft.mode) ? "New pages each time" : "Pages to optimise each time"}
                   </label>
-                  <input
-                    id="loop_crawl"
-                    type="number"
-                    min={1}
-                    max={100000}
-                    disabled={isWholeSite(draft.max_crawl_pages)}
-                    value={isWholeSite(draft.max_crawl_pages) ? "" : draft.max_crawl_pages}
-                    placeholder="all"
-                    onChange={(e) => set("max_crawl_pages", Number.parseInt(e.target.value, 10) || 0)}
-                  />
+                  <div className="limit-row">
+                    <input
+                      id="loop_cap"
+                      type="number"
+                      min={0}
+                      max={100000}
+                      value={draft.pages_to_optimise}
+                      onChange={(e) => set("pages_to_optimise", Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="note">
+                    Every page here costs Claude, Gemini and DataForSEO credits, and
+                    this fires on its own. A cap is the difference between a loop and
+                    a surprise. 0 means no cap.
+                  </div>
                 </div>
-                <div className="note">
-                  {fillsGaps(draft.mode)
-                    ? "How much of OUR site is crawled to work out what we already have. Cap this and anything past the cap looks missing, which is how a gap run comes to write a page you already had. Leave it on the whole site unless you have a reason: the run says in its log if a crawl ever reaches the engine's ceiling."
-                    : "How many pages are crawled to choose from."}
-                </div>
-              </div>
+              ) : null}
 
-              <div className="field">
-                <label htmlFor="loop_cap">
-                  {fillsGaps(draft.mode) ? "New pages each time" : "Pages to optimise each time"}
-                </label>
-                <div className="limit-row">
-                  <input
-                    id="loop_cap"
-                    type="number"
-                    min={0}
-                    max={100000}
-                    value={draft.pages_to_optimise}
-                    onChange={(e) => set("pages_to_optimise", Number(e.target.value))}
-                  />
+              {touchesSite(draft.mode) ? (
+                <div className="field">
+                  <label htmlFor="loop_reuse">Reuse a crawl up to</label>
+                  <div className="limit-row">
+                    <input
+                      id="loop_reuse"
+                      type="number"
+                      min={0}
+                      max={90}
+                      value={draft.reuse_crawl_days}
+                      onChange={(e) => set("reuse_crawl_days", Number(e.target.value))}
+                    />
+                    <span className="note" style={{ margin: 0 }}>days old</span>
+                  </div>
+                  <div className="note">
+                    What keeps a nightly loop cheap. A crawl of our own site from
+                    yesterday is good enough to tell whether we cover a game. 0
+                    crawls fresh every time.
+                  </div>
                 </div>
-                <div className="note">
-                  Every page here costs Claude, Gemini and DataForSEO credits, and
-                  this fires on its own. A cap is the difference between a loop and
-                  a surprise. 0 means no cap.
-                </div>
-              </div>
-
-              <div className="field">
-                <label htmlFor="loop_reuse">Reuse a crawl up to</label>
-                <div className="limit-row">
-                  <input
-                    id="loop_reuse"
-                    type="number"
-                    min={0}
-                    max={90}
-                    value={draft.reuse_crawl_days}
-                    onChange={(e) => set("reuse_crawl_days", Number(e.target.value))}
-                  />
-                  <span className="note" style={{ margin: 0 }}>days old</span>
-                </div>
-                <div className="note">
-                  What keeps a nightly loop cheap. A crawl of our own site from
-                  yesterday is good enough to tell whether we cover a game. 0
-                  crawls fresh every time.
-                </div>
-              </div>
+              ) : null}
 
               {fillsGaps(draft.mode) ? (
                 <div className="field">
@@ -882,33 +1048,35 @@ export default function LoopView() {
                 </div>
               ) : null}
 
-              <div className="field field-sep">
-                <label>Page classes by body class</label>
-                <div className="note" style={{ marginTop: 0, marginBottom: 9 }}>
-                  Optional, and only used by the optimiser — a gap fill writes
-                  game reviews and has nothing to classify.
+              {touchesSite(draft.mode) ? (
+                <div className="field field-sep">
+                  <label>Page classes by body class</label>
+                  <div className="note" style={{ marginTop: 0, marginBottom: 9 }}>
+                    Optional, and only used by the optimiser — a gap fill writes
+                    game reviews and has nothing to classify.
+                  </div>
+                  <div className="row-2">
+                    {CLASS_FIELDS.map((field) => (
+                      <div className="field" key={field.key}>
+                        <label htmlFor={`loop_bc_${field.key}`}>{field.label}</label>
+                        <input
+                          id={`loop_bc_${field.key}`}
+                          type="text"
+                          className="mono"
+                          placeholder={field.placeholder}
+                          value={draft.body_classes[field.key]}
+                          onChange={(e) =>
+                            set("body_classes", {
+                              ...draft.body_classes,
+                              [field.key]: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="row-2">
-                  {CLASS_FIELDS.map((field) => (
-                    <div className="field" key={field.key}>
-                      <label htmlFor={`loop_bc_${field.key}`}>{field.label}</label>
-                      <input
-                        id={`loop_bc_${field.key}`}
-                        type="text"
-                        className="mono"
-                        placeholder={field.placeholder}
-                        value={draft.body_classes[field.key]}
-                        onChange={(e) =>
-                          set("body_classes", {
-                            ...draft.body_classes,
-                            [field.key]: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
+              ) : null}
 
               <div className="loop-actions">
                 <button type="submit" className="btn" disabled={busy}>

@@ -61,6 +61,16 @@ const GROUPS: Array<{ title: string; blurb: string; names: string[] }> = [
       "be shared with its email address.",
     names: ["GOOGLE_SERVICE_ACCOUNT", "ANTHROPIC_MODEL"],
   },
+  {
+    title: "Link prospects",
+    blurb:
+      "The list of domains a prospect checker keeps up to date, and the key for reading them. " +
+      "Ahrefs is optional: a loop can ask DataForSEO instead, which is already configured, " +
+      "though its rank is its own and will not match a Domain Rating. An Ahrefs API key is " +
+      "billed separately from an Ahrefs seat. The sheet must be shared with the service " +
+      "account with edit rights, since this one is written to and not only read.",
+    names: ["SHEET_PROSPECTS_ID", "AHREFS_API_KEY"],
+  },
 ];
 
 /** Long values get a textarea; a key on one line gets an input. */

@@ -42,12 +42,24 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const websiteUrl = String(body.website_url ?? "").trim();
-    if (!websiteUrl) {
+
+    /*
+     * A site, and a login for it, except for the one loop that needs neither.
+     *
+     * Checking link prospects reads a spreadsheet and writes to it. There is no
+     * website and nothing is ever published, so demanding an address and a
+     * WordPress password would mean naming an unrelated site to get past two
+     * checks that do not apply — and a loop pointed at a site it never touches
+     * is a loop somebody will later delete the site out from under.
+     */
+    const checksProspects = String(body.mode ?? "") === "prospects";
+
+    if (!websiteUrl && !checksProspects) {
       return NextResponse.json({ error: "A website URL is required." }, { status: 400 });
     }
 
-    const credentials = await credentialsFor(websiteUrl);
-    if (!credentials && !body.id) {
+    const credentials = websiteUrl ? await credentialsFor(websiteUrl) : null;
+    if (!credentials && !body.id && !checksProspects) {
       return NextResponse.json(
         {
           error:
@@ -98,8 +110,10 @@ export async function POST(request: Request) {
           ? "game gap filler"
           : saved.mode === "casino_gap"
             ? "casino gap filler"
-            : "optimiser"
-      } on ${saved.website_url}, ` +
+            : saved.mode === "prospects"
+              ? `prospect checker via ${saved.stats_provider}`
+              : "optimiser"
+      }${saved.website_url ? ` on ${saved.website_url}` : ""}, ` +
         `every ${saved.everyHours}h`,
     );
 
