@@ -33,6 +33,16 @@ export type ExecutionDetail = ExecutionSummary & {
   cost: CostBreakdown | null;
   /** What was submitted to start it, read back out of the payload. */
   inputs: RunInputs | null;
+  /**
+   * Which pipeline ran, as opposed to how it was submitted.
+   *
+   * `mode` above is n8n's own word for that and is always "api" here. This is
+   * the run's kind, and the difference matters because the four kinds finish
+   * with four different things having happened: telling somebody their pages
+   * are live in WordPress after a run that only read a spreadsheet is a small
+   * lie the console used to tell every time.
+   */
+  runMode: "optimise" | "gap" | "casino_gap" | "build" | "prospects" | null;
 };
 
 export type StartRunInput = {
@@ -443,6 +453,8 @@ export async function getExecution(id: string): Promise<ExecutionDetail> {
 
   return {
     ...summary,
+    // n8n runs one workflow and has no notion of the engine's four kinds.
+    runMode: null,
     lastNodeExecuted,
     error,
     dataUnavailable: executedNodes.length === 0 ? dataUnavailable : null,

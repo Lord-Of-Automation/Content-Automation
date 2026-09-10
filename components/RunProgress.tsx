@@ -376,10 +376,23 @@ export default function RunProgress({
         </div>
       ) : null}
 
+      {/*
+        * What finishing meant, which depends on what ran.
+        *
+        * This said the pages were live in WordPress whatever the run was, so a
+        * check that only read a spreadsheet ended by describing work it had not
+        * done. Four kinds of run, four different things having happened.
+        */}
       {execution.status === "success" ? (
         <div className="alert alert-ok" style={{ marginTop: 16 }}>
-          <strong>Finished.</strong> The page has been updated in WordPress and
-          logged to the Published sheet.
+          <strong>Finished.</strong>{" "}
+          {execution.runMode === "prospects"
+            ? "The prospects sheet has been updated with the current figures."
+            : execution.runMode === "build"
+              ? "The site has been written. It is on the AI Websites page, ready to edit."
+              : execution.runMode === "gap" || execution.runMode === "casino_gap"
+                ? "The missing pages have been written to WordPress and logged to the Published sheet."
+                : "The page has been updated in WordPress and logged to the Published sheet."}
         </div>
       ) : null}
 

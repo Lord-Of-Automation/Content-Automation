@@ -310,6 +310,7 @@ export async function getExecution(id: string): Promise<ExecutionDetail> {
 
   return {
     ...summarise(run),
+    runMode: run.mode ?? "optimise",
     progress: progressOf(run),
     lastNodeExecuted: run.steps?.at(-1)?.name ?? null,
     error: run.error,
