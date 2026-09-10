@@ -7576,3 +7576,19 @@ code,
     margin-left: 14px;
   }
 }
+
+/* The redirect address, to be copied rather than read. On its own line and in
+   the monospace face because it is a string that must be reproduced exactly,
+   and a proportional font hides the difference between one hyphen and two. */
+.mail-redirect {
+  display: block;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, currentColor 7%, transparent);
+  font-family: var(--font-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  user-select: all;
+  word-break: break-all;
+}

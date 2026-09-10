@@ -48,7 +48,7 @@ export default function MailingView() {
   const ask = useAsk();
   const { push } = useToasts();
 
-  const [status, setStatus] = useState<(MailStatus & { consoleConfigured?: boolean }) | null>(null);
+  const [status, setStatus] = useState<MailStatus | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [open, setOpen] = useState<string | null>(null);
@@ -289,8 +289,23 @@ export default function MailingView() {
               {status?.note ??
                 "A Google OAuth client has to exist before an account can grant " +
                   "access to it."}{" "}
-              Set GOOGLE_MAIL_CLIENT_ID and GOOGLE_MAIL_CLIENT_SECRET on both the
-              console and the engine, then reload this page.
+              Make one at{" "}
+              <a href="https://console.cloud.google.com/auth/clients" target="_blank" rel="noreferrer">
+                Google Auth Platform, under Clients
+              </a>
+              , as a Web application, then set GOOGLE_MAIL_CLIENT_ID and
+              GOOGLE_MAIL_CLIENT_SECRET on both this console and the engine.
+              {status?.redirectUri ? (
+                <>
+                  {" "}
+                  Its one authorised redirect address has to be exactly this,
+                  which is the part that is usually wrong:
+                  {/* Shown rather than described. It must match character for
+                      character, and Google's mismatch error names neither the
+                      address it got nor the one it wanted. */}
+                  <code className="mail-redirect">{status.redirectUri}</code>
+                </>
+              ) : null}
             </div>
           ) : !connected ? (
             <div className="notice">

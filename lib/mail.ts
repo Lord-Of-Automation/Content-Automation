@@ -37,6 +37,10 @@ export type MailStatus = {
   connected: boolean;
   address: string;
   note?: string;
+  /** Whether this app has the other half of that client. */
+  consoleConfigured?: boolean;
+  /** The exact address to register against the OAuth client. */
+  redirectUri?: string;
 };
 
 export type Contact = {
