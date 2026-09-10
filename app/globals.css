@@ -7414,3 +7414,165 @@ code,
     gap: 3px;
   }
 }
+
+/* ==========================================================================
+   Mailing
+
+   Conversations, not an inbox. The list is short by construction — it holds
+   only the people this platform has written to — so it is drawn as a stack of
+   readable rows rather than as a dense table. A prospect list of four hundred
+   domains produces a dozen conversations, and a dozen things want space.
+   ========================================================================== */
+
+.mail-threads {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mail-thread {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-2);
+  border-radius: var(--radius);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+/* A reply is the whole point of the page, so it is the one thing that changes
+   a row's colour. Everything else here is waiting. */
+.mail-thread.has-reply {
+  border-left-color: var(--ok);
+}
+
+.mail-thread-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) auto auto;
+  gap: 12px;
+  align-items: baseline;
+  width: 100%;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mail-thread-head:hover {
+  background: var(--hover);
+}
+
+.mail-who {
+  font-size: 13px;
+  font-weight: 620;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mail-subject {
+  font-size: 13px;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mail-count {
+  font-size: 11px;
+  font-weight: 640;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.mail-thread.has-reply .mail-count {
+  color: var(--ok);
+}
+
+.mail-at {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mail-note {
+  margin: 0 14px 12px;
+  font-size: 12.5px;
+}
+
+.mail-messages {
+  padding: 4px 14px 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mail-message {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel-2);
+}
+
+/* Ours indented and tinted, theirs plain and flush. The asymmetry is what
+   lets you find the reply without reading the names. */
+.mail-message.is-mine {
+  margin-left: 28px;
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.mail-message header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+
+.mail-message header strong {
+  font-size: 12.5px;
+  font-weight: 620;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mail-message header span {
+  font-size: 11px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+/* Their words, as words. Preformatted because an email's line breaks are the
+   only formatting it has, and never as markup because it was written by
+   somebody outside this platform. */
+.mail-message pre {
+  margin: 0;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 900px) {
+  .mail-thread-head {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .mail-message.is-mine {
+    margin-left: 14px;
+  }
+}

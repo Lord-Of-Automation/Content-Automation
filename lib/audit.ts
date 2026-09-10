@@ -18,6 +18,16 @@ export type AuditAction =
   | "site-removed"
   /** Which engine credentials were changed. The names only, never the values. */
   | "keys-updated"
+  /**
+   * Outreach, which is the only thing this console does that reaches a person.
+   *
+   * A wrong name server takes a site off the internet and can be put back. A
+   * message sent to somebody cannot be, so who sent it and to whom is worth
+   * keeping for the same reason.
+   */
+  | "mail-connected"
+  | "mail-sent"
+  | "mail-forgotten"
   /** Loops: runs that start themselves. */
   | "schedule-created"
   | "schedule-updated"

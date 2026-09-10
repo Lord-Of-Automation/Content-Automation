@@ -79,6 +79,16 @@ export default async function TopBar({
               },
             ]}
           />
+          {/* Beside Domains, because a link prospect is a domain and writing
+              to one is what the list of them is for. Its own entry rather than
+              an item under Domains: that menu is about names you might buy,
+              and this is about people. */}
+          <NavLink
+            href="/mailing"
+            className={current === "mailing" ? "topnav-link is-current" : "topnav-link"}
+          >
+            Mailing
+          </NavLink>
           {/* What this platform wrote, before anything hosts it. Ahead of
               Hosting because that is the order the work happens in.
 
