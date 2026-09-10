@@ -16,6 +16,7 @@
  */
 
 import { backend } from "./backend";
+import { oauthClient } from "./googleoauth";
 
 /**
  * What the account is asked for.
@@ -120,12 +121,34 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
-export function mailClientId(): string {
-  return process.env.GOOGLE_MAIL_CLIENT_ID?.trim() ?? "";
-}
+/**
+ * The OAuth client the consent is granted to.
+ *
+ * The Search Console one, unless something says otherwise. This console
+ * already stores a Google OAuth client — it needs one to read Search Console
+ * on somebody's behalf, and it keeps it under Accounts where it can be typed
+ * in rather than in an environment variable that needs a redeploy to change.
+ *
+ * Asking for a second one meant a second client in Google Cloud, two more
+ * variables in Vercel, the same two again on the engine, and a redeploy to
+ * make any of it take effect. All of that to name the same application twice.
+ * One client with the Gmail API enabled and a second redirect address on it
+ * does the same job.
+ *
+ * The environment variables still win where they are set, for anyone who
+ * would rather keep outreach on its own client — revoking one grant revokes
+ * the other when they share a client, and that is a real reason to separate
+ * them.
+ */
+export async function mailClient(): Promise<{ clientId: string; clientSecret: string } | null> {
+  const fromEnv = {
+    clientId: process.env.GOOGLE_MAIL_CLIENT_ID?.trim() ?? "",
+    clientSecret: process.env.GOOGLE_MAIL_CLIENT_SECRET?.trim() ?? "",
+  };
+  if (fromEnv.clientId && fromEnv.clientSecret) return fromEnv;
 
-function mailClientSecret(): string {
-  return process.env.GOOGLE_MAIL_CLIENT_SECRET?.trim() ?? "";
+  const shared = await oauthClient();
+  return shared ? { clientId: shared.clientId, clientSecret: shared.clientSecret } : null;
 }
 
 /**
@@ -144,9 +167,9 @@ export function callbackUrl(request: Request): string {
 }
 
 /** The consent screen, with everything Google needs to come back usefully. */
-export function consentUrl(redirect: string, state: string): string {
+export function consentUrl(clientId: string, redirect: string, state: string): string {
   const asked = new URLSearchParams({
-    client_id: mailClientId(),
+    client_id: clientId,
     redirect_uri: redirect,
     response_type: "code",
     scope: MAIL_SCOPES.join(" "),
@@ -163,14 +186,18 @@ export function consentUrl(redirect: string, state: string): string {
 }
 
 /** The code Google handed back, exchanged for the token the engine will keep. */
-export async function exchangeCode(code: string, redirect: string): Promise<string> {
+export async function exchangeCode(
+  code: string,
+  redirect: string,
+  client: { clientId: string; clientSecret: string },
+): Promise<string> {
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       code,
-      client_id: mailClientId(),
-      client_secret: mailClientSecret(),
+      client_id: client.clientId,
+      client_secret: client.clientSecret,
       redirect_uri: redirect,
       grant_type: "authorization_code",
     }).toString(),
@@ -208,10 +235,25 @@ export async function mailStatus(): Promise<MailStatus> {
   return call<MailStatus>("/mail/status");
 }
 
-export async function connectMail(refreshToken: string): Promise<{ address: string }> {
+/**
+ * Hands the engine everything it needs to keep using the consent.
+ *
+ * The client travels with the token, rather than being configured separately
+ * on the engine. It is not a secret the engine has any other use for, and
+ * asking somebody to paste the same two values into a second screen before the
+ * first one works is how a five-minute setup becomes an afternoon.
+ */
+export async function connectMail(
+  refreshToken: string,
+  client: { clientId: string; clientSecret: string },
+): Promise<{ address: string }> {
   return call<{ address: string }>("/mail/connect", {
     method: "POST",
-    body: JSON.stringify({ refresh_token: refreshToken }),
+    body: JSON.stringify({
+      refresh_token: refreshToken,
+      client_id: client.clientId,
+      client_secret: client.clientSecret,
+    }),
   });
 }
 

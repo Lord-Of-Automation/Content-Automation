@@ -285,21 +285,17 @@ export default function MailingView() {
         <div className="card-body tight">
           {!ready ? (
             <div className="notice warn">
-              <strong>There is no application to connect to yet.</strong>{" "}
-              {status?.note ??
-                "A Google OAuth client has to exist before an account can grant " +
-                  "access to it."}{" "}
-              Make one at{" "}
-              <a href="https://console.cloud.google.com/auth/clients" target="_blank" rel="noreferrer">
-                Google Auth Platform, under Clients
-              </a>
-              , as a Web application, then set GOOGLE_MAIL_CLIENT_ID and
-              GOOGLE_MAIL_CLIENT_SECRET on both this console and the engine.
+              <strong>There is no Google OAuth client to connect through.</strong>{" "}
+              This page uses the same one Search Console does, so the quickest
+              fix is to add it under Accounts, Search Console — an OAuth client
+              ID and secret from Google Cloud, type Web application.
               {status?.redirectUri ? (
                 <>
                   {" "}
-                  Its one authorised redirect address has to be exactly this,
-                  which is the part that is usually wrong:
+                  Whichever client it is, it needs the <strong>Gmail API</strong>{" "}
+                  enabled on its project and this exact address among its
+                  authorised redirect addresses, alongside whatever is already
+                  there:
                   {/* Shown rather than described. It must match character for
                       character, and Google's mismatch error names neither the
                       address it got nor the one it wanted. */}

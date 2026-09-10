@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse, requireSession } from "@/lib/api-guard";
-import { callbackUrl, consentUrl, disconnectMail, mailClientId } from "@/lib/mail";
+import { callbackUrl, consentUrl, disconnectMail, mailClient } from "@/lib/mail";
 import { signState } from "@/lib/mailstate";
 
 export const runtime = "nodejs";
@@ -18,19 +18,23 @@ export async function GET(request: Request) {
   const denied = await requireSession();
   if (denied) return denied;
 
-  if (!mailClientId()) {
+  const client = await mailClient();
+  if (!client) {
     return NextResponse.json(
       {
         error:
-          "GOOGLE_MAIL_CLIENT_ID is not set on this console, so there is no " +
-          "application for Google to grant access to.",
+          "There is no Google OAuth client to grant access to. Add one under " +
+          "Accounts, Search Console — the same client serves both — or set " +
+          "GOOGLE_MAIL_CLIENT_ID and GOOGLE_MAIL_CLIENT_SECRET for a separate one.",
       },
       { status: 428 },
     );
   }
 
   try {
-    return NextResponse.redirect(consentUrl(callbackUrl(request), signState()));
+    return NextResponse.redirect(
+      consentUrl(client.clientId, callbackUrl(request), signState()),
+    );
   } catch (error) {
     return errorResponse(error);
   }

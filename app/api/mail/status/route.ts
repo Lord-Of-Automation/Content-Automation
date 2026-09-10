@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse, requireSession } from "@/lib/api-guard";
-import { callbackUrl, mailClientId, mailStatus } from "@/lib/mail";
+import { callbackUrl, mailClient, mailStatus } from "@/lib/mail";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,12 +13,22 @@ export async function GET(request: Request) {
 
   try {
     const status = await mailStatus();
+    const client = await mailClient();
     return NextResponse.json({
       ...status,
+      /*
+       * Whether the engine has a client is no longer the question.
+       *
+       * The client travels to the engine with the consent now, so what matters
+       * before connecting is only whether this console has one to consent
+       * against — and it usually does, because Search Console needs the same
+       * thing and is set up first.
+       */
+      configured: status.configured || !!client,
       // The engine holds one half of the OAuth client and this app holds the
       // other, and a connect button that leads to a Google error page because
       // only one of them is set is worse than a button that says why.
-      consoleConfigured: !!mailClientId(),
+      consoleConfigured: !!client,
       /*
        * The address Google must be told to send the browser back to.
        *

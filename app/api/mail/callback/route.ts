@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { record } from "@/lib/audit";
 import { requireSession } from "@/lib/api-guard";
-import { callbackUrl, connectMail, exchangeCode } from "@/lib/mail";
+import { callbackUrl, connectMail, exchangeCode, mailClient } from "@/lib/mail";
 import { stateHolds } from "@/lib/mailstate";
 
 export const runtime = "nodejs";
@@ -63,8 +63,11 @@ export async function GET(request: Request) {
   const actor = session?.user?.name ?? "unknown";
 
   try {
-    const refreshToken = await exchangeCode(code, callbackUrl(request));
-    const { address } = await connectMail(refreshToken);
+    const client = await mailClient();
+    if (!client) throw new Error("The OAuth client went missing between starting and finishing.");
+
+    const refreshToken = await exchangeCode(code, callbackUrl(request), client);
+    const { address } = await connectMail(refreshToken, client);
 
     await record(actor, "mail-connected", address);
     back.searchParams.set("mail", `Connected as ${address}.`);
