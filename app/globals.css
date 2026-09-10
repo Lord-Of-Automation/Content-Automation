@@ -7696,11 +7696,35 @@ code,
   background: var(--ok-soft);
 }
 
-/* The conversations, on their own. Writing to one publisher by hand is what
-   the campaign does per publisher and with an article attached, so this half
-   of the page is now the whole of it. */
+/* The conversations, on their own.
+
+   Padded here rather than by the card. The card body is deliberately padding
+   free, because the campaign beside this is made of sections that draw their
+   own full-width separators and would look cut off inset. This half has no
+   such sections, so it supplies its own — and without it the list sat flush
+   against the card's border with the coloured edge of each row painted on top
+   of it. Matched to what a section uses, so the two tabs line up. */
 .mail-only {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding: 4px 20px 20px;
+}
+
+/* Same reason, for anything that has to be said above the list. */
+.mail-notice {
+  margin: 16px 20px 0;
+}
+
+/* The head row's own top margin is for sitting under an editor toolbar. Here
+   it is the first thing in a padded box and does not need it. */
+.mail-only > .editor-body-head {
+  margin-top: 8px;
+}
+
+/* A checkbox in a head row is a filter, not a form field, so it keeps its
+   pill shape and stops the label wrapping under it on a narrow card. */
+.mail-only > .editor-body-head .check {
+  flex: none;
+  white-space: nowrap;
 }

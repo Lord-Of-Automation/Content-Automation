@@ -255,7 +255,7 @@ export default function MailingView() {
               Said here rather than discovered at the end of a run, after every
               article has been written and paid for. */}
           {connected && status?.canDraft === false ? (
-            <div className="notice warn">
+            <div className="notice warn mail-notice">
               <strong>This connection cannot create drafts.</strong> It was
               granted before campaigns existed, so it can send and read mail but
               not put an article in a document. Campaigns will write every
@@ -274,7 +274,7 @@ export default function MailingView() {
           ) : null}
 
           {!ready ? (
-            <div className="notice warn">
+            <div className="notice warn mail-notice">
               <strong>There is no Google OAuth client to connect through.</strong>{" "}
               This page uses the same one Search Console does, so the quickest
               fix is to add it under Accounts, Search Console — an OAuth client
@@ -294,7 +294,7 @@ export default function MailingView() {
               ) : null}
             </div>
           ) : !connected ? (
-            <div className="notice">
+            <div className="notice mail-notice">
               <strong>What connecting allows.</strong> Two things, and Google will
               list both: sending mail as you, and reading mail. There is no
               narrower read permission than the whole mailbox, so the narrowing
