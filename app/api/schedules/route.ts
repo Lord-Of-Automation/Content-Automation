@@ -44,22 +44,31 @@ export async function POST(request: Request) {
     const websiteUrl = String(body.website_url ?? "").trim();
 
     /*
-     * A site, and a login for it, except for the one loop that needs neither.
+     * A site, and a login for it, asked for only where they can be answered.
      *
-     * Checking link prospects reads a spreadsheet and writes to it. There is no
-     * website and nothing is ever published, so demanding an address and a
-     * WordPress password would mean naming an unrelated site to get past two
-     * checks that do not apply — and a loop pointed at a site it never touches
-     * is a loop somebody will later delete the site out from under.
+     * Two exemptions, and both of them are about what the caller actually sent.
+     *
+     * A loop that checks link prospects reads a spreadsheet and writes to it.
+     * There is no website and nothing is ever published, so demanding an
+     * address and a WordPress password would mean naming an unrelated site to
+     * get past two checks that do not apply.
+     *
+     * And an existing loop is edited by sending only what changed. Pausing one
+     * sends its id and a flag, and the engine merges that onto what it already
+     * holds — so this used to refuse to switch a loop off because the message
+     * that switches it off carries no address, which it never needed to. Only
+     * a loop being created has to say where it points, because there is nothing
+     * stored for it to be merged onto.
      */
+    const creating = !body.id;
     const checksProspects = String(body.mode ?? "") === "prospects";
 
-    if (!websiteUrl && !checksProspects) {
+    if (!websiteUrl && creating && !checksProspects) {
       return NextResponse.json({ error: "A website URL is required." }, { status: 400 });
     }
 
     const credentials = websiteUrl ? await credentialsFor(websiteUrl) : null;
-    if (!credentials && !body.id && !checksProspects) {
+    if (!credentials && creating && !checksProspects) {
       return NextResponse.json(
         {
           error:

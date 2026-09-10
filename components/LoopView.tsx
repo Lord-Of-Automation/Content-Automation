@@ -427,7 +427,11 @@ export default function LoopView() {
       const response = await fetch("/api/schedules", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: schedule.id, website_url: schedule.website_url, enabled }),
+        // The id and the flag, and nothing else. The address used to be sent
+        // alongside them only to satisfy a check on the other end that has no
+        // business running on an update, and a loop with no website of its own
+        // could not be switched off because of it.
+        body: JSON.stringify({ id: schedule.id, enabled }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error ?? "That did not work.");
