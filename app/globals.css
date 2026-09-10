@@ -7601,6 +7601,14 @@ code,
    wizard, because every one of them is worth changing after seeing the next.
    ========================================================================== */
 
+/* A button directly under a row of fields.
+   The row has no bottom margin, because usually a label follows it and labels
+   carry their own. A button carries none, so it sat against the boxes above it
+   as though it belonged to them. */
+.site-row + .btn {
+  margin-top: 14px;
+}
+
 .campaign-count {
   margin-left: 8px;
   font-size: 12px;
@@ -7662,6 +7670,15 @@ code,
   border-bottom: 1px solid var(--line);
   color: var(--ink-2);
   white-space: nowrap;
+}
+
+/* The checkbox column, sized to a checkbox. Left to itself the browser shares
+   the spare width out evenly and gives an empty header cell as much room as
+   the domains, which pushes the whole table right of the heading above it. */
+.campaign-table th:first-child,
+.campaign-table td:first-child {
+  width: 1%;
+  padding-right: 0;
 }
 
 /* The whole row is the target. Aiming at a checkbox to pick a publisher out of
