@@ -87,7 +87,7 @@ export default async function TopBar({
             href="/mailing"
             className={current === "mailing" ? "topnav-link is-current" : "topnav-link"}
           >
-            Mailing
+            Backlink Mailing
           </NavLink>
           {/* What this platform wrote, before anything hosts it. Ahead of
               Hosting because that is the order the work happens in.
