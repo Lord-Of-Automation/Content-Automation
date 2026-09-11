@@ -465,6 +465,7 @@ export default function OutreachCampaign({
                           <td>{short(one.traffic)}</td>
                           <td>{one.price === null ? "—" : one.price}</td>
                           <td>{one.geo || "—"}</td>
+                          <td>{one.language || "—"}</td>
                           {/* Marked where it names something nothing can send
                               as, because that row will be skipped and the
                               reason is not visible anywhere else. */}
