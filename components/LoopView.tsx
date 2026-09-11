@@ -568,7 +568,7 @@ export default function LoopView() {
                     <div className="loop-actions">
                       <button
                         type="button"
-                        className="btn btn-ghost"
+                        className="btn btn-ghost loop-do is-run"
                         disabled={busy}
                         onClick={() => act(schedule.id, "POST", "Started. Watch it on the Runs page.")}
                       >
@@ -576,7 +576,7 @@ export default function LoopView() {
                       </button>
                       <button
                         type="button"
-                        className="btn btn-ghost"
+                        className="btn btn-ghost loop-do is-edit"
                         disabled={busy}
                         onClick={() => setDraft(draftOf(schedule))}
                       >
@@ -584,7 +584,7 @@ export default function LoopView() {
                       </button>
                       <button
                         type="button"
-                        className="btn btn-ghost"
+                        className="btn btn-ghost loop-do is-edit"
                         disabled={busy}
                         title="Open a copy of this loop, paused, for you to change and save."
                         onClick={() => setDraft(copyOf(schedule))}
@@ -593,7 +593,7 @@ export default function LoopView() {
                       </button>
                       <button
                         type="button"
-                        className="btn btn-ghost"
+                        className="btn btn-ghost loop-do is-delete"
                         disabled={busy}
                         onClick={() => setDeleting(schedule)}
                       >

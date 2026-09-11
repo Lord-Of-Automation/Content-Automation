@@ -9259,3 +9259,58 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
     transition: none;
   }
 }
+
+/* ------------------------------------------- the four buttons on a loop
+
+   They were four identical ghosts, so starting a run that costs money and
+   opening an editor that changes nothing looked like the same decision, and
+   deleting the loop looked like both.
+
+   Coloured by consequence rather than one colour each. Run now spends money
+   the moment it is pressed; Edit and Duplicate only open the form below, which
+   is genuinely the same kind of act twice and is not worth pretending
+   otherwise; Delete is the one that cannot be undone. */
+.loop-do {
+  border-color: transparent;
+}
+
+/* Starts a run, now, at whatever a run costs. The same blue a running job
+   wears everywhere else on the platform. */
+.loop-do.is-run {
+  background: var(--run-soft);
+  color: var(--run);
+}
+
+.loop-do.is-run:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--run) 18%, var(--panel));
+  border-color: color-mix(in srgb, var(--run) 40%, transparent);
+}
+
+/* Opens the editor underneath and changes nothing on its own, so it stays the
+   colour of the page. */
+.loop-do.is-edit {
+  background: var(--panel-2);
+  color: var(--ink-2);
+  border-color: var(--line);
+}
+
+.loop-do.is-edit:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--ink);
+  border-color: var(--line-2);
+}
+
+/* Tinted at rest rather than only under the pointer, which is what the Hosting
+   rows do. There the warning is for one button among many on a page where
+   nothing is wrong; here it is one of four on a box, and which of the four
+   ends the loop is worth knowing before reaching for it. */
+.loop-do.is-delete {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.loop-do.is-delete:hover:not(:disabled) {
+  background: var(--danger-bg);
+  color: #fff;
+  border-color: var(--danger-bg);
+}
