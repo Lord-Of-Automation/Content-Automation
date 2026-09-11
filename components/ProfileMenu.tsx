@@ -162,6 +162,25 @@ export default function ProfileMenu({
             Activity log
           </Link>
 
+          {/* With the other things that change how the platform behaves
+              rather than what it is looking at. An instruction attached to a
+              site is set once and then forgotten about, which is what the
+              pages in this menu have in common. */}
+          <Link
+            href="/prompts"
+            role="menuitem"
+            className={current === "prompts" ? "profile-item is-current" : "profile-item"}
+            onClick={() => setOpen(false)}
+          >
+            {/* A page with lines on it and a pen. */}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8" />
+              <path d="M9 8h5M9 12h4M9 16h3" />
+              <path d="m17.5 3.5 3 3L15 12l-3.5.5.5-3.5Z" />
+            </svg>
+            Prompts
+          </Link>
+
           <div className="profile-sep" />
 
           {/* Beside the dark mode switch rather than up with the pages,

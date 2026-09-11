@@ -48,6 +48,15 @@ export type AuditAction =
   | "domain-buying"
   | "domain-bought"
   /**
+   * The per-site instruction, changed.
+   *
+   * Worth keeping because it changes every page written for that site from
+   * then on, and "when did this start sounding different" is a question
+   * somebody asks months later with nothing else to go on.
+   */
+  | "prompt-saved"
+  | "prompt-deleted"
+  /**
    * Where a domain points, or what it answers.
    *
    * The only entry here that changes something outside this console. A wrong

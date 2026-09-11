@@ -9643,3 +9643,66 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
   border-color: color-mix(in srgb, var(--accent) 30%, transparent);
   cursor: progress;
 }
+
+/* ------------------------------------------- a site's own instructions
+
+   One entry per site, each showing the whole instruction rather than a first
+   line. It is the reason the page exists and it is usually three sentences;
+   truncating it would mean opening every one to find the one being looked for. */
+.prompt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.prompt {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  padding: 12px 14px;
+  transition: border-color var(--quick, 120ms) var(--ease, ease);
+}
+
+/* The one being edited above. Marked, because the editor is a card away and
+   it is otherwise easy to save over the wrong site. */
+.prompt.is-open {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 4%, var(--panel-2));
+}
+
+.prompt-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.prompt-head strong {
+  font-size: 13.5px;
+}
+
+.prompt-when {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.prompt-drop:hover:not(:disabled) {
+  background: var(--bad-soft);
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 35%, var(--line-2));
+}
+
+/* Preformatted, because these are written a line at a time and the line breaks
+   are the only structure they have. */
+.prompt-words {
+  margin: 10px 0 0;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

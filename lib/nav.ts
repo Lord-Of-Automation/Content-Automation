@@ -19,4 +19,5 @@ export type Section =
   | "performance"
   | "accounts"
   | "keys"
-  | "design";
+  | "design"
+  | "prompts";
