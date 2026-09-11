@@ -176,10 +176,10 @@ function unquote(text: string): string {
 }
 
 /** Where this console serves one picture out of one conversation. */
-function pictureAt(email: string, message: string, id: string): string {
+function pictureAt(thread: string, message: string, id: string): string {
   return (
     "/api/mail/image" +
-    `?email=${encodeURIComponent(email)}` +
+    `?thread=${encodeURIComponent(thread)}` +
     `&message=${encodeURIComponent(message)}` +
     `&id=${encodeURIComponent(id)}`
   );
@@ -270,9 +270,10 @@ export default function MailThread({
 
   return (
     <li
-      /* Named so it can be followed when it changes sides. The address is the
-         one thing about a conversation that does not change. */
-      data-glide={thread.email}
+      /* Named so it can be followed when it changes sides. The thread,
+         because one publisher can have several and the address would name all
+         of them at once. */
+      data-glide={thread.threadId}
       className={
         paid
           ? "mail-thread is-paid"
@@ -355,13 +356,13 @@ export default function MailThread({
                     <a
                       key={picture.id}
                       className="mail-seen-one"
-                      href={pictureAt(thread.email, message.id, picture.id)}
+                      href={pictureAt(thread.threadId, message.id, picture.id)}
                       target="_blank"
                       rel="noreferrer noopener"
                       title={`${picture.name} — open it full size`}
                     >
                       <img
-                        src={pictureAt(thread.email, message.id, picture.id)}
+                        src={pictureAt(thread.threadId, message.id, picture.id)}
                         alt={picture.name}
                         loading="lazy"
                       />

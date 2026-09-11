@@ -31,6 +31,7 @@ export async function POST(request: Request) {
 
   try {
     const payload = (await request.json()) as Record<string, unknown>;
+    const thread = String(payload.thread ?? "").trim();
     const email = String(payload.email ?? "").trim().toLowerCase();
     const body = String(payload.body ?? "").trim();
 
@@ -44,7 +45,9 @@ export async function POST(request: Request) {
      */
     const images = Array.isArray(payload.images) ? (payload.images as ReplyPicture[]) : [];
 
-    if (!email) return NextResponse.json({ error: "No address was given." }, { status: 400 });
+    if (!thread) {
+      return NextResponse.json({ error: "No conversation was named." }, { status: 400 });
+    }
     if (!body && !images.length) {
       return NextResponse.json(
         { error: "An empty reply would say nothing." },
@@ -52,13 +55,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const sent = await replyToThread(email, body, images);
+    const sent = await replyToThread(thread, body, images);
     // The words themselves are not recorded. The log says a message went and
     // to whom, which is what it is for; the conversation is in the mailbox.
     await record(
       actor,
       "mail-replied",
-      images.length ? `${email} (${images.length} picture${images.length === 1 ? "" : "s"})` : email,
+      images.length
+        ? `${email || thread} (${images.length} picture${images.length === 1 ? "" : "s"})`
+        : email || thread,
     );
     return NextResponse.json(sent);
   } catch (error) {

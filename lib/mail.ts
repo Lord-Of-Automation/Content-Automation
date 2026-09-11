@@ -373,8 +373,8 @@ export async function mailThreads(): Promise<{ threads: Thread[]; address: strin
   return { threads: answer.threads ?? [], address: answer.address ?? "" };
 }
 
-export async function forgetThread(email: string): Promise<void> {
-  await call(`/mail/threads/${encodeURIComponent(email)}`, { method: "DELETE" });
+export async function forgetThread(thread: string): Promise<void> {
+  await call(`/mail/threads/${encodeURIComponent(thread)}`, { method: "DELETE" });
 }
 
 export async function mailOpportunities(
@@ -418,13 +418,13 @@ export interface ThreadPicture {
 
 /** The bytes of one, base64, for the route that turns them into a response. */
 export async function threadImage(
-  email: string,
+  thread: string,
   message: string,
   id: string,
 ): Promise<{ mime: string; name: string; data: string }> {
   const query = `message=${encodeURIComponent(message)}&id=${encodeURIComponent(id)}`;
   return call<{ mime: string; name: string; data: string }>(
-    `/mail/threads/${encodeURIComponent(email)}/image?${query}`,
+    `/mail/threads/${encodeURIComponent(thread)}/image?${query}`,
   );
 }
 
@@ -436,19 +436,19 @@ export interface ReplyPicture {
 }
 
 export async function replyToThread(
-  email: string,
+  thread: string,
   body: string,
   images: ReplyPicture[] = [],
 ): Promise<{ sent: number }> {
-  return call<{ sent: number }>(`/mail/threads/${encodeURIComponent(email)}/reply`, {
+  return call<{ sent: number }>(`/mail/threads/${encodeURIComponent(thread)}/reply`, {
     method: "POST",
     body: JSON.stringify({ body, images }),
   });
 }
 
 /** Marks one paid, or puts it back. */
-export async function setThreadPaid(email: string, paid: boolean): Promise<void> {
-  await call(`/mail/threads/${encodeURIComponent(email)}/paid`, {
+export async function setThreadPaid(thread: string, paid: boolean): Promise<void> {
+  await call(`/mail/threads/${encodeURIComponent(thread)}/paid`, {
     method: "POST",
     body: JSON.stringify({ paid }),
   });

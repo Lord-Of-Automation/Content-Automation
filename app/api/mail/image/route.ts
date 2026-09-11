@@ -34,16 +34,16 @@ export async function GET(request: Request) {
   if (denied) return denied;
 
   const asked = new URL(request.url).searchParams;
-  const email = String(asked.get("email") ?? "").trim().toLowerCase();
+  const thread = String(asked.get("thread") ?? "").trim();
   const message = String(asked.get("message") ?? "").trim();
   const id = String(asked.get("id") ?? "").trim();
 
-  if (!email || !message || !id) {
+  if (!thread || !message || !id) {
     return NextResponse.json({ error: "No picture was named." }, { status: 400 });
   }
 
   try {
-    const picture = await threadImage(email, message, id);
+    const picture = await threadImage(thread, message, id);
     const bytes = Buffer.from(picture.data, "base64");
 
     return new Response(new Uint8Array(bytes), {

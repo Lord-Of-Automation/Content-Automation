@@ -298,7 +298,9 @@ export default function MailingView() {
       const response = await fetch("/api/mail/threads", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: thread.email, paid }),
+        // The conversation. The address would name every conversation with
+        // that publisher, which is more than one now.
+        body: JSON.stringify({ thread: thread.threadId, email: thread.email, paid }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "That did not work.");
@@ -337,6 +339,7 @@ export default function MailingView() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          thread: thread.threadId,
           email: thread.email,
           body: words,
           // Only the three fields the engine wants. The preview and the id
@@ -358,15 +361,16 @@ export default function MailingView() {
     }
   }
 
-  async function forget(email: string) {
+  async function forget(thread: Thread) {
     const sure = await ask.confirm({
-      title: `Forget the conversation with ${email}?`,
+      title: `Forget the conversation with ${thread.email}?`,
       body: (
         <>
-          It disappears from this page and this platform stops reading it. The
-          messages stay in the mailbox. Because this list is the only thing that
-          makes a conversation readable at all, forgetting one is also how you
-          stop it being looked at.
+          <strong>{thread.subject}</strong> disappears from this page and this
+          platform stops reading it. Any other conversation with the same
+          publisher is untouched. The messages stay in the mailbox, and because
+          this list is the only thing that makes a conversation readable at
+          all, forgetting one is also how you stop it being looked at.
         </>
       ),
       confirmLabel: "Forget it",
@@ -376,9 +380,11 @@ export default function MailingView() {
 
     setBusy(true);
     try {
-      const response = await fetch(`/api/mail/threads?email=${encodeURIComponent(email)}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        `/api/mail/threads?thread=${encodeURIComponent(thread.threadId)}` +
+          `&email=${encodeURIComponent(thread.email)}`,
+        { method: "DELETE" },
+      );
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "It could not be forgotten.");
       await loadThreads();
@@ -628,13 +634,15 @@ export default function MailingView() {
                       <ul className="mail-threads">
                         {rows.map((thread) => (
                           <MailThread
-                            key={thread.email}
+                            key={thread.threadId}
                             thread={thread}
-                            open={open === thread.email}
+                            open={open === thread.threadId}
                             busy={busy}
-                            onToggle={() => setOpen(open === thread.email ? null : thread.email)}
+                            onToggle={() =>
+                              setOpen(open === thread.threadId ? null : thread.threadId)
+                            }
                             onPay={(paidNow) => void pay(thread, paidNow)}
-                            onForget={() => void forget(thread.email)}
+                            onForget={() => void forget(thread)}
                             onReply={(words, shots) => answer(thread, words, shots)}
                             onTrouble={(why) => push("bad", why)}
                           />
@@ -676,13 +684,15 @@ export default function MailingView() {
                         <ul className="mail-threads">
                           {rows.map((thread) => (
                             <MailThread
-                              key={thread.email}
+                              key={thread.threadId}
                               thread={thread}
-                              open={open === thread.email}
+                              open={open === thread.threadId}
                               busy={busy}
-                              onToggle={() => setOpen(open === thread.email ? null : thread.email)}
+                              onToggle={() =>
+                                setOpen(open === thread.threadId ? null : thread.threadId)
+                              }
                               onPay={(paidNow) => void pay(thread, paidNow)}
-                              onForget={() => void forget(thread.email)}
+                              onForget={() => void forget(thread)}
                               onReply={(words, shots) => answer(thread, words, shots)}
                               onTrouble={(why) => push("bad", why)}
                             />

@@ -44,13 +44,21 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json()) as Record<string, unknown>;
+    // The conversation, not the address. One publisher can have several, and
+    // marking "the one with Ed" paid stopped meaning anything the moment a
+    // second article was offered to Ed.
+    const thread = String(body.thread ?? "").trim();
     const email = String(body.email ?? "").trim().toLowerCase();
     const paid = body.paid !== false;
 
-    if (!email) return NextResponse.json({ error: "No address was given." }, { status: 400 });
+    if (!thread) {
+      return NextResponse.json({ error: "No conversation was named." }, { status: 400 });
+    }
 
-    await setThreadPaid(email, paid);
-    await record(actor, paid ? "mail-paid" : "mail-unpaid", email);
+    await setThreadPaid(thread, paid);
+    // Logged by who it was with, because a thread id means nothing to anybody
+    // reading the activity log a month later.
+    await record(actor, paid ? "mail-paid" : "mail-unpaid", email || thread);
     return NextResponse.json({ paid });
   } catch (error) {
     return errorResponse(error);
@@ -66,11 +74,15 @@ export async function DELETE(request: Request) {
   const actor = session?.user?.name ?? "unknown";
 
   try {
-    const email = String(new URL(request.url).searchParams.get("email") ?? "").trim();
-    if (!email) return NextResponse.json({ error: "No address was given." }, { status: 400 });
+    const asked = new URL(request.url).searchParams;
+    const thread = String(asked.get("thread") ?? "").trim();
+    const email = String(asked.get("email") ?? "").trim();
+    if (!thread) {
+      return NextResponse.json({ error: "No conversation was named." }, { status: 400 });
+    }
 
-    await forgetThread(email);
-    await record(actor, "mail-forgotten", email);
+    await forgetThread(thread);
+    await record(actor, "mail-forgotten", email || thread);
     return NextResponse.json({ forgotten: true });
   } catch (error) {
     return errorResponse(error);
