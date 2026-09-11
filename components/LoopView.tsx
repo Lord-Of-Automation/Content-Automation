@@ -516,8 +516,13 @@ export default function LoopView() {
               so they keep firing whether or not anyone has this page open.
             </p>
           </div>
+          {/* Pushed to the far end of the head, the way every other page puts
+              the one thing you came to do. The head's own padding is what
+              keeps it off the edge, so it lines up with the buttons on
+              Hosting and Appearance rather than sitting a few pixels out. */}
+          <div className="spacer" />
           {draft ? null : (
-            <button type="button" className="btn" onClick={() => setDraft({ ...BLANK })}>
+            <button type="button" className="btn head-do is-new" onClick={() => setDraft({ ...BLANK })}>
               New loop
             </button>
           )}
