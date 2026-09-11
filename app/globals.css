@@ -8998,3 +8998,81 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
 .mail-message pre a:hover {
   text-decoration-thickness: 2px;
 }
+
+/* ------------------------------------------- answering a publisher
+
+   At the foot of the conversation, where the next message goes, rather than
+   at the top where a compose window would be. What is being answered is the
+   thing directly above it.
+
+   It is a form so that the browser's own submit does the work: Enter inside a
+   textarea is a newline, which is right for a message, and the button and the
+   keyboard shortcut both reach the same place. */
+.mail-reply {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+}
+
+/* A textarea inherits the width rule from the base input styles; what it needs
+   on top is somewhere to start and permission to grow. Three rows is a short
+   reply, which is what most of these are, and dragging it taller is the one
+   resize a box inside a card can afford. */
+.mail-reply-box {
+  display: block;
+  min-height: 66px;
+  resize: vertical;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.mail-reply-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* Which of your addresses this goes out as. Worth saying on every reply: the
+   whole reason for answering here rather than in the mailbox is that the
+   mailbox makes you remember it. */
+.mail-reply-hint {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mail-reply-foot .btn {
+  flex: 0 0 auto;
+}
+
+/* ------------------------------------------- a page of rows, revealed
+
+   Show more mounts twenty rows under the ones already being read. They arrive
+   the way the first page did, but the stagger written for a table counts from
+   the top of the table and everything past the eighth row shares the last
+   delay — so a revealed batch landed in one piece after a pause, which reads
+   as a flicker rather than an arrival.
+
+   The delay for a revealed row is counted from the top of its batch instead,
+   and set inline, which is what lets it beat the rules above without a second
+   set of them. This is only the animation; the counting is in lib/reveal.ts. */
+.runs > .run-row {
+  animation: row-in 260ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
+}
+
+/* The first page of runs arrives with the panel around it, so only the rows
+   revealed afterwards carry a delay of their own — and those have it set
+   inline. Nothing more is needed here. */
+
+@media (prefers-reduced-motion: reduce) {
+  .runs > .run-row {
+    animation: none;
+  }
+}

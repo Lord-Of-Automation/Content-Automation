@@ -251,6 +251,39 @@ export default function MailingView() {
     }
   }
 
+  /**
+   * Answers a publisher, in the conversation they wrote in.
+   *
+   * Returns whether it went, because the box that called it clears itself only
+   * on a yes — a refused send that emptied it would lose what somebody had
+   * just written.
+   *
+   * Deliberately no confirmation. Marking an invoice paid asks first because
+   * it moves money in the record and has no obvious undo; a reply is the
+   * ordinary thing this page exists for, and a dialog in front of every
+   * sentence is how people stop using a reply box.
+   */
+  async function answer(thread: Thread, words: string): Promise<boolean> {
+    try {
+      const response = await fetch("/api/mail/reply", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: thread.email, body: words }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "It could not be sent.");
+
+      // Read back rather than added locally, so what is on screen is what is
+      // in the mailbox — including how Gmail threaded it.
+      await loadThreads();
+      push("ok", `Sent to ${thread.email}.`);
+      return true;
+    } catch (e) {
+      push("bad", e instanceof Error ? e.message : "It could not be sent.");
+      return false;
+    }
+  }
+
   async function forget(email: string) {
     const sure = await ask.confirm({
       title: `Forget the conversation with ${email}?`,
@@ -528,6 +561,7 @@ export default function MailingView() {
                             onToggle={() => setOpen(open === thread.email ? null : thread.email)}
                             onPay={(paidNow) => void pay(thread, paidNow)}
                             onForget={() => void forget(thread.email)}
+                            onReply={(words) => answer(thread, words)}
                           />
                         ))}
                       </ul>
@@ -574,6 +608,7 @@ export default function MailingView() {
                               onToggle={() => setOpen(open === thread.email ? null : thread.email)}
                               onPay={(paidNow) => void pay(thread, paidNow)}
                               onForget={() => void forget(thread.email)}
+                              onReply={(words) => answer(thread, words)}
                             />
                           ))}
                         </ul>

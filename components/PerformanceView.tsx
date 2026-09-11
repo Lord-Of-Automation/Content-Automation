@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useReveal } from "@/lib/reveal";
+
 import DatePicker from "@/components/DatePicker";
 import { Select } from "@/components/Select";
 import { ColumnPicker, useColumns, type ColumnSpec } from "@/components/Columns";
@@ -126,6 +128,9 @@ export default function PerformanceView() {
   const [sortKey, setSortKey] = useState<SortKey>("clicks");
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
   const [visible, setVisible] = useState(PAGE);
+  // Where a row revealed by Show more takes its arrival from, so a batch
+  // cascades instead of landing all at once.
+  const revealed = useReveal(visible);
 
   // Named "span", not "window": a parameter called window shadows the global
   // one, and the redirect below then reads as nonsense rather than as a
@@ -425,8 +430,8 @@ export default function PerformanceView() {
                     re-animated on every keystroke would be unreadable while
                     being typed at. */}
                 <tbody key={kind || "all"}>
-                  {shown.slice(0, visible).map((s) => (
-                    <tr key={s.siteUrl}>
+                  {shown.slice(0, visible).map((s, at) => (
+                    <tr key={s.siteUrl} style={revealed(at)}>
                       <td>
                         <a
                           className="domain-name"

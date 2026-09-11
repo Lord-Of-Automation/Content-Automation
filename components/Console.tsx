@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useReveal } from "@/lib/reveal";
+
 import RunForm, { type RunValues } from "@/components/RunForm";
 import RunProgress from "@/components/RunProgress";
 import StatusBadge from "@/components/StatusBadge";
@@ -40,12 +42,15 @@ function RunRow({
   run,
   selected,
   mail,
+  arriving,
   onSelect,
 }: {
   run: ExecutionSummary;
   selected: boolean;
   /** Started from the Mailing page, so it is named for that in the list. */
   mail: boolean;
+  /** When this row arrives, if Show more has just revealed it. */
+  arriving?: { animationDelay: string };
   onSelect: (id: string) => void;
 }) {
   // The list refreshes on a timer, so a run can finish while somebody is
@@ -54,7 +59,7 @@ function RunRow({
   const moved = useChanged(run.status);
 
   return (
-    <li>
+    <li className="run-row" style={arriving}>
       <button
         type="button"
         className={moved ? "run just-changed" : "run"}
@@ -110,6 +115,9 @@ export default function Console() {
   // The list is long and mostly noise, so it starts collapsed and grows a page
   // at a time. Reset in loadHistory would fight the poller, so it only grows.
   const [visibleRuns, setVisibleRuns] = useState(RUNS_PAGE);
+  // Where a row revealed by Show more takes its arrival from, so a batch
+  // cascades instead of landing all at once.
+  const revealed = useReveal(visibleRuns);
 
   // A run we started but could not get an execution id for, so we hunt for it.
   const pending = useRef<Pending | null>(null);
@@ -575,9 +583,10 @@ export default function Console() {
             ) : (
               <>
                 <ul className="runs">
-                  {history.slice(0, visibleRuns).map((run) => (
+                  {history.slice(0, visibleRuns).map((run, at) => (
                     <RunRow
                       key={run.id}
+                      arriving={revealed(at)}
                       run={run}
                       selected={run.id === selectedId}
                       mail={mailRuns.has(run.id)}

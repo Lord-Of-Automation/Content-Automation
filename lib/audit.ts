@@ -27,6 +27,7 @@ export type AuditAction =
    */
   | "mail-connected"
   | "mail-sent"
+  | "mail-replied"
   | "mail-forgotten"
   | "mail-campaign"
   | "mail-paid"

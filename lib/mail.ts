@@ -393,6 +393,20 @@ export async function mailCampaigns(): Promise<Campaign[]> {
   return campaigns ?? [];
 }
 
+/**
+ * Answers a publisher inside the conversation they wrote in.
+ *
+ * The engine decides which account it goes out as and what it threads onto —
+ * both are on the record it kept when it sent the first message, and neither
+ * is something a browser should be trusted to name.
+ */
+export async function replyToThread(email: string, body: string): Promise<{ sent: number }> {
+  return call<{ sent: number }>(`/mail/threads/${encodeURIComponent(email)}/reply`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  });
+}
+
 /** Marks one paid, or puts it back. */
 export async function setThreadPaid(email: string, paid: boolean): Promise<void> {
   await call(`/mail/threads/${encodeURIComponent(email)}/paid`, {

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import type { Thread } from "@/lib/mail";
 
@@ -180,6 +180,7 @@ export default function MailThread({
   onToggle,
   onPay,
   onForget,
+  onReply,
 }: {
   thread: Thread;
   open: boolean;
@@ -188,8 +189,31 @@ export default function MailThread({
   /** Marking it settled, or putting it back among the ones still owed. */
   onPay: (paid: boolean) => void;
   onForget: () => void;
+  /** Answers the publisher in this conversation. Resolves false if it failed. */
+  onReply: (body: string) => Promise<boolean>;
 }) {
   const paid = !!thread.paidAt;
+
+  /*
+   * What is being written back, kept per conversation.
+   *
+   * Here rather than on the page above, because a half-written reply belongs
+   * to the conversation it answers: opening a second one and coming back
+   * should find the draft where it was left, and closing this one should not
+   * put your words in somebody else's box.
+   */
+  const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+
+  async function send() {
+    const words = reply.trim();
+    if (!words || sending) return;
+    setSending(true);
+    // Cleared only when it actually went. A refused send that emptied the box
+    // would lose what somebody had just written.
+    if (await onReply(words)) setReply("");
+    setSending(false);
+  }
 
   return (
     <li
@@ -258,10 +282,55 @@ export default function MailThread({
               </pre>
             </article>
           ))}
+          {/*
+            Answering here rather than in Gmail.
+            
+            These go out from several addresses, so answering in the mailbox
+            means being signed into the right one of them and then finding the
+            thread. This page already knows both, and the engine sends it as
+            whoever the publisher knows — the box below cannot choose.
+          */}
+          <form
+            className="mail-reply"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void send();
+            }}
+          >
+            <textarea
+              className="mail-reply-box"
+              value={reply}
+              rows={3}
+              disabled={busy || sending}
+              placeholder={`Reply to ${thread.from || thread.email}…`}
+              aria-label={`Reply to ${thread.email}`}
+              onChange={(e) => setReply(e.target.value)}
+              onKeyDown={(e) => {
+                // The shortcut every mail client has. Enter alone stays a
+                // newline, because this is a message and not a search box.
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+            />
+            <div className="mail-reply-foot">
+              <span className="mail-reply-hint">
+                {thread.from ? `Goes out as ${thread.from}.` : ""} Ctrl+Enter sends.
+              </span>
+              <button
+                type="submit"
+                className="btn btn-sm"
+                disabled={busy || sending || !reply.trim()}
+              >
+                {sending ? "Sending…" : "Send reply"}
+              </button>
+            </div>
+          </form>
+
           <div className="ve-actions">
-            {/* Answering happens in the mailbox. A reply to a publisher is a
-                conversation, and a one-line box on a dashboard is the wrong
-                place to hold one. */}
+            {/* Still offered, for the things a box on a dashboard is the wrong
+                place for: an attachment, or a message worth composing slowly. */}
             <a
               className="btn btn-ghost btn-sm"
               href={`https://mail.google.com/mail/u/0/#all/${thread.threadId}`}

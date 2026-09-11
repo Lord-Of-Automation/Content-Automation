@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { useReveal } from "@/lib/reveal";
+
 import type { AuditAction } from "@/lib/audit";
 import { SkeletonTable } from "@/components/Skeleton";
 
@@ -46,6 +48,7 @@ const LABEL: Record<AuditAction, string> = {
   "website-exported": "Downloaded a website",
   "mail-connected": "Connected a mailbox",
   "mail-sent": "Emailed a prospect",
+  "mail-replied": "Replied to a publisher",
   "mail-forgotten": "Forgot a conversation",
   "mail-campaign": "Started an outreach campaign",
   "mail-paid": "Marked an invoice paid",
@@ -85,6 +88,7 @@ const TONE: Record<AuditAction, string> = {
   "website-exported": "idle",
   "mail-connected": "ok",
   "mail-sent": "run",
+  "mail-replied": "run",
   "mail-forgotten": "idle",
   "mail-campaign": "run",
   "mail-paid": "ok",
@@ -133,6 +137,9 @@ export default function LogsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [visible, setVisible] = useState(PAGE);
+  // Where a row revealed by Show more takes its arrival from, so a batch
+  // cascades instead of landing all at once.
+  const revealed = useReveal(visible);
   const [filter, setFilter] = useState<"all" | "runs" | "auth">("all");
 
   const load = useCallback(async () => {
@@ -251,7 +258,7 @@ export default function LogsView() {
                     read stay put and only the newly revealed ones arrive. */}
                 <tbody key={filter}>
                   {shown.slice(0, visible).map((event, i) => (
-                    <tr key={`${event.at}-${i}`}>
+                    <tr key={`${event.at}-${i}`} style={revealed(i)}>
                       <td className="mono nowrap">{formatWhen(event.at)}</td>
                       <td>{event.actor}</td>
                       <td>

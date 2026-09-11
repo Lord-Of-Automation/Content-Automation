@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useReveal } from "@/lib/reveal";
+
 import AddToCloudflare from "@/components/AddToCloudflare";
 import BulkBar from "@/components/BulkBar";
 import { Select } from "@/components/Select";
@@ -218,6 +220,9 @@ export default function DomainsView() {
   const [configError, setConfigError] = useState(false);
   const [query, setQuery] = useState("");
   const [visible, setVisible] = useState(PAGE);
+  // Where a row revealed by Show more takes its arrival from, so a batch
+  // cascades instead of landing all at once.
+  const revealed = useReveal(visible);
   const [sortKey, setSortKey] = useState<SortKey>("expires");
   const [direction, setDirection] = useState<Direction>("asc");
   const [only, setOnly] = useState<"all" | "soon" | "manual" | "parked" | "trouble">("all");
@@ -647,10 +652,14 @@ export default function DomainsView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {shown.slice(0, visible).map((d) => {
+                  {shown.slice(0, visible).map((d, at) => {
                     const where = pointsAt(d.nameServers);
                     return (
-                      <tr key={d.domain} className={picked.has(d.domain) ? "is-picked" : ""}>
+                      <tr
+                        key={d.domain}
+                        className={picked.has(d.domain) ? "is-picked" : ""}
+                        style={revealed(at)}
+                      >
                         <td className="pick">
                           <input
                             type="checkbox"

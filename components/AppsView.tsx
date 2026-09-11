@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useReveal } from "@/lib/reveal";
+
 import AppCredential from "@/components/AppCredential";
 import AppDomain from "@/components/AppDomain";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -194,6 +196,9 @@ export default function AppsView() {
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [direction, setDirection] = useState<"asc" | "desc">("asc");
   const [visible, setVisible] = useState(PAGE);
+  // Where a row revealed by Show more takes its arrival from, so a batch
+  // cascades instead of landing all at once.
+  const revealed = useReveal(visible);
   /** The application whose domain is being changed, if any. */
   const [managing, setManaging] = useState<App | null>(null);
   const [creating, setCreating] = useState(false);
@@ -606,8 +611,8 @@ export default function AppsView() {
                     silently becoming one. Nothing in a row holds state of its
                     own, so replacing them costs nothing. */}
                 <tbody key={server || "all"}>
-                  {shown.slice(0, visible).map((a) => (
-                    <tr key={a.key}>
+                  {shown.slice(0, visible).map((a, at) => (
+                    <tr key={a.key} style={revealed(at)}>
                       <td>
                         <div className="app-name">
                           <a
