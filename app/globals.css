@@ -8145,8 +8145,16 @@ code,
   background: var(--accent-soft);
 }
 
-.mail-run > .pill {
+/* The status, spanning both rows so it sits against the middle of the two
+   lines beside it rather than level with the first.
+
+   It was written as .pill, which is what this console calls its other small
+   coloured labels and not what StatusBadge renders. The rule matched nothing,
+   so the badge was never put in the area made for it and landed in the first
+   cell instead, level with the anchor and above the date. */
+.mail-run > .badge {
   grid-area: badge;
+  align-self: center;
 }
 
 /* The anchor, which is what a campaign was for and the only thing that tells
