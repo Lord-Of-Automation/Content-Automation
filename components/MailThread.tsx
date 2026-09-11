@@ -175,6 +175,16 @@ function unquote(text: string): string {
     .trim();
 }
 
+/** Where this console serves one picture out of one conversation. */
+function pictureAt(email: string, message: string, id: string): string {
+  return (
+    "/api/mail/image" +
+    `?email=${encodeURIComponent(email)}` +
+    `&message=${encodeURIComponent(message)}` +
+    `&id=${encodeURIComponent(id)}`
+  );
+}
+
 export default function MailThread({
   thread,
   open,
@@ -324,8 +334,41 @@ export default function MailThread({
                     opens one of these, so it is a link here too. */}
                 {unquote(message.text)
                   ? linkify(unquote(message.text))
-                  : "(no words in it)"}
+                  : message.images?.length
+                    ? "(a picture, and no words)"
+                    : "(no words in it)"}
               </pre>
+
+              {/*
+                The pictures in it, under the words, where they were written.
+
+                Fetched one at a time through this console rather than carried
+                with the conversation: a dozen threads are read to build the
+                list and most are never opened, so the bytes wait until
+                somebody looks. Left to the browser to load lazily, decode off
+                the main thread and keep, which is the whole reason this is an
+                img rather than a string of base64.
+              */}
+              {message.images?.length ? (
+                <div className="mail-seen">
+                  {message.images.map((picture) => (
+                    <a
+                      key={picture.id}
+                      className="mail-seen-one"
+                      href={pictureAt(thread.email, message.id, picture.id)}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      title={`${picture.name} — open it full size`}
+                    >
+                      <img
+                        src={pictureAt(thread.email, message.id, picture.id)}
+                        alt={picture.name}
+                        loading="lazy"
+                      />
+                    </a>
+                  ))}
+                </div>
+              ) : null}
             </article>
           ))}
           {/*

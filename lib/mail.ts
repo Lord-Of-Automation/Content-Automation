@@ -84,6 +84,14 @@ export type ThreadMessage = {
   at: string;
   text: string;
   mine: boolean;
+  /**
+   * Pictures in this message, named but not carried.
+   *
+   * Absent on a conversation read by an engine older than this, which is why
+   * it is optional rather than an empty array everybody has to remember to
+   * send.
+   */
+  images?: ThreadPicture[];
 };
 
 export type Thread = {
@@ -400,6 +408,26 @@ export async function mailCampaigns(): Promise<Campaign[]> {
  * both are on the record it kept when it sent the first message, and neither
  * is something a browser should be trusted to name.
  */
+/** A picture in a message, named by the engine but not yet fetched. */
+export interface ThreadPicture {
+  id: string;
+  name: string;
+  mime: string;
+  bytes: number;
+}
+
+/** The bytes of one, base64, for the route that turns them into a response. */
+export async function threadImage(
+  email: string,
+  message: string,
+  id: string,
+): Promise<{ mime: string; name: string; data: string }> {
+  const query = `message=${encodeURIComponent(message)}&id=${encodeURIComponent(id)}`;
+  return call<{ mime: string; name: string; data: string }>(
+    `/mail/threads/${encodeURIComponent(email)}/image?${query}`,
+  );
+}
+
 export interface ReplyPicture {
   name: string;
   mime: string;
