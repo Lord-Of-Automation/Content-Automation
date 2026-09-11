@@ -13,6 +13,16 @@ import { useToasts } from "@/components/Toasts";
 import type { MailStatus, Thread } from "@/lib/mail";
 
 /**
+ * How long between reads of the inbox.
+ *
+ * A minute, not the few seconds a running job gets. Every conversation is its
+ * own call to Gmail on the engine's side, so this costs as many calls as there
+ * are conversations each time it runs — and a reply is not something anybody
+ * needs to hear about within four seconds of it landing.
+ */
+const MAIL_POLL = 60_000;
+
+/**
  * Writing to link prospects, and reading what comes back.
  *
  * Two halves and they are deliberately unequal. Sending is a form you fill in
@@ -139,6 +149,46 @@ export default function MailingView() {
       }
     })();
   }, [loadStatus, loadThreads]);
+
+  /*
+   * Replies that arrive while the page is open.
+   *
+   * This read its conversations once, on arrival, and then never again. A
+   * publisher answering an hour later was in the mailbox and not on the page,
+   * and the only way to find out was to press Refresh — which nobody does,
+   * because a page that has been sitting there looking finished does not
+   * suggest it is out of date.
+   *
+   * Not cheap, so not often. Every conversation is a separate call to Gmail on
+   * the engine's side, so twenty conversations is twenty calls, and this waits
+   * a minute between rounds rather than the few seconds a run's progress gets.
+   *
+   * And only while somebody is actually looking. A tab left open overnight on
+   * another monitor should not spend the night asking Google for mail nobody
+   * is reading, so the timer skips a hidden tab entirely and a fresh read
+   * happens the moment the tab comes back — which is the instant it matters,
+   * and makes the minute between rounds unnoticeable.
+   */
+  useEffect(() => {
+    if (!status?.connected) return;
+
+    // Quietly. A poll that failed would otherwise put an error over a page
+    // that is already showing the last good answer.
+    const again = () => {
+      if (document.visibilityState !== "visible") return;
+      void loadThreads().catch(() => {});
+    };
+
+    const timer = window.setInterval(again, MAIL_POLL);
+    document.addEventListener("visibilitychange", again);
+    window.addEventListener("focus", again);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", again);
+      window.removeEventListener("focus", again);
+    };
+  }, [status?.connected, loadThreads]);
 
   /**
    * Disconnect and connect again, in one press.
