@@ -29,6 +29,39 @@ function when(value: string | null | undefined): string {
   });
 }
 
+/**
+ * The angle brackets a mail client puts down the side of a quoted reply.
+ *
+ * They are a convention from terminal mail readers, where a message was
+ * unstyled text and the only way to show which half of it somebody else had
+ * written was to mark every line of it. Every graphical client since has drawn
+ * a bar or a fold instead, and only keeps the brackets in the plain-text copy
+ * of the message — which is the copy this reads, so they arrive here as
+ * literal characters in the middle of the words.
+ *
+ * Stripped rather than styled, because what is under them is usually the
+ * message directly above it in this same thread. A reply two people have gone
+ * back and forth on carries every previous round, nested a bracket deeper each
+ * time, and the newest sentence ends up at the top of a wall of things you
+ * have already read.
+ *
+ * Only the markers go. The lines they were marking stay, because a quote is
+ * sometimes trimmed to the one paragraph being answered, and that paragraph is
+ * the reply.
+ */
+const QUOTE = /^[ \t]*(?:>[ \t]?)+/;
+
+function unquote(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => line.replace(QUOTE, ""))
+    .join("\n")
+    // Removing the markers can leave a run of blank lines where the quoted
+    // paragraphs were spaced apart. Three or more become one gap.
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export default function MailThread({
   thread,
   open,
@@ -105,7 +138,7 @@ export default function MailThread({
                 <strong>{message.mine ? "You" : message.from}</strong>
                 <span>{when(message.at)}</span>
               </header>
-              <pre>{message.text.trim() || "(no words in it)"}</pre>
+              <pre>{unquote(message.text) || "(no words in it)"}</pre>
             </article>
           ))}
           <div className="ve-actions">
