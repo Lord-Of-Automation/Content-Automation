@@ -9,6 +9,16 @@ type Credential = {
   hint: string;
 };
 
+/** The arrow on a group's title. Turns to point down when the group is open. */
+function Chevron() {
+  return (
+    <svg className="keys-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
 /** Grouped so the page reads as jobs rather than as an alphabet of names. */
 const GROUPS: Array<{ title: string; blurb: string; names: string[] }> = [
   {
@@ -95,6 +105,17 @@ export default function KeysView() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /*
+   * Which groups are open, for the ones somebody has actually clicked.
+   *
+   * Absent means "whatever this group would do on its own", which is open when
+   * something in it is not set yet. The page is nine groups of fields and only
+   * one of them is usually the reason anybody came; the ones already filled in
+   * are the ones worth folding away, and they are also the ones this can
+   * recognise without being told.
+   */
+  const [opened, setOpened] = useState<Record<string, boolean>>({});
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -179,9 +200,32 @@ export default function KeysView() {
               const rows = group.names.filter((n) => byName.has(n));
               if (!rows.length) return null;
 
+              const set = rows.filter((n) => byName.get(n)!.set).length;
+              const isOpen = opened[group.title] ?? set < rows.length;
+
               return (
-                <div key={group.title} style={{ marginTop: 22 }}>
-                  <h3 style={{ margin: "0 0 4px", fontSize: 14 }}>{group.title}</h3>
+                <div className={isOpen ? "keys-group is-open" : "keys-group"} key={group.title}>
+                  {/* The whole title bar is the control, not just the arrow. A
+                      target the width of the box is easier to hit than one
+                      sixteen pixels across, and the arrow beside it is what
+                      says the bar can be clicked at all. */}
+                  <button
+                    type="button"
+                    className="keys-group-head"
+                    aria-expanded={isOpen}
+                    onClick={() => setOpened((was) => ({ ...was, [group.title]: !isOpen }))}
+                  >
+                    <h3>{group.title}</h3>
+                    {/* What a folded group still tells you. Without it, a
+                        closed group is a title and no information. */}
+                    <span className="keys-group-count">
+                      {set} of {rows.length} set
+                    </span>
+                    <Chevron />
+                  </button>
+
+                  <div className="keys-group-body">
+                    <div>
                   <p className="stage-hint" style={{ margin: "0 0 12px" }}>{group.blurb}</p>
 
                   {rows.map((name) => {
@@ -245,6 +289,8 @@ export default function KeysView() {
                       </div>
                     );
                   })}
+                    </div>
+                  </div>
                 </div>
               );
             })
