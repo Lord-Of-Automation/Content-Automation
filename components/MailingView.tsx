@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAsk } from "@/components/Ask";
 import CampaignHistory from "@/components/CampaignHistory";
 import MailingRuns from "@/components/MailingRuns";
+import MailThread from "@/components/MailThread";
 import OutreachCampaign from "@/components/OutreachCampaign";
 import { useToasts } from "@/components/Toasts";
 import type { MailStatus, Thread } from "@/lib/mail";
@@ -23,6 +24,30 @@ import type { MailStatus, Thread } from "@/lib/mail";
  * because "connect your Gmail" is a big thing to ask and the answer to "what
  * can it see" should not be "trust us".
  */
+
+/**
+ * The conversations, in one section per address they went out as.
+ *
+ * Which is the whole point of sending as several: a reply says which of your
+ * identities a publisher answered before you read a word of it. Ordered by the
+ * most recent conversation in each, so whoever has just heard something is at
+ * the top.
+ *
+ * Shared by the inbox and by the paid list below it. Which of your identities
+ * was paid is as much a fact about a conversation as that it was.
+ */
+function groupBySender(rows: Thread[]): Array<[string, Thread[]]> {
+  const by = new Map<string, Thread[]>();
+  for (const one of rows) {
+    const key = one.from || one.mailbox || "";
+    by.set(key, [...(by.get(key) ?? []), one]);
+  }
+
+  const newest = (group: Thread[]) =>
+    group.reduce((at, one) => ((one.lastAt ?? one.sentAt) > at ? one.lastAt ?? one.sentAt : at), "");
+
+  return [...by.entries()].sort((a, b) => newest(b[1]).localeCompare(newest(a[1])));
+}
 
 function when(value: string | null | undefined): string {
   if (!value) return "never";
@@ -287,26 +312,7 @@ export default function MailingView() {
   const connected = !!status?.connected;
   const ready = !!status?.configured && !!status?.consoleConfigured;
 
-  /*
-   * The conversations, in one section per address they went out as.
-   *
-   * Which is the whole point of sending as several: a reply says which of your
-   * identities a publisher answered before you read a word of it. Ordered by
-   * the most recent conversation in each, so whoever has just heard something
-   * is at the top.
-   */
-  const grouped = (() => {
-    const by = new Map<string, Thread[]>();
-    for (const one of showing) {
-      const key = one.from || one.mailbox || "";
-      by.set(key, [...(by.get(key) ?? []), one]);
-    }
-    return [...by.entries()].sort((a, b) => {
-      const newest = (rows: Thread[]) =>
-        rows.reduce((at, one) => (one.lastAt ?? one.sentAt) > at ? (one.lastAt ?? one.sentAt) : at, "");
-      return newest(b[1]).localeCompare(newest(a[1]));
-    });
-  })();
+  const grouped = groupBySender(showing);
 
   return (
     <div className="stack">
@@ -418,15 +424,16 @@ export default function MailingView() {
           ) : null}
 
           {view === "runs" ? (
-            <div className="mail-only">
+            <div className="mail-only mail-panel" key="runs">
               <MailingRuns />
             </div>
           ) : view === "history" ? (
-            <div className="mail-only">
+            <div className="mail-only mail-panel" key="history">
               <CampaignHistory />
             </div>
           ) : view === "campaign" ? (
             <OutreachCampaign
+              key="campaign"
               connected={connected}
               senders={status?.senders ?? []}
               onStarted={() => {
@@ -437,7 +444,7 @@ export default function MailingView() {
               }}
             />
           ) : connected ? (
-            <div className="mail-only">
+            <div className="mail-only mail-panel" key="inbox">
                 <div className="editor-body-head">
                   <span className="field-label">
                     Inbox{owed.length ? ` (${showing.length})` : ""}
@@ -469,212 +476,91 @@ export default function MailingView() {
                 </div>
 
                 {!showing.length ? (
-                <p className="provider-hint">
-                  {find.trim()
-                    ? `Nothing here matches "${find.trim()}". It searches the messages as well as the addresses and subjects.`
-                    : paidOnly
-                      ? "No reply has named a way to be paid yet."
-                      : "Nothing sent yet. A conversation appears here once this platform has written to somebody, and only then."}
-                </p>
+                  <p className="provider-hint">
+                    {find.trim()
+                      ? `Nothing here matches "${find.trim()}". It searches the messages as well as the addresses and subjects.`
+                      : paidOnly
+                        ? "No reply has named a way to be paid yet."
+                        : "Nothing sent yet. A conversation appears here once this platform has written to somebody, and only then."}
+                  </p>
                 ) : (
-                grouped.map(([sender, rows]) => (
-                  <section className="mail-group" key={sender || "unknown"}>
-                    {/* The address the publisher knows you by. Named even when
-                        there is only one, because a page that starts labelling
-                        things once there are two reads differently on the day
-                        you add one. */}
-                    <h3 className="mail-group-head">
-                      <span>{sender || "an address no longer connected"}</span>
-                      <span className="mail-group-count">
-                        {rows.length} conversation{rows.length === 1 ? "" : "s"}
-                        {rows.filter((one) => one.replies).length
-                          ? `, ${rows.filter((one) => one.replies).length} replied`
-                          : ""}
-                      </span>
-                    </h3>
-                    <ul className="mail-threads">
-                      {rows.map((thread) => {
-                        const isOpen = open === thread.email;
-                        return (
-                          <li
+                  grouped.map(([sender, rows]) => (
+                    <section className="mail-group" key={sender || "unknown"}>
+                      {/* The address the publisher knows you by. Named even
+                          when there is only one, because a page that starts
+                          labelling things once there are two reads differently
+                          on the day you add one. */}
+                      <h3 className="mail-group-head">
+                        <span>{sender || "an address no longer connected"}</span>
+                        <span className="mail-group-count">
+                          {rows.length} conversation{rows.length === 1 ? "" : "s"}
+                          {rows.filter((one) => one.replies).length
+                            ? `, ${rows.filter((one) => one.replies).length} replied`
+                            : ""}
+                        </span>
+                      </h3>
+                      <ul className="mail-threads">
+                        {rows.map((thread) => (
+                          <MailThread
                             key={thread.email}
-                            className={thread.replies ? "mail-thread has-reply" : "mail-thread"}
-                          >
-                            {/* The row and the one action on it, side by side.
-                                Marking an invoice paid is the commonest thing
-                                to do to a conversation and it should not need
-                                the conversation opened first — and a button
-                                inside a button is not a thing, so the row is a
-                                row with a button in it rather than one itself. */}
-                            <div className="mail-thread-row">
-                              <button
-                                type="button"
-                                className="mail-thread-head"
-                                onClick={() => setOpen(isOpen ? null : thread.email)}
-                              >
-                                <span className="mail-who">{thread.email}</span>
-                                <span className="mail-subject">{thread.subject}</span>
-                                <span className="mail-count">
-                                  {thread.replies
-                                    ? `${thread.replies} repl${thread.replies === 1 ? "y" : "ies"}`
-                                    : "no reply yet"}
-                                </span>
-                                <span className="mail-at">
-                                  {when(thread.lastAt ?? thread.sentAt)}
-                                </span>
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-paid btn-sm mail-thread-paid"
-                                disabled={busy}
-                                title={`Mark ${thread.email} as paid`}
-                                onClick={() => void pay(thread, true)}
-                              >
-                                Paid
-                              </button>
-                            </div>
-
-                            {thread.note ? (
-                              <p className="notice warn mail-note">{thread.note}</p>
-                            ) : null}
-
-                            {isOpen ? (
-                              <div className="mail-messages">
-                                {thread.messages.map((message) => (
-                                  <article
-                                    key={message.id}
-                                    className={message.mine ? "mail-message is-mine" : "mail-message"}
-                                  >
-                                    <header>
-                                      <strong>{message.mine ? "You" : message.from}</strong>
-                                      <span>{when(message.at)}</span>
-                                    </header>
-                                    {/* As text, never as markup. What is in here
-                                        was written by somebody outside this
-                                        platform, and a page that renders their
-                                        HTML renders whatever they felt like
-                                        sending. */}
-                                    <pre>{message.text.trim() || "(no words in it)"}</pre>
-                                  </article>
-                                ))}
-                                <div className="ve-actions">
-                                  {/* Answering happens in the mailbox. A reply to a publisher is a
-                                      conversation, and a one-line box on a dashboard is the wrong
-                                      place to hold one. */}
-                                  <a
-                                    className="btn btn-ghost btn-sm"
-                                    href={`https://mail.google.com/mail/u/0/#all/${thread.threadId}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                  >
-                                    Open in Gmail
-                                  </a>
-                                  <button
-                                    type="button"
-                                    className={
-                                      thread.paidAt ? "btn btn-ghost btn-sm" : "btn btn-paid btn-sm"
-                                    }
-                                    disabled={busy}
-                                    onClick={() => void pay(thread, !thread.paidAt)}
-                                  >
-                                    {thread.paidAt ? "Not paid after all" : "Paid"}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="btn btn-danger btn-sm"
-                                    disabled={busy}
-                                    onClick={() => void forget(thread.email)}
-                                  >
-                                    Forget
-                                  </button>
-                                </div>
-                              </div>
-                            ) : null}
-                          </li>
-                        );
-                      })}
+                            thread={thread}
+                            open={open === thread.email}
+                            busy={busy}
+                            onToggle={() => setOpen(open === thread.email ? null : thread.email)}
+                            onPay={(paidNow) => void pay(thread, paidNow)}
+                            onForget={() => void forget(thread.email)}
+                          />
+                        ))}
                       </ul>
                     </section>
                   ))
                 )}
 
-                {/* Below the inbox, not hidden from it.
+                {/* Below the inbox, and shown whether or not anything is left
+                    in it: a search that matches only settled conversations
+                    should find them rather than answer with nothing.
 
-                    A conversation that ended in money is finished as far as
-                    the work goes, so it stops competing for attention with the
-                    ones still being chased. It is still the record of a link
-                    that was bought, and that is worth being able to find. */}
+                    A conversation that ended in money is finished as far as the
+                    work goes, so it stops competing for attention with the ones
+                    still being chased. It is still the record of a link that was
+                    bought, and that is worth finding.
+
+                    Grouped by sender like the inbox, for the same reason: which
+                    of your identities was paid is as much a fact about it as
+                    that it was. */}
                 {paid.length ? (
-                  <section className="mail-group mail-paid">
-                    <h3 className="mail-group-head">
+                  <div className="mail-paid">
+                    <h3 className="mail-group-head mail-paid-head">
                       <span>Paid</span>
                       <span className="mail-group-count">
                         {paid.length} conversation{paid.length === 1 ? "" : "s"}
                       </span>
                     </h3>
-                    <ul className="mail-threads">
-                      {paid.map((thread) => (
-                        <li className="mail-thread is-paid" key={thread.email}>
-                          <div className="mail-thread-row">
-                            <button
-                              type="button"
-                              className="mail-thread-head"
-                              onClick={() => setOpen(open === thread.email ? null : thread.email)}
-                            >
-                              <span className="mail-who">{thread.email}</span>
-                              <span className="mail-subject">{thread.subject}</span>
-                              <span className="mail-count">paid {when(thread.paidAt)}</span>
-                              <span className="mail-at">{thread.from || ""}</span>
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-sm mail-thread-paid"
-                              disabled={busy}
-                              title="Put it back among the ones still owed"
-                              onClick={() => void pay(thread, false)}
-                            >
-                              Not paid
-                            </button>
-                          </div>
 
-                          {open === thread.email ? (
-                            <div className="mail-messages">
-                              {thread.messages.map((message) => (
-                                <article
-                                  key={message.id}
-                                  className={message.mine ? "mail-message is-mine" : "mail-message"}
-                                >
-                                  <header>
-                                    <strong>{message.mine ? "You" : message.from}</strong>
-                                    <span>{when(message.at)}</span>
-                                  </header>
-                                  <pre>{message.text.trim() || "(no words in it)"}</pre>
-                                </article>
-                              ))}
-                              <div className="ve-actions">
-                                <a
-                                  className="btn btn-ghost btn-sm"
-                                  href={`https://mail.google.com/mail/u/0/#all/${thread.threadId}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  Open in Gmail
-                                </a>
-                                <button
-                                  type="button"
-                                  className="btn btn-danger btn-sm"
-                                  disabled={busy}
-                                  onClick={() => void forget(thread.email)}
-                                >
-                                  Forget
-                                </button>
-                              </div>
-                            </div>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
+                    {groupBySender(paid).map(([sender, rows]) => (
+                      <section className="mail-group" key={sender || "unknown"}>
+                        <h3 className="mail-group-head">
+                          <span>{sender || "an address no longer connected"}</span>
+                          <span className="mail-group-count">
+                            {rows.length} conversation{rows.length === 1 ? "" : "s"}
+                          </span>
+                        </h3>
+                        <ul className="mail-threads">
+                          {rows.map((thread) => (
+                            <MailThread
+                              key={thread.email}
+                              thread={thread}
+                              open={open === thread.email}
+                              busy={busy}
+                              onToggle={() => setOpen(open === thread.email ? null : thread.email)}
+                              onPay={(paidNow) => void pay(thread, paidNow)}
+                              onForget={() => void forget(thread.email)}
+                            />
+                          ))}
+                        </ul>
+                      </section>
+                    ))}
+                  </div>
                 ) : null}
             </div>
           ) : null}

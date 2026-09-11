@@ -276,7 +276,7 @@ export default function OutreachCampaign({
   }
 
   return (
-    <div className="campaign">
+    <div className="campaign mail-panel">
       {!connected ? (
         <div className="notice warn">
           <strong>No mailbox is connected.</strong> A campaign ends in email, so

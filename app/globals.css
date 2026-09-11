@@ -8217,3 +8217,55 @@ code,
     max-width: none;
   }
 }
+
+/* ------------------------------------------------------- switching tabs
+
+   The four panels on the Mailing page are different heights and different
+   shapes, so swapping one for another is an abrupt change to most of the card.
+   A short rise settles that: the new panel arrives from slightly below and
+   fades in, which reads as the page catching up rather than as a flicker.
+
+   Short and small on purpose. Twenty pixels over a sixth of a second is enough
+   to see and not enough to wait for, and anything longer becomes something to
+   sit through every time you check the inbox.
+
+   Each panel carries a key, so React replaces rather than reuses it and the
+   animation runs on every switch instead of only the first. */
+@keyframes mail-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+.mail-panel {
+  animation: mail-panel-in 180ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+/* The rows inside the inbox follow a beat later, so a list of conversations
+   arrives as a list rather than as one block. Capped: past the fifth the
+   stagger stops being a rhythm and starts being a delay. */
+.mail-panel .mail-group {
+  animation: mail-panel-in 200ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+.mail-panel .mail-group:nth-of-type(2) {
+  animation-delay: 40ms;
+}
+
+.mail-panel .mail-group:nth-of-type(3) {
+  animation-delay: 80ms;
+}
+
+.mail-panel .mail-group:nth-of-type(n + 4) {
+  animation-delay: 120ms;
+}
+
+/* Anybody who has asked for less movement gets the change and none of the
+   travel. The panel still has to appear. */
+@media (prefers-reduced-motion: reduce) {
+  .mail-panel,
+  .mail-panel .mail-group {
+    animation: none;
+  }
+}
