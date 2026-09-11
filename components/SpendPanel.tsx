@@ -98,7 +98,7 @@ export default function SpendPanel() {
               <span className="spend-total-amount">{money(spend.total)}</span>
             </div>
 
-            <div className="spend-split">
+            <div className="spend-split spend-in">
               <div>
                 <h3 className="spend-head">By person</h3>
                 {spend.byActor.length === 0 ? (

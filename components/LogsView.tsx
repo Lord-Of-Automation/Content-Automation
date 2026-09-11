@@ -235,7 +235,7 @@ export default function LogsView() {
             </div>
           ) : (
             <>
-              <table className="logs">
+              <table className="logs table-in">
                 <thead>
                   <tr>
                     <th>When</th>
@@ -245,7 +245,11 @@ export default function LogsView() {
                     <th className="num">Cost</th>
                   </tr>
                 </thead>
-                <tbody>
+                {/* Keyed on the tab, so switching it replaces the rows
+                    rather than editing them, which is what lets them arrive
+                    again. Show more leaves the key alone, so the rows already
+                    read stay put and only the newly revealed ones arrive. */}
+                <tbody key={filter}>
                   {shown.slice(0, visible).map((event, i) => (
                     <tr key={`${event.at}-${i}`}>
                       <td className="mono nowrap">{formatWhen(event.at)}</td>
