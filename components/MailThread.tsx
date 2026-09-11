@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+
+import { readPicture, weight, PICTURE_TYPES, type Picture } from "@/lib/picture";
 
 import type { Thread } from "@/lib/mail";
 
@@ -181,6 +183,7 @@ export default function MailThread({
   onPay,
   onForget,
   onReply,
+  onTrouble,
 }: {
   thread: Thread;
   open: boolean;
@@ -190,7 +193,9 @@ export default function MailThread({
   onPay: (paid: boolean) => void;
   onForget: () => void;
   /** Answers the publisher in this conversation. Resolves false if it failed. */
-  onReply: (body: string) => Promise<boolean>;
+  onReply: (body: string, images: Picture[]) => Promise<boolean>;
+  /** Says why a picture was refused, in the page's own voice. */
+  onTrouble: (why: string) => void;
 }) {
   const paid = !!thread.paidAt;
 
@@ -203,16 +208,54 @@ export default function MailThread({
    * put your words in somebody else's box.
    */
   const [reply, setReply] = useState("");
+  const [pictures, setPictures] = useState<Picture[]>([]);
   const [sending, setSending] = useState(false);
+  const picker = useRef<HTMLInputElement>(null);
 
   async function send() {
     const words = reply.trim();
-    if (!words || sending) return;
+    // A picture on its own is a reply. Somebody sending a screenshot of a paid
+    // invoice has said what they meant to.
+    if ((!words && !pictures.length) || sending) return;
     setSending(true);
     // Cleared only when it actually went. A refused send that emptied the box
-    // would lose what somebody had just written.
-    if (await onReply(words)) setReply("");
+    // would lose what somebody had just written, and the pictures with it.
+    if (await onReply(words, pictures)) {
+      setReply("");
+      setPictures([]);
+    }
     setSending(false);
+  }
+
+  /**
+   * Files, from wherever they came.
+   *
+   * The same path for the picker, a paste and a drop, because they are the
+   * same act. Paste is the one that matters: a screenshot goes to the
+   * clipboard and nowhere else, and saving it to a folder first so it can be
+   * picked from that folder is the step worth removing.
+   */
+  async function take(files: FileList | File[] | null) {
+    const chosen = [...(files ?? [])];
+    if (!chosen.length) return;
+
+    if (pictures.length + chosen.length > 6) {
+      onTrouble("A reply carries at most six pictures.");
+      return;
+    }
+
+    for (const file of chosen) {
+      try {
+        const picture = await readPicture(file);
+        setPictures((was) => [...was, picture]);
+      } catch (e) {
+        onTrouble(e instanceof Error ? e.message : "That picture could not be read.");
+      }
+    }
+  }
+
+  function drop(id: string) {
+    setPictures((was) => was.filter((one) => one.id !== id));
   }
 
   return (
@@ -299,6 +342,22 @@ export default function MailThread({
               e.preventDefault();
               void send();
             }}
+            onPaste={(e) => {
+              // Only when there is actually a file on the clipboard. Pasting
+              // words must go on pasting words.
+              const files = [...e.clipboardData.files];
+              if (!files.length) return;
+              e.preventDefault();
+              void take(files);
+            }}
+            onDragOver={(e) => {
+              if (e.dataTransfer.types.includes("Files")) e.preventDefault();
+            }}
+            onDrop={(e) => {
+              if (!e.dataTransfer.files.length) return;
+              e.preventDefault();
+              void take(e.dataTransfer.files);
+            }}
           >
             {/* Addressed to the publisher, not to us. A conversation's "from"
                 is the identity it went out as — the address this box sends
@@ -321,14 +380,66 @@ export default function MailThread({
                 }
               }}
             />
+            {pictures.length ? (
+              <ul className="mail-shots">
+                {pictures.map((one) => (
+                  <li className="mail-shot" key={one.id}>
+                    {/* The picture itself, because a filename is not a way to
+                        tell one screenshot from another. */}
+                    <img src={one.preview} alt={one.name} />
+                    <span className="mail-shot-size">{weight(one.bytes)}</span>
+                    <button
+                      type="button"
+                      className="mail-shot-drop"
+                      aria-label={`Take ${one.name} off this reply`}
+                      title={`Take ${one.name} off this reply`}
+                      disabled={sending}
+                      onClick={() => drop(one.id)}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
             <div className="mail-reply-foot">
+              {/* Hidden, because a file input is drawn differently by every
+                  browser and none of them match anything else on this page. */}
+              <input
+                ref={picker}
+                type="file"
+                accept={PICTURE_TYPES.join(",")}
+                multiple
+                hidden
+                onChange={(e) => {
+                  void take(e.target.files);
+                  // Cleared, or picking the same file twice in a row does
+                  // nothing the second time.
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm mail-shot-add"
+                disabled={busy || sending || pictures.length >= 6}
+                title="Put a picture in this reply. You can also paste or drop one."
+                onClick={() => picker.current?.click()}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <rect x="3" y="4" width="18" height="16" rx="2" />
+                  <circle cx="8.5" cy="9.5" r="1.5" />
+                  <path d="m4 17 4.5-4.5 3 3L15 12l5 5" />
+                </svg>
+                Picture
+              </button>
               <span className="mail-reply-hint">
                 {thread.from ? `Goes out as ${thread.from}.` : ""} Ctrl+Enter sends.
               </span>
               <button
                 type="submit"
                 className="btn btn-sm"
-                disabled={busy || sending || !reply.trim()}
+                disabled={busy || sending || (!reply.trim() && !pictures.length)}
               >
                 {sending ? "Sending…" : "Send reply"}
               </button>

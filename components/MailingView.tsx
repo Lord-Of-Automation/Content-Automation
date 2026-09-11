@@ -7,6 +7,7 @@ import CampaignHistory from "@/components/CampaignHistory";
 import MailingRuns from "@/components/MailingRuns";
 import MailThread from "@/components/MailThread";
 import { useGlide } from "@/lib/glide";
+import type { Picture } from "@/lib/picture";
 import OutreachCampaign from "@/components/OutreachCampaign";
 import { useToasts } from "@/components/Toasts";
 import type { MailStatus, Thread } from "@/lib/mail";
@@ -276,12 +277,22 @@ export default function MailingView() {
    * ordinary thing this page exists for, and a dialog in front of every
    * sentence is how people stop using a reply box.
    */
-  async function answer(thread: Thread, words: string): Promise<boolean> {
+  async function answer(
+    thread: Thread,
+    words: string,
+    shots: Picture[] = [],
+  ): Promise<boolean> {
     try {
       const response = await fetch("/api/mail/reply", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: thread.email, body: words }),
+        body: JSON.stringify({
+          email: thread.email,
+          body: words,
+          // Only the three fields the engine wants. The preview and the id
+          // belong to this page and would double the size of the request.
+          images: shots.map((one) => ({ name: one.name, mime: one.mime, data: one.data })),
+        }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "It could not be sent.");
@@ -574,7 +585,8 @@ export default function MailingView() {
                             onToggle={() => setOpen(open === thread.email ? null : thread.email)}
                             onPay={(paidNow) => void pay(thread, paidNow)}
                             onForget={() => void forget(thread.email)}
-                            onReply={(words) => answer(thread, words)}
+                            onReply={(words, shots) => answer(thread, words, shots)}
+                            onTrouble={(why) => push("bad", why)}
                           />
                         ))}
                       </ul>
@@ -621,7 +633,8 @@ export default function MailingView() {
                               onToggle={() => setOpen(open === thread.email ? null : thread.email)}
                               onPay={(paidNow) => void pay(thread, paidNow)}
                               onForget={() => void forget(thread.email)}
-                              onReply={(words) => answer(thread, words)}
+                              onReply={(words, shots) => answer(thread, words, shots)}
+                              onTrouble={(why) => push("bad", why)}
                             />
                           ))}
                         </ul>

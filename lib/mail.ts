@@ -400,10 +400,21 @@ export async function mailCampaigns(): Promise<Campaign[]> {
  * both are on the record it kept when it sent the first message, and neither
  * is something a browser should be trusted to name.
  */
-export async function replyToThread(email: string, body: string): Promise<{ sent: number }> {
+export interface ReplyPicture {
+  name: string;
+  mime: string;
+  /** Base64, no data: prefix. */
+  data: string;
+}
+
+export async function replyToThread(
+  email: string,
+  body: string,
+  images: ReplyPicture[] = [],
+): Promise<{ sent: number }> {
   return call<{ sent: number }>(`/mail/threads/${encodeURIComponent(email)}/reply`, {
     method: "POST",
-    body: JSON.stringify({ body }),
+    body: JSON.stringify({ body, images }),
   });
 }
 

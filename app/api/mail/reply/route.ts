@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
-import { replyToThread } from "@/lib/mail";
+import { replyToThread, type ReplyPicture } from "@/lib/mail";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,18 +34,32 @@ export async function POST(request: Request) {
     const email = String(payload.email ?? "").trim().toLowerCase();
     const body = String(payload.body ?? "").trim();
 
+    /*
+     * The pictures, carried through and not inspected.
+     *
+     * The engine checks them, because the engine is what turns them into a
+     * message and is therefore the only place that can say what a message will
+     * accept. Two sets of rules would disagree the first time one of them
+     * changed, and the one that matters is the one nearest the bytes.
+     */
+    const images = Array.isArray(payload.images) ? (payload.images as ReplyPicture[]) : [];
+
     if (!email) return NextResponse.json({ error: "No address was given." }, { status: 400 });
-    if (!body) {
+    if (!body && !images.length) {
       return NextResponse.json(
         { error: "An empty reply would say nothing." },
         { status: 400 },
       );
     }
 
-    const sent = await replyToThread(email, body);
+    const sent = await replyToThread(email, body, images);
     // The words themselves are not recorded. The log says a message went and
     // to whom, which is what it is for; the conversation is in the mailbox.
-    await record(actor, "mail-replied", email);
+    await record(
+      actor,
+      "mail-replied",
+      images.length ? `${email} (${images.length} picture${images.length === 1 ? "" : "s"})` : email,
+    );
     return NextResponse.json(sent);
   } catch (error) {
     return errorResponse(error);
