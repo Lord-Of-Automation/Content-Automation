@@ -164,6 +164,25 @@ export default function ProfileMenu({
 
           <div className="profile-sep" />
 
+          {/* Beside the dark mode switch rather than up with the pages,
+              because it is the same subject: this one chooses the colours,
+              that one chooses which set of them is showing. */}
+          <Link
+            href="/design"
+            role="menuitem"
+            className={current === "design" ? "profile-item is-current" : "profile-item"}
+            onClick={() => setOpen(false)}
+          >
+            {/* A swatch on a palette. */}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M12 3a9 9 0 1 0 0 18c.8 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.4-1-.3-.3-.4-.6-.4-1 0-.9.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.4-4-8-9-8Z" />
+              <circle cx="7.5" cy="12" r="1.1" fill="currentColor" stroke="none" />
+              <circle cx="10" cy="7.8" r="1.1" fill="currentColor" stroke="none" />
+              <circle cx="15" cy="8.2" r="1.1" fill="currentColor" stroke="none" />
+            </svg>
+            Appearance
+          </Link>
+
           {/* Left in place while the theme is unknown, so the menu does not
               change height on the first frame after it opens. */}
           <button

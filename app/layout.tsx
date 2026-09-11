@@ -4,6 +4,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { auth } from "@/auth";
 import Ask from "@/components/Ask";
 import PageFrame from "@/components/PageFrame";
+import { getPalette, paletteCss } from "@/lib/palette";
 import AskClaude from "@/components/AskClaude";
 import "./globals.css";
 
@@ -79,6 +80,18 @@ export default async function RootLayout({
    */
   const session = await auth();
 
+  /*
+   * The console's own colours, if anybody has changed them.
+   *
+   * Rendered into the document rather than fetched, because a palette that
+   * arrives after the first paint is a palette you watch being applied. This
+   * is the same reason the theme script above runs where it does.
+   *
+   * Empty for an installation nobody has touched, which is the usual case, and
+   * then this is one absent style element rather than a copy of the defaults.
+   */
+  const palette = paletteCss(await getPalette());
+
   return (
     // The script mutates <html> before React hydrates, which React would
     // otherwise report as a mismatch.
@@ -89,6 +102,9 @@ export default async function RootLayout({
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: noFlashTheme }} />
+        {palette ? (
+          <style id="ca-palette" dangerouslySetInnerHTML={{ __html: palette }} />
+        ) : null}
       </head>
       <body>
         {/* Above everything, because anything may need to ask something. */}

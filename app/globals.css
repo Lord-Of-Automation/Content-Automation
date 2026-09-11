@@ -8708,3 +8708,200 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
     animation: none;
   }
 }
+
+/* ------------------------------------------- the colours, as a page
+
+   A row per colour: the colour itself big enough to judge, what it paints in
+   words, and the value to type into if somebody has a hex from somewhere else.
+
+   The swatch is a real <input type="color"> with the browser's own control
+   hidden behind a block of the colour. The native control is a small square
+   with a border and an operating system's idea of a label, three different
+   shapes on three platforms, and none of them the size you need to judge a
+   near-white against another near-white. */
+.swatches {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.swatch {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 12px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  transition:
+    background-color var(--quick, 120ms) var(--ease, ease),
+    border-color var(--quick, 120ms) var(--ease, ease);
+}
+
+.swatch:hover {
+  background: var(--hover);
+}
+
+/* A colour that is no longer the one it shipped as. Marked, because the Reset
+   buttons are otherwise the only way to tell and they are at the far edge. */
+.swatch.is-changed {
+  border-color: var(--accent-soft);
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+
+.swatch-chip {
+  position: relative;
+  display: block;
+  width: 52px;
+  height: 38px;
+  cursor: pointer;
+}
+
+.swatch-chip input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+
+/* The inner shadow rather than a border: a border in --line disappears against
+   a swatch that happens to be --line, and this reads as an edge on every
+   colour including white and black. */
+.swatch-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  box-shadow:
+    inset 0 0 0 1px rgba(16, 20, 26, 0.16),
+    0 1px 2px rgba(16, 20, 26, 0.08);
+  transition: box-shadow var(--quick, 120ms) var(--ease, ease);
+}
+
+.swatch-chip:hover .swatch-fill {
+  box-shadow:
+    inset 0 0 0 1px rgba(16, 20, 26, 0.28),
+    0 2px 6px rgba(16, 20, 26, 0.14);
+}
+
+.swatch-chip input:focus-visible + .swatch-fill {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.swatch-what {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.swatch-what strong {
+  font-size: 14px;
+}
+
+.swatch-note {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.45;
+}
+
+.swatch-var {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.swatch-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Two selectors deep, because the base input rule is input[type="text"] and
+   would otherwise stretch this to the full width of the row. */
+.swatch-value .swatch-hex {
+  flex: 0 0 auto;
+  width: 104px;
+  text-align: center;
+  text-transform: lowercase;
+}
+
+/* Held at the same width whether it is offered or not, so a row does not
+   change shape the moment somebody changes its colour. */
+.swatch-reset {
+  min-width: 62px;
+}
+
+.swatch-reset:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.swatch:hover .swatch-reset:disabled {
+  opacity: 0.35;
+}
+
+.design-modes {
+  margin-bottom: 14px;
+}
+
+.design-hint {
+  margin: 0;
+}
+
+.design-when {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+/* Two colours shown doing the job they are being judged on, which is a
+   different question from whether they look nice side by side. */
+.contrast-sample {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .swatch {
+    grid-template-columns: 44px minmax(0, 1fr);
+    row-gap: 10px;
+  }
+
+  .swatch-value {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+/* The panel in a tabbed sheet, arriving as the sheet resizes around it.
+
+   The box growing or shrinking is measured in JavaScript, because height only
+   animates between two numbers and the number this one wants is whatever its
+   contents come to. This is the other half: the contents fading up inside it,
+   which is what makes the two read as one movement rather than a box changing
+   size and then filling. */
+.sheet-panel {
+  animation: sheet-panel-in 260ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) 60ms backwards;
+}
+
+@keyframes sheet-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-panel {
+    animation: none;
+  }
+}

@@ -197,21 +197,40 @@ export default function MailingView() {
    * to make.
    */
   async function pay(thread: Thread, paid: boolean) {
-    if (paid) {
-      const sure = await ask.confirm({
-        title: `Mark ${thread.email} as paid?`,
-        body: (
-          <>
-            It moves out of the inbox and into Paid, so it stops competing for
-            attention with the ones still being chased. Nothing is sent, the
-            publisher is told nothing, and the conversation itself is untouched.
-            You can put it back.
-          </>
-        ),
-        confirmLabel: "Yes, it is paid",
-      });
-      if (!sure) return;
-    }
+    /*
+     * Both directions ask first.
+     *
+     * Marking one paid is the careful one and was the only one that asked, on
+     * the reasoning that putting it back is easy. But the two buttons sit in
+     * the same place on the row and read almost the same at a glance, and what
+     * the second one actually does is throw away the date an invoice was
+     * settled on — which is not somewhere the record can be put back from.
+     */
+    const sure = paid
+      ? await ask.confirm({
+          title: `Mark ${thread.email} as paid?`,
+          body: (
+            <>
+              It moves out of the inbox and into Paid, so it stops competing for
+              attention with the ones still being chased. Nothing is sent, the
+              publisher is told nothing, and the conversation itself is
+              untouched. You can put it back.
+            </>
+          ),
+          confirmLabel: "Yes, it is paid",
+        })
+      : await ask.confirm({
+          title: `Put ${thread.email} back among the unpaid?`,
+          body: (
+            <>
+              It returns to the inbox and starts being chased again, and the
+              date it was marked paid on is forgotten rather than kept. Nothing
+              is sent and the publisher is told nothing.
+            </>
+          ),
+          confirmLabel: "Yes, it is not paid",
+        });
+    if (!sure) return;
 
     setBusy(true);
     try {

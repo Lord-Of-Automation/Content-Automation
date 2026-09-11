@@ -18,4 +18,5 @@ export type Section =
   | "apps"
   | "performance"
   | "accounts"
-  | "keys";
+  | "keys"
+  | "design";

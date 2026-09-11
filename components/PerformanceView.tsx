@@ -419,7 +419,12 @@ export default function PerformanceView() {
                     <th />
                   </tr>
                 </thead>
-                <tbody>
+                {/* Keyed on the filter so changing it replaces the rows
+                    rather than editing them, which is what lets them arrive
+                    again. Deliberately not keyed on the search box: rows that
+                    re-animated on every keystroke would be unreadable while
+                    being typed at. */}
+                <tbody key={kind || "all"}>
                   {shown.slice(0, visible).map((s) => (
                     <tr key={s.siteUrl}>
                       <td>

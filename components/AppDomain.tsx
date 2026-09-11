@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import AppCredential from "@/components/AppCredential";
 import { Select } from "@/components/Select";
@@ -167,6 +167,60 @@ export default function AppDomain({
 
   const shell = useRef<HTMLDialogElement>(null);
 
+  /*
+   * The sheet resizing itself when you change tabs.
+   *
+   * The four jobs behind these tabs are different lengths — a password and a
+   * link on one, a form and a typed-out confirmation on another — so switching
+   * between them jumped the whole dialog to a new height in one frame, which
+   * moved the tab you had just clicked out from under the pointer.
+   *
+   * It has to be measured. Height animates only between two numbers, and the
+   * number this sheet wants is whatever its contents come to; there is no CSS
+   * for that. So the height before the change is remembered, the height after
+   * it is read once React has swapped the panel, and the box is animated
+   * between the two.
+   *
+   * On the split rather than the panel beside it: the tabs and the panel are a
+   * flex row that stretches, so the panel's height is a consequence of the
+   * row's and animating it would move nothing.
+   */
+  const split = useRef<HTMLDivElement>(null);
+  const lastHeight = useRef(0);
+  const resizing = useRef<Animation | null>(null);
+
+  useLayoutEffect(() => {
+    const box = split.current;
+    if (!box) return;
+
+    // Cancelled before measuring, or the height read back is a frame of the
+    // animation still running rather than what the new contents come to.
+    resizing.current?.cancel();
+    resizing.current = null;
+
+    const to = box.getBoundingClientRect().height;
+    const from = lastHeight.current;
+    lastHeight.current = to;
+
+    if (!from || Math.abs(from - to) < 1) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    // Clipped while it moves, so the taller panel is revealed by the box
+    // growing rather than spilling out of it on the first frame.
+    box.style.overflow = "hidden";
+    const motion = box.animate(
+      [{ height: `${from}px` }, { height: `${to}px` }],
+      { duration: 260, easing: "cubic-bezier(0.2, 0, 0, 1)" },
+    );
+    resizing.current = motion;
+    const done = () => {
+      if (resizing.current === motion) resizing.current = null;
+      box.style.overflow = "";
+    };
+    motion.addEventListener("finish", done);
+    motion.addEventListener("cancel", done);
+  }, [tab]);
+
   useEffect(() => {
     const dialog = shell.current;
     if (!dialog) return;
@@ -303,7 +357,7 @@ export default function AppDomain({
           </button>
         </div>
 
-        <div className="sheet-split">
+        <div className="sheet-split" ref={split}>
           {/* Before the panel in the markup as well as on screen. Tabbing
               through a dialog should follow what the eye does, and a tab list
               that reads second while sitting first is a trap for anyone not
@@ -335,7 +389,7 @@ export default function AppDomain({
             ))}
           </nav>
 
-          <div className="sheet-body sheet-panel" role="tabpanel">
+          <div className="sheet-body sheet-panel" role="tabpanel" key={tab}>
             {error ? (
               <div className="sheet-section">
                 <div className="notice bad">{error}</div>

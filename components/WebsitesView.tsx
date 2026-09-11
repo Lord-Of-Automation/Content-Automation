@@ -437,7 +437,7 @@ export default function WebsitesView() {
           ) : null}
 
           {sites && sites.length ? (
-            <table className="logs logs-middle">
+            <table className="logs logs-middle table-in">
               <thead>
                 <tr>
                   <th>Website</th>
