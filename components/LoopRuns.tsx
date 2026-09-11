@@ -183,8 +183,8 @@ export default function LoopRuns() {
                       is a word repeated as many times as there are rows.
 
                       Its own class rather than the campaign list's, which
-                      holds an anchor phrase and sets it in bold to say so. An
-                      id is a reference, not a heading. */}
+                      holds an anchor phrase: same weight, mono face, and a
+                      shade quieter. */}
                   <span className="loop-run-id mono">{one.id.slice(PREFIX.length)}</span>
                   <span className="mail-run-at">{when(one.startedAt)}</span>
                 </button>

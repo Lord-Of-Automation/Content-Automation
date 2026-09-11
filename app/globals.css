@@ -8937,14 +8937,14 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
 
 /* The engine's id for a loop's run, on the row that opens it.
 
-   Sits where a campaign's anchor sits and is set differently on purpose: an
-   anchor is the phrase the campaign exists to place and reads as the title of
-   its row, while this is a reference somebody copies. Regular weight, and in
-   the mono face, because it is read character by character. */
+   Sits where a campaign's anchor sits and carries the same weight, because it
+   does the same job: it is the line that says which row this is. In the mono
+   face and a shade quieter than an anchor, since it is read character by
+   character rather than as a phrase. */
 .loop-run-id {
   grid-area: anchor;
   font-size: 12.5px;
-  font-weight: 400;
+  font-weight: 600;
   color: var(--ink-2);
   overflow: hidden;
   text-overflow: ellipsis;
