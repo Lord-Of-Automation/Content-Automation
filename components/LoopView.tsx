@@ -6,6 +6,7 @@ import { LANGUAGES, MARKETS } from "@/lib/markets";
 import type { Schedule, StatsProvider } from "@/lib/schedules";
 import { DECLARABLE_CLASSES, type DeclarableClass } from "@/lib/validate";
 import { Select } from "@/components/Select";
+import LoopRuns from "@/components/LoopRuns";
 import { Toasts, useToasts } from "@/components/Toasts";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { SkeletonCards } from "@/components/Skeleton";
@@ -1102,6 +1103,10 @@ export default function LoopView() {
           </div>
         </div>
       ) : null}
+
+      {/* Under the loops and under the editor, because it is what the loops
+          above it have done rather than something to do to them. */}
+      <LoopRuns />
     </div>
   );
 }
