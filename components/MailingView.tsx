@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { useAsk } from "@/components/Ask";
+import CampaignHistory from "@/components/CampaignHistory";
 import OutreachCampaign from "@/components/OutreachCampaign";
 import { useToasts } from "@/components/Toasts";
 import type { MailStatus, Thread } from "@/lib/mail";
@@ -42,7 +43,7 @@ export default function MailingView() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   /** Which half of the page. The inbox first: it is what you come back to. */
-  const [view, setView] = useState<"inbox" | "campaign">("inbox");
+  const [view, setView] = useState<"inbox" | "campaign" | "history">("inbox");
   /** Show only the replies that name a way to be paid, which is the answer. */
   const [paidOnly, setPaidOnly] = useState(false);
 
@@ -254,6 +255,13 @@ export default function MailingView() {
               >
                 Campaign
               </button>
+              <button
+                type="button"
+                className={view === "history" ? "seg-btn is-on" : "seg-btn"}
+                onClick={() => setView("history")}
+              >
+                History
+              </button>
             </div>
             {connected ? (
               <button
@@ -306,15 +314,20 @@ export default function MailingView() {
             </div>
           ) : null}
 
-          {view === "campaign" ? (
+          {view === "history" ? (
+            <div className="mail-only">
+              <CampaignHistory />
+            </div>
+          ) : view === "campaign" ? (
             <OutreachCampaign
               connected={connected}
               senders={status?.senders ?? []}
               onStarted={() => {
-                // The first email lands within a minute or two, so the list is
-                // worth another look shortly. Switching tabs is the cue.
-                setView("inbox");
-                void loadThreads().catch(() => {});
+                // Straight to the history, which is where the campaign just
+                // started can be watched. The replies take longer than the
+                // sending does, so the inbox is the wrong place to be told to
+                // look first.
+                setView("history");
               }}
             />
           ) : connected ? (

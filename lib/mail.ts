@@ -133,6 +133,22 @@ export type SheetHas = {
   notes: boolean;
 };
 
+/** A campaign that has run, as the history reads it back. */
+export type Campaign = {
+  id: string;
+  status: string;
+  startedAt: string;
+  stoppedAt: string | null;
+  error: string | null;
+  anchor: string;
+  anchorUrl: string;
+  brief: string;
+  /** How many publishers were chosen when it started. */
+  chosen: number;
+  written: Array<{ domain: string; draft: string }>;
+  skipped: Array<{ domain: string; because: string }>;
+};
+
 export class NotOnThisBackend extends Error {}
 
 function base(): string {
@@ -368,4 +384,9 @@ export async function mailOpportunities(
       sender: false, notes: false,
     },
   };
+}
+
+export async function mailCampaigns(): Promise<Campaign[]> {
+  const { campaigns } = await call<{ campaigns: Campaign[] }>("/mail/campaigns");
+  return campaigns ?? [];
 }
