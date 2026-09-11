@@ -11,11 +11,19 @@ export async function GET() {
   const denied = await requireSession();
   if (denied) return denied;
 
+  const session = await auth();
+
   try {
     // The tokens travel with the palette rather than being imported by the
     // page. They carry the defaults, and a default that reached the browser by
     // a second route could disagree with the one the server saves against.
-    return NextResponse.json({ palette: await getPalette(), tokens: TOKENS });
+    //
+    // The palette is the signed-in account's own. Nobody else's is readable
+    // through here, which is the point of it being theirs.
+    return NextResponse.json({
+      palette: await getPalette(session?.user?.name),
+      tokens: TOKENS,
+    });
   } catch (error) {
     return errorResponse(error);
   }
@@ -26,10 +34,10 @@ export async function PUT(request: Request) {
   if (denied) return denied;
 
   const session = await auth();
-  const actor = session?.user?.name ?? "unknown";
+  const who = session?.user?.name ?? "";
 
   try {
-    const palette = await savePalette(await request.json(), actor);
+    const palette = await savePalette(await request.json(), who);
     return NextResponse.json({ palette });
   } catch (error) {
     return errorResponse(error);

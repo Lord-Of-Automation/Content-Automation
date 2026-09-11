@@ -7,6 +7,7 @@ import StatusBadge from "@/components/StatusBadge";
 import { useToasts } from "@/components/Toasts";
 import type { ExecutionDetail } from "@/lib/n8n";
 import type { Campaign } from "@/lib/mail";
+import { runLabel } from "@/lib/runlabel";
 
 /**
  * The runs this page started, and only those.
@@ -166,7 +167,15 @@ export default function MailingRuns() {
           >
             <StatusBadge status={one.status as never} />
             <span className="mail-run-anchor">{one.anchor || "no anchor recorded"}</span>
-            <span className="mail-run-at">{when(one.startedAt)}</span>
+            <span className="mail-run-at">
+              {/* Named the way the Runs page names it, so the same run can be
+                  found on the list that holds every kind of run. On the date
+                  line rather than beside it: this row is a two-line grid with
+                  named areas, and a third child would land somewhere nobody
+                  put it. */}
+              <span className="mail-run-id mono">{runLabel(one.id, true)}</span>
+              {when(one.startedAt) ? ` · ${when(one.startedAt)}` : ""}
+            </span>
           </button>
         ))}
       </nav>

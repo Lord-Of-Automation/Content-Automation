@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import ConfirmDialog from "@/components/ConfirmDialog";
 import StatusBadge from "@/components/StatusBadge";
+import { runLabel } from "@/lib/runlabel";
 import { formatDuration, formatWhen } from "@/lib/format";
 import { LANGUAGES, MARKETS } from "@/lib/markets";
 import type { ExecutionDetail, N8nStatus } from "@/lib/n8n";
@@ -307,6 +308,9 @@ export default function RunProgress({
 
   const { progress } = execution;
   const finished = execution.stoppedAt;
+  // The detail carries the run's kind, unlike the list it was picked from, so
+  // this is the one place that does not have to be told.
+  const named = runLabel(execution.id, execution.runMode === "outreach");
 
   return (
     /*
@@ -322,7 +326,7 @@ export default function RunProgress({
             {progress?.currentLabel ?? "Waiting for the first node"}
           </div>
           <div className="stage-hint">
-            Execution {execution.id} · started {formatWhen(execution.startedAt)} ·{" "}
+            Execution {named} · started {formatWhen(execution.startedAt)} ·{" "}
             {formatDuration(execution.startedAt, finished)}
             {finished ? " total" : " so far"}
           </div>
@@ -527,7 +531,7 @@ export default function RunProgress({
       <ConfirmDialog
         open={confirming}
         busy={cancelling}
-        title={`Stop run #${execution.id}?`}
+        title={`Stop run #${named}?`}
         confirmLabel="Stop the run"
         busyLabel="Stopping…"
         onDismiss={() => setConfirming(false)}

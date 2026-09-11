@@ -16,16 +16,45 @@
  * rather than written out at its default, so the defaults below stay the
  * source of truth and a palette saved a year ago inherits anything added to
  * them since.
+ *
+ * And one palette per person, not one per installation. Two people sharing a
+ * console do not share an opinion about what colour a button should be, and
+ * the one who never opened this page should go on seeing the blue it shipped
+ * with rather than somebody else's green.
  */
 
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { kvConfigured, kvGetJSON, kvSetJSON } from "./kv";
 
-const KEY = "content-automation:palette";
 const DIR = path.join(process.cwd(), ".data");
-const FILE = path.join(DIR, "palette.json");
+
+/**
+ * Where one person's palette is kept.
+ *
+ * The username is not a filename. It is whatever is in AUTH_USERS, which is
+ * typed by hand and can hold a dot, a slash or a space, and "../../etc" is a
+ * username as far as that list is concerned. So the readable part is reduced
+ * to letters and digits for somebody reading the directory, and a hash of the
+ * actual name is what makes it unique — which also means two users whose names
+ * differ only in punctuation cannot land on the same file.
+ */
+function slot(user: string): string {
+  const who = String(user ?? "").trim().toLowerCase();
+  const readable = who.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24);
+  const stamp = createHash("sha256").update(who).digest("hex").slice(0, 10);
+  return readable ? `${readable}-${stamp}` : stamp;
+}
+
+function keyFor(user: string): string {
+  return `content-automation:palette:${slot(user)}`;
+}
+
+function fileFor(user: string): string {
+  return path.join(DIR, `palette-${slot(user)}.json`);
+}
 
 export type Mode = "light" | "dark";
 
@@ -343,14 +372,15 @@ export function paletteCss(palette: Palette): string {
 
 // ----------------------------------------------------------------- storage
 
-async function read(): Promise<Palette> {
+async function read(user: string): Promise<Palette> {
   if (kvConfigured()) {
-    const saved = await kvGetJSON<Palette>(KEY);
+    const saved = await kvGetJSON<Palette>(keyFor(user));
     if (saved && typeof saved === "object") return { ...EMPTY, ...saved };
   }
   try {
-    if (existsSync(FILE)) {
-      const parsed = JSON.parse(readFileSync(FILE, "utf8")) as Palette;
+    const file = fileFor(user);
+    if (existsSync(file)) {
+      const parsed = JSON.parse(readFileSync(file, "utf8")) as Palette;
       if (parsed && typeof parsed === "object") return { ...EMPTY, ...parsed };
     }
   } catch {
@@ -359,25 +389,35 @@ async function read(): Promise<Palette> {
   return EMPTY;
 }
 
-export async function getPalette(): Promise<Palette> {
-  const saved = await read();
+/**
+ * One person's palette.
+ *
+ * Nobody is the empty palette, which is the blue this shipped with — so a new
+ * account, and an account that has never opened the page, both get the
+ * defaults rather than whatever the last person to save chose.
+ */
+export async function getPalette(user: string | null | undefined): Promise<Palette> {
+  if (!user) return EMPTY;
+  const saved = await read(user);
   const only = clean(saved);
   return { ...saved, light: only.light, dark: only.dark };
 }
 
-export async function savePalette(input: unknown, actor: string): Promise<Palette> {
+export async function savePalette(input: unknown, user: string): Promise<Palette> {
+  if (!user) throw new Error("A palette belongs to somebody, and nobody is signed in.");
+
   const only = clean(input);
   const palette: Palette = {
     ...only,
     updatedAt: new Date().toISOString(),
-    updatedBy: actor,
+    updatedBy: user,
   };
 
   if (kvConfigured()) {
-    if (await kvSetJSON(KEY, palette)) return palette;
+    if (await kvSetJSON(keyFor(user), palette)) return palette;
     throw new Error("The store did not accept the write, so nothing was saved.");
   }
   mkdirSync(DIR, { recursive: true });
-  writeFileSync(FILE, JSON.stringify(palette, null, 2), "utf8");
+  writeFileSync(fileFor(user), JSON.stringify(palette, null, 2), "utf8");
   return palette;
 }

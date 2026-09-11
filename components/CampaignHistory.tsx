@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import StatusBadge from "@/components/StatusBadge";
 import type { Campaign } from "@/lib/mail";
+import { runLabel } from "@/lib/runlabel";
 
 /**
  * Every campaign that has run, and what came of it.
@@ -142,7 +143,12 @@ export default function CampaignHistory() {
                       {/* The log, for the questions this summary cannot answer:
                           what each site turned out to be about, and what the
                           whole thing cost. */}
-                      <Link href={`/runs?run=${encodeURIComponent(one.id)}`}>{one.id}</Link>
+                      <Link href={`/runs?run=${encodeURIComponent(one.id)}`}>
+                        {/* The link carries the bare id, because that is what
+                            the Runs page looks a run up by. Only the words
+                            somebody reads carry the prefix. */}
+                        {runLabel(one.id, true)}
+                      </Link>
                     </dd>
                   </div>
                 </dl>

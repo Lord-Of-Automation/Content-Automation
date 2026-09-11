@@ -8905,3 +8905,12 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
     animation: none;
   }
 }
+
+/* The engine's own id for a campaign, on the date line beneath its anchor. A
+   shade stronger than the date beside it, because it is the half of that line
+   somebody is actually looking for when they came here to cross-reference the
+   Runs page. */
+.mail-run-id {
+  color: var(--ink-2);
+  font-size: 11px;
+}

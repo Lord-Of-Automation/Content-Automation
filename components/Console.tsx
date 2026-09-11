@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import RunForm, { type RunValues } from "@/components/RunForm";
 import RunProgress from "@/components/RunProgress";
 import StatusBadge from "@/components/StatusBadge";
+import { runId, runLabel } from "@/lib/runlabel";
 import { useChanged } from "@/lib/changed";
 import { formatDuration, formatWhen } from "@/lib/format";
 import type { ExecutionDetail, ExecutionSummary, N8nStatus } from "@/lib/n8n";
@@ -38,10 +39,13 @@ type Pending = { startedAt: string; since: number };
 function RunRow({
   run,
   selected,
+  mail,
   onSelect,
 }: {
   run: ExecutionSummary;
   selected: boolean;
+  /** Started from the Mailing page, so it is named for that in the list. */
+  mail: boolean;
   onSelect: (id: string) => void;
 }) {
   // The list refreshes on a timer, so a run can finish while somebody is
@@ -57,7 +61,7 @@ function RunRow({
         aria-current={selected}
         onClick={() => onSelect(run.id)}
       >
-        <span className="run-id">#{run.id}</span>
+        <span className="run-id">#{runLabel(run.id, mail)}</span>
         <span className="run-meta">
           {formatWhen(run.startedAt)} · {formatDuration(run.startedAt, run.stoppedAt)}
         </span>
@@ -69,6 +73,19 @@ function RunRow({
 
 export default function Console() {
   const [history, setHistory] = useState<ExecutionSummary[]>([]);
+  /*
+   * Which of the runs above were campaigns.
+   *
+   * Kept separately because the run list does not say. The engine writes a
+   * run's kind down, but only the detail of one run carries it back — the list
+   * is ids, status and times — so the campaigns are asked for by name and
+   * matched up here.
+   *
+   * Refreshed on the same poll as the list rather than once on arrival: a
+   * campaign started from the Mailing page in another tab appears in this list
+   * within fifteen seconds, and it should appear already named.
+   */
+  const [mailRuns, setMailRuns] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ExecutionDetail | null>(null);
 
@@ -112,6 +129,20 @@ export default function Console() {
       setLoadError(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Could not reach n8n.");
+    }
+  }, []);
+
+  const loadMailRuns = useCallback(async () => {
+    try {
+      const response = await fetch("/api/mail/campaigns", { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = await response.json();
+      const rows: { id: string }[] = payload.campaigns ?? [];
+      setMailRuns(new Set(rows.map((one) => one.id)));
+    } catch {
+      // A run that cannot be identified as a campaign is shown as a run, which
+      // is what it was before. Not worth an error on a page about something
+      // else.
     }
   }, []);
 
@@ -227,6 +258,7 @@ export default function Console() {
 
   useEffect(() => {
     void loadHistory();
+    void loadMailRuns();
     void loadPins();
 
     /*
@@ -242,9 +274,12 @@ export default function Console() {
      */
     let saved: string | null = null;
     try {
-      saved =
+      const asked =
         new URLSearchParams(window.location.search).get("run") ||
         window.localStorage.getItem(SELECTED_KEY);
+      // "Mail-412" is what a campaign is called on screen, so it is what ends
+      // up pasted into the address. The engine only knows 412.
+      saved = asked ? runId(asked) : null;
     } catch {
       saved = null;
     }
@@ -253,12 +288,15 @@ export default function Console() {
       setSelectedId(saved);
       void loadDetail(saved);
     }
-  }, [loadHistory, loadPins, loadDetail]);
+  }, [loadHistory, loadMailRuns, loadPins, loadDetail]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => void loadHistory(), HISTORY_POLL);
+    const timer = window.setInterval(() => {
+      void loadHistory();
+      void loadMailRuns();
+    }, HISTORY_POLL);
     return () => window.clearInterval(timer);
-  }, [loadHistory]);
+  }, [loadHistory, loadMailRuns]);
 
   // Poll the selected run while it is in flight. Depending on the status
   // string rather than the object keeps the interval from resetting on every
@@ -542,6 +580,7 @@ export default function Console() {
                       key={run.id}
                       run={run}
                       selected={run.id === selectedId}
+                      mail={mailRuns.has(run.id)}
                       onSelect={selectRun}
                     />
                   ))}
@@ -564,7 +603,7 @@ export default function Console() {
       <div className="card">
         <div className="card-head">
           <div>
-            <h2>{selectedId ? `Run #${selectedId}` : "Progress"}</h2>
+            <h2>{selectedId ? `Run #${runLabel(selectedId, mailRuns.has(selectedId))}` : "Progress"}</h2>
             <p>Stages are inferred from the nodes n8n has actually executed.</p>
           </div>
         </div>

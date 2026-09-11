@@ -87,10 +87,15 @@ export default async function RootLayout({
    * arrives after the first paint is a palette you watch being applied. This
    * is the same reason the theme script above runs where it does.
    *
-   * Empty for an installation nobody has touched, which is the usual case, and
-   * then this is one absent style element rather than a copy of the defaults.
+   * The signed-in account's own, so two people sharing this console do not
+   * share a palette — and somebody who has never opened the page keeps the
+   * blue it shipped with rather than inheriting a colleague's green.
+   *
+   * Empty for an account that has not changed anything, which is the usual
+   * case, and then this is one absent style element rather than a copy of the
+   * defaults.
    */
-  const palette = paletteCss(await getPalette());
+  const palette = paletteCss(await getPalette(session?.user?.name));
 
   return (
     // The script mutates <html> before React hydrates, which React would
