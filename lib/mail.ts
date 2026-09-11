@@ -42,25 +42,30 @@ export const MAIL_SCOPES = [
   "https://www.googleapis.com/auth/drive.file",
 ];
 
+/** One connected account, and the addresses it may send as. */
+export type Mailbox = {
+  address: string;
+  sendAs: string[];
+  connectedAt: string;
+  /** Whether this one may put a draft in Drive. */
+  canDraft: boolean;
+  /** Why it is not usable, when it is not. */
+  note?: string;
+};
+
 export type MailStatus = {
   /** Whether the engine has an OAuth client to run a consent against. */
   configured: boolean;
   connected: boolean;
-  address: string;
+  /** Every account connected here. A publisher is written to as one of them. */
+  mailboxes?: Mailbox[];
+  /** Every address anything connected can send as, for a chooser to offer. */
+  senders?: string[];
   note?: string;
   /** Whether this app has the other half of that client. */
   consoleConfigured?: boolean;
   /** The exact address to register against the OAuth client. */
   redirectUri?: string;
-  /**
-   * Whether this connection can put a draft in Drive.
-   *
-   * A mailbox connected before campaigns existed sends mail perfectly and
-   * fails at the document, at the end of a run, after every article has been
-   * written and paid for. Said here so the page can offer a reconnect first.
-   */
-  canDraft?: boolean;
-  scopes?: string[];
 };
 
 export type Contact = {
@@ -88,6 +93,9 @@ export type Thread = {
   subject: string;
   sentAt: string;
   sent: number;
+  /** The account holding this conversation, and the identity it went out as. */
+  mailbox?: string;
+  from?: string;
   replies: number;
   /** Whether anything they wrote back names a way to be paid. */
   paypal?: boolean;
@@ -106,6 +114,8 @@ export type Opportunity = {
   price: number | null;
   geo: string;
   language: string;
+  /** Which of our addresses this publisher knows us by, where the sheet says. */
+  sender: string;
   countries: string;
   sentAt: string | null;
   sent: number;
@@ -117,6 +127,7 @@ export type SheetHas = {
   price: boolean;
   geo: boolean;
   language: boolean;
+  sender: boolean;
 };
 
 export class NotOnThisBackend extends Error {}
@@ -301,8 +312,12 @@ export async function connectMail(
   });
 }
 
-export async function disconnectMail(): Promise<void> {
-  await call("/mail/connect", { method: "DELETE" });
+/** One named account, or every one of them when none is named. */
+export async function disconnectMail(address = ""): Promise<void> {
+  await call(
+    `/mail/connect${address ? `?address=${encodeURIComponent(address)}` : ""}`,
+    { method: "DELETE" },
+  );
 }
 
 export async function mailContacts(sheet: string, tab: string): Promise<Contact[]> {
@@ -345,6 +360,8 @@ export async function mailOpportunities(
   );
   return {
     opportunities: answer.opportunities ?? [],
-    has: answer.has ?? { email: false, price: false, geo: false, language: false },
+    has: answer.has ?? {
+      email: false, price: false, geo: false, language: false, sender: false,
+    },
   };
 }

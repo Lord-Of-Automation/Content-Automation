@@ -107,10 +107,14 @@ export default function MailingView() {
    * it is two presses in two places with a Google screen in between. This is
    * the same thing without the first half being somebody's job.
    */
-  async function reconnect() {
+  async function reconnect(address = "") {
     setBusy(true);
     try {
-      await fetch("/api/mail/connect", { method: "DELETE" });
+      if (address) {
+        await fetch(`/api/mail/connect?address=${encodeURIComponent(address)}`, {
+          method: "DELETE",
+        });
+      }
     } catch {
       // Not worth stopping for. The consent that follows replaces whatever is
       // stored anyway, and this only tidies up first.
@@ -118,14 +122,14 @@ export default function MailingView() {
     window.location.href = "/api/mail/connect";
   }
 
-  async function disconnect() {
+  async function disconnect(address: string) {
     const sure = await ask.confirm({
-      title: "Disconnect this mailbox?",
+      title: `Disconnect ${address || "this mailbox"}?`,
       body: (
         <>
-          Nothing more will be sent and no conversation will be read until an
-          account is connected again. The messages already sent stay where they
-          are, in the mailbox they were sent from.
+          Nothing more goes out as that address and its conversations stop
+          being read. Anything already sent stays where it is, in the mailbox
+          it was sent from, and other connected mailboxes are untouched.
         </>
       ),
       confirmLabel: "Disconnect",
@@ -135,11 +139,15 @@ export default function MailingView() {
 
     setBusy(true);
     try {
-      const response = await fetch("/api/mail/connect", { method: "DELETE" });
+      const response = await fetch(
+        `/api/mail/connect?address=${encodeURIComponent(address)}`,
+        { method: "DELETE" },
+      );
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "It could not be disconnected.");
-      setThreads([]);
-      await loadStatus();
+      const left = await loadStatus();
+      if (left?.connected) await loadThreads().catch(() => {});
+      else setThreads([]);
       push("ok", "Disconnected.");
     } catch (e) {
       push("bad", e instanceof Error ? e.message : "It could not be disconnected.");
@@ -184,8 +192,30 @@ export default function MailingView() {
 
   if (loading) return <div className="empty">Reading the mailbox…</div>;
 
+  const boxes = status?.mailboxes ?? [];
   const connected = !!status?.connected;
   const ready = !!status?.configured && !!status?.consoleConfigured;
+
+  /*
+   * The conversations, in one section per address they went out as.
+   *
+   * Which is the whole point of sending as several: a reply says which of your
+   * identities a publisher answered before you read a word of it. Ordered by
+   * the most recent conversation in each, so whoever has just heard something
+   * is at the top.
+   */
+  const grouped = (() => {
+    const by = new Map<string, Thread[]>();
+    for (const one of showing) {
+      const key = one.from || one.mailbox || "";
+      by.set(key, [...(by.get(key) ?? []), one]);
+    }
+    return [...by.entries()].sort((a, b) => {
+      const newest = (rows: Thread[]) =>
+        rows.reduce((at, one) => (one.lastAt ?? one.sentAt) > at ? (one.lastAt ?? one.sentAt) : at, "");
+      return newest(b[1]).localeCompare(newest(a[1]));
+    });
+  })();
 
   return (
     <div className="stack">
@@ -196,9 +226,11 @@ export default function MailingView() {
           <div>
             <h2>Mailing</h2>
             <p className="quiet">
-              {connected
-                ? `Sending as ${status?.address}`
-                : "No mailbox is connected yet"}
+              {!connected
+                ? "No mailbox is connected yet"
+                : boxes.length === 1
+                  ? `Sending as ${boxes[0]!.address}`
+                  : `${boxes.length} mailboxes connected`}
             </p>
           </div>
           <div className="app-head-actions">
@@ -224,55 +256,24 @@ export default function MailingView() {
               </button>
             </div>
             {connected ? (
-              <>
-                <button
-                  type="button"
-                  className="btn btn-ghost bar-btn"
-                  disabled={busy}
-                  onClick={() => void loadThreads().catch((e) => push("bad", String(e.message)))}
-                >
-                  Refresh
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger bar-btn"
-                  disabled={busy}
-                  onClick={() => void disconnect()}
-                >
-                  Disconnect
-                </button>
-              </>
-            ) : ready ? (
+              <button
+                type="button"
+                className="btn btn-ghost bar-btn"
+                disabled={busy}
+                onClick={() => void loadThreads().catch((e) => push("bad", String(e.message)))}
+              >
+                Refresh
+              </button>
+            ) : null}
+            {ready ? (
               <a className="btn btn-primary bar-btn" href="/api/mail/connect">
-                Connect Gmail
+                {boxes.length ? "Connect another" : "Connect Gmail"}
               </a>
             ) : null}
           </div>
         </div>
 
         <div className="card-body tight">
-          {/* Connected, and not permitted to do the thing a campaign needs.
-              Said here rather than discovered at the end of a run, after every
-              article has been written and paid for. */}
-          {connected && status?.canDraft === false ? (
-            <div className="notice warn mail-notice">
-              <strong>This connection cannot create drafts.</strong> It was
-              granted before campaigns existed, so it can send and read mail but
-              not put an article in a document. Campaigns will write every
-              article and then fail at the last step.
-              <div className="sa-notice-do">
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  disabled={busy}
-                  onClick={() => void reconnect()}
-                >
-                  Reconnect and grant it
-                </button>
-              </div>
-            </div>
-          ) : null}
-
           {!ready ? (
             <div className="notice warn mail-notice">
               <strong>There is no Google OAuth client to connect through.</strong>{" "}
@@ -308,6 +309,7 @@ export default function MailingView() {
           {view === "campaign" ? (
             <OutreachCampaign
               connected={connected}
+              senders={status?.senders ?? []}
               onStarted={() => {
                 // The first email lands within a minute or two, so the list is
                 // worth another look shortly. Switching tabs is the cue.
@@ -344,79 +346,96 @@ export default function MailingView() {
                     : "Nothing sent yet. Conversations appear here once this platform has written to somebody, and only those."}
                 </p>
                 ) : (
-                <ul className="mail-threads">
-                  {showing.map((thread) => {
-                    const showing = open === thread.email;
-                    return (
-                      <li
-                        key={thread.email}
-                        className={thread.replies ? "mail-thread has-reply" : "mail-thread"}
-                      >
-                        <button
-                          type="button"
-                          className="mail-thread-head"
-                          onClick={() => setOpen(showing ? null : thread.email)}
-                        >
-                          <span className="mail-who">{thread.email}</span>
-                          <span className="mail-subject">{thread.subject}</span>
-                          <span className="mail-count">
-                            {thread.replies
-                              ? `${thread.replies} repl${thread.replies === 1 ? "y" : "ies"}`
-                              : "no reply yet"}
-                          </span>
-                          <span className="mail-at">{when(thread.lastAt ?? thread.sentAt)}</span>
-                        </button>
+                grouped.map(([sender, rows]) => (
+                  <section className="mail-group" key={sender || "unknown"}>
+                    {/* The address the publisher knows you by. Named even when
+                        there is only one, because a page that starts labelling
+                        things once there are two reads differently on the day
+                        you add one. */}
+                    <h3 className="mail-group-head">
+                      <span>{sender || "an address no longer connected"}</span>
+                      <span className="mail-group-count">
+                        {rows.length} conversation{rows.length === 1 ? "" : "s"}
+                        {rows.filter((one) => one.replies).length
+                          ? `, ${rows.filter((one) => one.replies).length} replied`
+                          : ""}
+                      </span>
+                    </h3>
+                    <ul className="mail-threads">
+                      {rows.map((thread) => {
+                        const isOpen = open === thread.email;
+                        return (
+                          <li
+                            key={thread.email}
+                            className={thread.replies ? "mail-thread has-reply" : "mail-thread"}
+                          >
+                            <button
+                              type="button"
+                              className="mail-thread-head"
+                              onClick={() => setOpen(isOpen ? null : thread.email)}
+                            >
+                              <span className="mail-who">{thread.email}</span>
+                              <span className="mail-subject">{thread.subject}</span>
+                              <span className="mail-count">
+                                {thread.replies
+                                  ? `${thread.replies} repl${thread.replies === 1 ? "y" : "ies"}`
+                                  : "no reply yet"}
+                              </span>
+                              <span className="mail-at">{when(thread.lastAt ?? thread.sentAt)}</span>
+                            </button>
 
-                        {thread.note ? (
-                          <p className="notice warn mail-note">{thread.note}</p>
-                        ) : null}
+                            {thread.note ? (
+                              <p className="notice warn mail-note">{thread.note}</p>
+                            ) : null}
 
-                        {showing ? (
-                          <div className="mail-messages">
-                            {thread.messages.map((message) => (
-                              <article
-                                key={message.id}
-                                className={message.mine ? "mail-message is-mine" : "mail-message"}
-                              >
-                                <header>
-                                  <strong>{message.mine ? "You" : message.from}</strong>
-                                  <span>{when(message.at)}</span>
-                                </header>
-                                {/* As text, never as markup. What is in here
-                                    was written by somebody outside this
-                                    platform, and a page that renders their
-                                    HTML renders whatever they felt like
-                                    sending. */}
-                                <pre>{message.text.trim() || "(no words in it)"}</pre>
-                              </article>
-                            ))}
-                            <div className="ve-actions">
-                              {/* Answering happens in the mailbox. A reply to a publisher is a
-                                  conversation, and a one-line box on a dashboard is the wrong
-                                  place to hold one. */}
-                              <a
-                                className="btn btn-ghost btn-sm"
-                                href={`https://mail.google.com/mail/u/0/#all/${thread.threadId}`}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                Open in Gmail
-                              </a>
-                              <button
-                                type="button"
-                                className="btn btn-danger btn-sm"
-                                disabled={busy}
-                                onClick={() => void forget(thread.email)}
-                              >
-                                Forget
-                              </button>
-                            </div>
-                          </div>
-                        ) : null}
-                      </li>
-                    );
-                  })}
-                </ul>
+                            {isOpen ? (
+                              <div className="mail-messages">
+                                {thread.messages.map((message) => (
+                                  <article
+                                    key={message.id}
+                                    className={message.mine ? "mail-message is-mine" : "mail-message"}
+                                  >
+                                    <header>
+                                      <strong>{message.mine ? "You" : message.from}</strong>
+                                      <span>{when(message.at)}</span>
+                                    </header>
+                                    {/* As text, never as markup. What is in here
+                                        was written by somebody outside this
+                                        platform, and a page that renders their
+                                        HTML renders whatever they felt like
+                                        sending. */}
+                                    <pre>{message.text.trim() || "(no words in it)"}</pre>
+                                  </article>
+                                ))}
+                                <div className="ve-actions">
+                                  {/* Answering happens in the mailbox. A reply to a publisher is a
+                                      conversation, and a one-line box on a dashboard is the wrong
+                                      place to hold one. */}
+                                  <a
+                                    className="btn btn-ghost btn-sm"
+                                    href={`https://mail.google.com/mail/u/0/#all/${thread.threadId}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    Open in Gmail
+                                  </a>
+                                  <button
+                                    type="button"
+                                    className="btn btn-danger btn-sm"
+                                    disabled={busy}
+                                    onClick={() => void forget(thread.email)}
+                                  >
+                                    Forget
+                                  </button>
+                                </div>
+                              </div>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                      </ul>
+                    </section>
+                  ))
                 )}
             </div>
           ) : null}

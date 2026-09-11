@@ -55,9 +55,12 @@ function short(value: number | null): string {
 
 export default function OutreachCampaign({
   connected,
+  senders,
   onStarted,
 }: {
   connected: boolean;
+  /** Every address anything connected can send as, to check the sheet against. */
+  senders: string[];
   onStarted: () => void;
 }) {
   const ask = useAsk();
@@ -168,7 +171,22 @@ export default function OutreachCampaign({
   ]);
 
   const picked = showing.filter((one) => chosen.has(one.domain));
-  const withAddress = picked.filter((one) => one.email);
+
+  /*
+   * Who each chosen publisher would hear from, worked out here so the page can
+   * refuse before a campaign spends anything.
+   *
+   * A sheet naming an address nothing can send as is the one failure this
+   * feature exists to prevent, and it is silent on Gmail's side: an unverified
+   * From is not rejected, it is rewritten to the account's own address and
+   * sent. So a row like that is not sent at all, and says so up front.
+   */
+  const allowed = new Set(senders.map((one) => one.toLowerCase()));
+  const sendable = (one: Opportunity): boolean =>
+    !one.sender || allowed.has(one.sender.toLowerCase());
+
+  const withAddress = picked.filter((one) => one.email && sendable(one));
+  const unsendable = picked.filter((one) => one.email && !sendable(one));
 
   function toggle(domain: string) {
     setChosen((was) => {
@@ -199,6 +217,14 @@ export default function OutreachCampaign({
               skipped.
             </>
           ) : null}
+          {unsendable.length ? (
+            <>
+              {" "}
+              {unsendable.length} name a Send from address nothing connected here
+              can send as, and are skipped rather than written to by somebody the
+              publisher does not know.
+            </>
+          ) : null}
         </>
       ),
       confirmLabel: "Start the campaign",
@@ -214,6 +240,7 @@ export default function OutreachCampaign({
           targets: withAddress.map((one) => ({
             domain: one.domain,
             email: one.email,
+            from: one.sender,
             price: one.price,
           })),
           anchor_text: anchor,
@@ -400,6 +427,7 @@ export default function OutreachCampaign({
                         <th>Price</th>
                         <th>GEO</th>
                         <th>Language</th>
+                        <th>Send from</th>
                         <th>Email</th>
                       </tr>
                     </thead>
@@ -424,7 +452,21 @@ export default function OutreachCampaign({
                           <td>{short(one.traffic)}</td>
                           <td>{one.price === null ? "—" : one.price}</td>
                           <td>{one.geo || "—"}</td>
-                          <td>{one.language || "—"}</td>
+                          {/* Marked where it names something nothing can send
+                              as, because that row will be skipped and the
+                              reason is not visible anywhere else. */}
+                          <td
+                            className={
+                              sendable(one) ? "mono" : "mono campaign-nosender"
+                            }
+                            title={
+                              sendable(one)
+                                ? undefined
+                                : "Nothing connected on the Mailing page can send as this"
+                            }
+                          >
+                            {one.sender || "—"}
+                          </td>
                           {/* A publisher worth a link and missing an address is
                               a thing to go and find an address for, so it is
                               listed and marked rather than hidden. */}
