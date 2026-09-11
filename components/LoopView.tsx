@@ -651,7 +651,10 @@ export default function LoopView() {
       </div>
 
       {draft ? (
-        <div className="card">
+        /* Keyed on which loop is being edited so that clicking Edit on a
+           second one opens again, rather than silently changing the values in
+           a box that is already sitting there. */
+        <div className="card loop-form" key={draft.id ?? "new"}>
           <div className="card-head">
             <div>
               <h2>{draft.id ? "Edit loop" : "New loop"}</h2>

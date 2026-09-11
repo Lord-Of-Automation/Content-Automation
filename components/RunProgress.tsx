@@ -309,7 +309,13 @@ export default function RunProgress({
   const finished = execution.stoppedAt;
 
   return (
-    <div className="card-body">
+    /*
+     * Keyed on the run, so the arrival plays when the run being looked at
+     * changes and not on the poll that keeps a live one current. Without the
+     * key React reuses this element between two runs and the values simply
+     * swap; with it on every render the box would flicker every four seconds.
+     */
+    <div className="card-body run-box" key={execution.id}>
       <div className="progress-head">
         <div>
           <div className="progress-now">

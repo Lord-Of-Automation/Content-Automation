@@ -420,7 +420,12 @@ export default function WebsiteEditor({ id }: { id: string }) {
   }
 
   return (
-    <div className={assist ? "stack we-with-claude" : "stack"}>
+    /*
+     * The editor is read before it can be drawn, so for a moment this page is
+     * the word "Reading" and then it is the whole thing at once. Arriving
+     * instead gives the eye somewhere to start.
+     */
+    <div className={assist ? "stack editor-in we-with-claude" : "stack editor-in"}>
       {assist ? (
         <SiteAssistant
           id={id}

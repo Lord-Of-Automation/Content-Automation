@@ -6495,10 +6495,13 @@ textarea {
  * is a hundred animations and looks like a wave.
  */
 .card-body > table.logs,
-.ov-list,
-.loop-list {
+.ov-list {
   animation: fade-in 160ms var(--ease);
 }
+
+/* The loop list is the exception, and it is the reason for the rule: the
+   boxes in it are big enough to be worth arriving one at a time, so each
+   carries its own arrival further down and the list carries none. */
 
 /*
  * A value that changed while you were looking elsewhere.
@@ -8436,6 +8439,183 @@ code,
   .history > .campaign-run,
   .mail-runs-list > .mail-run,
   .campaign-run-body {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------- a run, arriving
+
+   Picking a run out of the list empties the box and refills it, and the refill
+   used to land in one piece: a wall of stages, a bar already full, a cost
+   already totalled. Nothing wrong with it except that it gave no sense of
+   which parts belonged together.
+
+   So it arrives in the order it reads in. The box itself, then the bar
+   filling, then the stages one after another, then what the run cost and what
+   can be done about it. It is the same content in the same place — only the
+   half-second it takes to get there is now spent saying what it is.
+
+   Keyed on the run's own id in RunProgress, so this plays when the run being
+   looked at changes and not on the four-second poll that keeps it current. */
+.run-box {
+  animation: run-box-in 300ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+@keyframes run-box-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* The bar fills rather than appearing filled. Scaled from its left edge, so
+   the width n8n actually reported stays the width it stops at — a keyframe
+   cannot know that number, and a transition does not run on the first frame
+   an element exists. */
+.run-box .bar > span {
+  animation: bar-sweep 520ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) 120ms both;
+  transform-origin: left center;
+}
+
+@keyframes bar-sweep {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* What was asked for, and the page it is on now, between the bar and the
+   stages. */
+.run-box .current-page,
+.run-box .done-pages,
+.run-box .inputs {
+  animation: row-in 260ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) 140ms both;
+}
+
+/* The stages, in the order they run in. Capped at the eighth: a long list
+   dealing itself out one line at a time is slower to read, not better. */
+.run-box .stages > .stage {
+  animation: row-in 300ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+.run-box .stages > .stage:nth-child(1) { animation-delay: 180ms; }
+.run-box .stages > .stage:nth-child(2) { animation-delay: 215ms; }
+.run-box .stages > .stage:nth-child(3) { animation-delay: 250ms; }
+.run-box .stages > .stage:nth-child(4) { animation-delay: 285ms; }
+.run-box .stages > .stage:nth-child(5) { animation-delay: 320ms; }
+.run-box .stages > .stage:nth-child(6) { animation-delay: 355ms; }
+.run-box .stages > .stage:nth-child(7) { animation-delay: 390ms; }
+.run-box .stages > .stage:nth-child(n + 8) { animation-delay: 420ms; }
+
+/* Last, because they are what you read last: the bill, and the buttons. */
+.run-box .cost,
+.run-box .run-actions {
+  animation: row-in 280ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) 300ms both;
+}
+
+/* ------------------------------------------- the loops, arriving
+
+   The loops are fetched, so the page exists for a moment before they do and
+   they used to replace a pair of skeletons all at once. Each box now rises on
+   its own, a beat apart, which is the same rhythm the tables and the campaigns
+   keep.
+
+   Keyed by schedule id in LoopView, so switching one on or saving one does not
+   send the whole list through this again. */
+.loop-list > .loop {
+  animation: row-in 300ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+.loop-list > .loop:nth-child(1) { animation-delay: 0ms; }
+.loop-list > .loop:nth-child(2) { animation-delay: 45ms; }
+.loop-list > .loop:nth-child(3) { animation-delay: 90ms; }
+.loop-list > .loop:nth-child(4) { animation-delay: 135ms; }
+.loop-list > .loop:nth-child(5) { animation-delay: 180ms; }
+.loop-list > .loop:nth-child(n + 6) { animation-delay: 215ms; }
+
+/* The editor, which opens below the list and used to be there before you had
+   finished clicking. It comes up from under the list it belongs to, and its
+   first rows follow it in, so it reads as one thing opening rather than a
+   second page appearing.
+
+   Keyed on which loop is being edited, so clicking Edit on one and then on
+   another plays it again instead of quietly swapping the values. */
+.loop-form {
+  animation: run-box-in 300ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+.loop-form .card-body form > * {
+  animation: row-in 280ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+.loop-form .card-body form > *:nth-child(1) { animation-delay: 90ms; }
+.loop-form .card-body form > *:nth-child(2) { animation-delay: 125ms; }
+.loop-form .card-body form > *:nth-child(3) { animation-delay: 160ms; }
+.loop-form .card-body form > *:nth-child(n + 4) { animation-delay: 190ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .run-box,
+  .run-box .bar > span,
+  .run-box .current-page,
+  .run-box .done-pages,
+  .run-box .inputs,
+  .run-box .stages > .stage,
+  .run-box .cost,
+  .run-box .run-actions,
+  .loop-list > .loop,
+  .loop-form,
+  .loop-form .card-body form > * {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------- the editor, arriving
+
+   Everything on this page waits on one read: the site, its pages, its design
+   and its history all come back together, and until they do the page is the
+   sentence "Reading the website". Then all of it is there at once, which is a
+   lot of page to land in a single frame.
+
+   So the cards come up in the order they are stacked in, and the assistant
+   beside them comes in from its own edge, because it is a panel rather than a
+   card and it opens from the side it lives on. */
+.editor-in > .card {
+  animation: run-box-in 320ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+.editor-in > .card:nth-child(1) { animation-delay: 0ms; }
+.editor-in > .card:nth-child(2) { animation-delay: 60ms; }
+.editor-in > .card:nth-child(n + 3) { animation-delay: 110ms; }
+
+/* The toolbar and the page it is editing, a beat after the card holding them,
+   so the card is a card before it has anything in it. */
+.editor-in .editor-sections,
+.editor-in .sheet-section,
+.editor-in .editor-body-head {
+  animation: row-in 300ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) 120ms both;
+}
+
+@keyframes editor-aside-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+
+.editor-in > .sa-panel,
+.editor-in > aside {
+  animation: editor-aside-in 320ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-in > .card,
+  .editor-in .editor-sections,
+  .editor-in .sheet-section,
+  .editor-in .editor-body-head,
+  .editor-in > .sa-panel,
+  .editor-in > aside {
     animation: none;
   }
 }
