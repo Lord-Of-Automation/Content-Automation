@@ -14,13 +14,21 @@ import { useEffect, useRef, useState } from "react";
  * Counting answers that without a word. A figure that runs upward went up, one
  * that runs down went down, and the distance it travels is roughly how much.
  *
- * Not on the first appearance. A page arriving with every number spinning from
- * zero is a slot machine; this is for the change from one answer to the next,
- * so the first value is simply the value.
+ * It runs on the first appearance too, from zero. These figures arrive after a
+ * fetch, so the page has already been sitting there with a row of skeletons
+ * where they go, and counting is what makes them land rather than simply
+ * replace the placeholder. It is over in a quarter of a second either way.
  */
 
-/** Long enough to read as counting, short enough not to be waited for. */
-const RUN = 420;
+/**
+ * Short enough that the digits in between cannot be read.
+ *
+ * Which is the point of them. Nobody wants to know that the figure passed
+ * through 816 on its way to 1,284 — what the count is for is the direction and
+ * roughly the distance, and a run slow enough to read each step invites
+ * somebody to try.
+ */
+const RUN = 260;
 
 /**
  * Fast first and slow at the end.
@@ -42,13 +50,16 @@ export default function Tally({
   format: (n: number) => string;
   className?: string;
 }) {
-  const [shown, setShown] = useState(value);
+  // Starts at nothing, so the first value counts up to itself rather than
+  // appearing. Every figure this is used for arrives after a fetch, so there is
+  // no frame where the real number was already on screen to jump from.
+  const [shown, setShown] = useState(0);
 
   // What is on screen right now, which is where the next count starts from.
   // A ref rather than state: a count interrupted halfway by another change
   // should carry on from the figure being looked at, not from the one it was
   // heading for.
-  const at = useRef(value);
+  const at = useRef(0);
   const frame = useRef(0);
 
   useEffect(() => {

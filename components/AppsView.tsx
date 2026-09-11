@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useReveal } from "@/lib/reveal";
+import Tally from "@/components/Tally";
 
 import AppCredential from "@/components/AppCredential";
 import AppDomain from "@/components/AppDomain";
@@ -175,6 +176,11 @@ function home(app: App): string {
  * three controls, times every application on the account.
  */
 const PAGE = 50;
+
+/** A plain count, which is what all four of these are. */
+function count(n: number): string {
+  return new Intl.NumberFormat().format(Math.round(n));
+}
 
 function Chevrons({ state }: { state: "none" | "asc" | "desc" }) {
   return (
@@ -503,21 +509,31 @@ export default function AppsView() {
 
           {data && data.apps.length ? (
             <>
+              {/* Counted rather than swapped, so filtering to one host shows
+                  the four figures moving to their new answers. */}
               <div className="domain-stats">
                 <div className="domain-stat">
-                  <span className="domain-stat-value">{totals.apps}</span>
+                  <span className="domain-stat-value">
+                    <Tally value={totals.apps} format={count} />
+                  </span>
                   <span className="domain-stat-label">applications</span>
                 </div>
                 <div className="domain-stat">
-                  <span className="domain-stat-value">{totals.servers}</span>
+                  <span className="domain-stat-value">
+                    <Tally value={totals.servers} format={count} />
+                  </span>
                   <span className="domain-stat-label">servers</span>
                 </div>
                 <div className={totals.homeless ? "domain-stat is-warn" : "domain-stat"}>
-                  <span className="domain-stat-value">{totals.homeless}</span>
+                  <span className="domain-stat-value">
+                    <Tally value={totals.homeless} format={count} />
+                  </span>
                   <span className="domain-stat-label">with no domain</span>
                 </div>
                 <div className="domain-stat">
-                  <span className="domain-stat-value">{totals.staging}</span>
+                  <span className="domain-stat-value">
+                    <Tally value={totals.staging} format={count} />
+                  </span>
                   <span className="domain-stat-label">staging copies</span>
                 </div>
               </div>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useReveal } from "@/lib/reveal";
+import Tally from "@/components/Tally";
 
 import AddToCloudflare from "@/components/AddToCloudflare";
 import BulkBar from "@/components/BulkBar";
@@ -116,6 +117,11 @@ function csvField(value: unknown): string {
 }
 
 /** Both registrars price in millionths. Rendered in the viewer's own locale. */
+/** A plain count, which is what every figure beside the money is. */
+function count(n: number): string {
+  return new Intl.NumberFormat().format(Math.round(n));
+}
+
 function money(micro: number, currency: string): string {
   try {
     return new Intl.NumberFormat(undefined, {
@@ -469,7 +475,11 @@ export default function DomainsView() {
                 {yearly.totals.length ? (
                   yearly.totals.map(([currency, total]) => (
                     <div className="domain-stat is-lead" key={currency}>
-                      <span className="domain-stat-value">{money(total, currency)}</span>
+                      <span className="domain-stat-value">
+                        {/* Counted, so a filter narrowing the list shows the
+                            bill moving rather than simply being different. */}
+                        <Tally value={total} format={(n) => money(n, currency)} />
+                      </span>
                       <span className="domain-stat-label">
                         renewals a year
                         {yearly.counted < domains.length ? (
@@ -486,19 +496,25 @@ export default function DomainsView() {
                 )}
 
                 <div className="domain-stat">
-                  <span className="domain-stat-value">{domains.length}</span>
+                  <span className="domain-stat-value">
+                    <Tally value={domains.length} format={count} />
+                  </span>
                   <span className="domain-stat-label">
                     domain{domains.length === 1 ? "" : "s"}
                   </span>
                 </div>
 
                 <div className={soon ? "domain-stat is-bad" : "domain-stat"}>
-                  <span className="domain-stat-value">{soon}</span>
+                  <span className="domain-stat-value">
+                    <Tally value={soon} format={count} />
+                  </span>
                   <span className="domain-stat-label">expiring within 30 days</span>
                 </div>
 
                 <div className={manual ? "domain-stat is-warn" : "domain-stat"}>
-                  <span className="domain-stat-value">{manual}</span>
+                  <span className="domain-stat-value">
+                    <Tally value={manual} format={count} />
+                  </span>
                   <span className="domain-stat-label">not on auto-renew</span>
                 </div>
               </div>

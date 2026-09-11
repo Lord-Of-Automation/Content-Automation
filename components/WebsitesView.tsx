@@ -514,14 +514,6 @@ export default function WebsitesView() {
             </table>
           ) : null}
 
-          {sites && sites.length ? (
-            <p className="domain-note">
-              None of these is hosted. They are pages waiting to be read and
-              corrected, and where each one lives is a decision still to be
-              made. A website still being written updates itself here every few
-              seconds.
-            </p>
-          ) : null}
         </div>
       </div>
     </div>
