@@ -89,6 +89,8 @@ export default function OutreachCampaign({
   const [anchor, setAnchor] = useState("");
   const [anchorUrl, setAnchorUrl] = useState("");
   const [brief, setBrief] = useState("");
+  /** A Google Doc of house style, for campaigns where the voice matters. */
+  const [briefDoc, setBriefDoc] = useState("");
   const [subject, setSubject] = useState(BLANK_SUBJECT);
   const [body, setBody] = useState(BLANK_BODY);
 
@@ -256,6 +258,7 @@ export default function OutreachCampaign({
           anchor_text: anchor,
           anchor_url: anchorUrl,
           article_brief: brief,
+          brief_doc_id: briefDoc.trim(),
           mail_subject: subject,
           mail_body: body,
         }),
@@ -527,6 +530,28 @@ export default function OutreachCampaign({
               placeholder="Optional. Left blank, each article is written from what that publisher already publishes."
               onChange={(e) => setBrief(e.target.value)}
             />
+
+            {/* The same brief the optimiser uses, by the same id, because it
+                is the same document: a campaign that wants the house voice
+                wants the one already written down rather than a second copy
+                of it pasted above. */}
+            <label className="field-label" htmlFor="c-brief-doc">
+              House brief document <span className="quiet">— optional</span>
+            </label>
+            <input
+              id="c-brief-doc"
+              type="text"
+              value={briefDoc}
+              spellCheck={false}
+              placeholder="A Google Doc id, or its address. Left blank, no brief is used."
+              onChange={(e) => setBriefDoc(e.target.value)}
+            />
+            <p className="provider-hint">
+              Read once for the whole campaign and followed on voice, structure
+              and what to avoid. The rules that keep an article publishable win
+              where the two disagree, and a document that cannot be read is
+              said so in the log rather than stopping the run.
+            </p>
           </section>
 
           {/* --------------------------------------------------- the email */}

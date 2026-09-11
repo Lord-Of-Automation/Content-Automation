@@ -56,6 +56,9 @@ export async function POST(request: Request) {
       anchor_text: String(body.anchor_text ?? ""),
       anchor_url: String(body.anchor_url ?? ""),
       article_brief: String(body.article_brief ?? ""),
+      // Optional. The engine takes the id out of an address if that is
+      // what was pasted, and says so in the log when it cannot be read.
+      brief_doc_id: String(body.brief_doc_id ?? ""),
       mail_subject: String(body.mail_subject ?? ""),
       mail_body: String(body.mail_body ?? ""),
     } as never);
