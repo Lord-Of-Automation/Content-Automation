@@ -7837,6 +7837,16 @@ code,
   white-space: nowrap;
 }
 
+/* The operator's own words about a publisher. Capped, because a note is as
+   long as somebody felt like making it and the table has seven other columns
+   to fit; the whole of it is on the row's title. */
+.campaign-notes {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink-3);
+}
+
 /* A Send from the platform cannot actually send as. The row is skipped rather
    than sent by somebody the publisher has never heard from, and this is the
    only place that is visible before the run. */

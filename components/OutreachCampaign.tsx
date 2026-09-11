@@ -149,14 +149,26 @@ export default function OutreachCampaign({
       if (limits.priceMax !== null && (one.price === null || one.price > limits.priceMax)) return false;
 
       if (wantedGeo) {
-        // The sheet's own word, matched against the code and the country name,
-        // because a column filled in by hand says "UK" on one row and "United
-        // Kingdom" on the next. Falls back to the countries the checker worked
-        // out, for a sheet with no GEO column at all.
-        const said = `${one.geo} ${one.countries}`.toLowerCase();
+        /*
+         * The sheet's own word, and the countries the checker worked out.
+         *
+         * Both, because a sheet often has no GEO column and the Top Countries
+         * one already says where the traffic is. Matched on whole words rather
+         * than anywhere in the string: "in" for India is two letters that
+         * appear inside half the English language, and "(US, 19.5K)" would
+         * have matched a search for Austria.
+         *
+         * The country's name counts as well as its code, since a column filled
+         * in by hand says UK on one row and United Kingdom on the next.
+         */
+        const said = `${one.geo} ${one.countries} ${one.notes}`.toLowerCase();
+        const words = new Set(said.split(/[^a-z]+/).filter(Boolean));
         const country = MARKETS.find((m) => m.code === wantedGeo);
-        const alsoCalled = country ? country.label.toLowerCase() : "";
-        if (!said.includes(wantedGeo) && !(alsoCalled && said.includes(alsoCalled))) return false;
+        const named = country ? country.label.toLowerCase().split(/[^a-z]+/).filter(Boolean) : [];
+
+        const matched =
+          words.has(wantedGeo) || (named.length > 0 && named.every((word) => words.has(word)));
+        if (!matched) return false;
       }
 
       if (wantedLanguage && !one.language.toLowerCase().includes(wantedLanguage)) return false;
@@ -429,6 +441,7 @@ export default function OutreachCampaign({
                         <th>Language</th>
                         <th>Send from</th>
                         <th>Email</th>
+                        <th>Notes</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -472,6 +485,9 @@ export default function OutreachCampaign({
                               listed and marked rather than hidden. */}
                           <td className={one.email ? "mono" : "campaign-noaddress"}>
                             {one.email || "none in the sheet"}
+                          </td>
+                          <td className="campaign-notes" title={one.notes}>
+                            {one.notes || "—"}
                           </td>
                         </tr>
                       ))}

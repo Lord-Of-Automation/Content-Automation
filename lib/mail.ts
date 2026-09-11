@@ -116,6 +116,8 @@ export type Opportunity = {
   language: string;
   /** Which of our addresses this publisher knows us by, where the sheet says. */
   sender: string;
+  /** Whatever the operator wrote about this one. */
+  notes: string;
   countries: string;
   sentAt: string | null;
   sent: number;
@@ -128,6 +130,7 @@ export type SheetHas = {
   geo: boolean;
   language: boolean;
   sender: boolean;
+  notes: boolean;
 };
 
 export class NotOnThisBackend extends Error {}
@@ -361,7 +364,8 @@ export async function mailOpportunities(
   return {
     opportunities: answer.opportunities ?? [],
     has: answer.has ?? {
-      email: false, price: false, geo: false, language: false, sender: false,
+      email: false, price: false, geo: false, language: false,
+      sender: false, notes: false,
     },
   };
 }
