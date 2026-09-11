@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import type { Thread } from "@/lib/mail";
 
 /**
@@ -50,6 +52,115 @@ function when(value: string | null | undefined): string {
  * the reply.
  */
 const QUOTE = /^[ \t]*(?:>[ \t]?)+/;
+
+/**
+ * A web address, an address missing its scheme, or an email address.
+ *
+ * Deliberately greedy about what belongs to a URL. A PayPal invoice link is
+ *
+ *   https://www.paypal.com/invoice/p/#49BMMNCTTYTC35AF
+ *
+ * and a pattern that stops at punctuation, or at the fragment, hands back half
+ * of it — which is worse than not linking it at all, because a half link looks
+ * like a whole one. So it runs to whitespace and the trailing punctuation is
+ * taken off afterwards, where the question can actually be answered.
+ */
+const LINKS = /(https?:\/\/[^\s<>]+|www\.[^\s<>]+|[^\s<>@]+@[^\s<>@]+\.[a-z]{2,})/gi;
+
+/**
+ * The punctuation at the end of a link that belongs to the sentence instead.
+ *
+ * "Pay at https://x.com/pay." ends in a full stop that is not part of the
+ * address, and "(see https://x.com/pay)" ends in a bracket that is not either
+ * — but "https://en.wikipedia.org/wiki/Dune_(novel)" ends in one that is. So a
+ * closing bracket is only given back to the sentence when nothing in the link
+ * opened it.
+ */
+function trimTail(url: string): string {
+  let out = url;
+  for (;;) {
+    const last = out.slice(-1);
+    if (".,;:!?'\"".includes(last)) {
+      out = out.slice(0, -1);
+      continue;
+    }
+    const opener = { ")": "(", "]": "[", "}": "{" }[last];
+    if (opener) {
+      const opens = out.split(opener).length - 1;
+      const closes = out.split(last).length - 1;
+      if (closes > opens) {
+        out = out.slice(0, -1);
+        continue;
+      }
+    }
+    return out;
+  }
+}
+
+/**
+ * Where a link found in a message actually goes.
+ *
+ * Only three schemes are ever produced, and the scheme is written here rather
+ * than taken from the text. The message was typed by somebody outside this
+ * platform, and "javascript:" is a URL as far as a pattern is concerned.
+ */
+function hrefFor(found: string): string | null {
+  if (/^https?:\/\//i.test(found)) return found;
+  if (/^www\./i.test(found)) return `https://${found}`;
+  if (found.includes("@") && !found.includes("/")) return `mailto:${found}`;
+  return null;
+}
+
+/** A run of plain words, or one address and where it goes. */
+export type Piece = string | { text: string; href: string };
+
+/**
+ * A message broken into the words and the addresses in them.
+ *
+ * Separate from the rendering, and exported, so what counts as a link can be
+ * tested against the shapes that actually turn up in a publisher's reply
+ * without standing a React tree up to ask.
+ */
+export function splitLinks(text: string): Piece[] {
+  const out: Piece[] = [];
+  let cursor = 0;
+
+  for (const match of text.matchAll(LINKS)) {
+    const at = match.index ?? 0;
+    const url = trimTail(match[0]);
+    const href = hrefFor(url);
+    if (!href) continue;
+
+    if (at > cursor) out.push(text.slice(cursor, at));
+    out.push({ text: url, href });
+    // Whatever trimTail gave back to the sentence is still the sentence's.
+    cursor = at + url.length;
+  }
+
+  if (cursor < text.length) out.push(text.slice(cursor));
+  return out;
+}
+
+/**
+ * A message's words, with the addresses in them made clickable.
+ *
+ * Built as React elements rather than as a string of HTML. The text came from
+ * a publisher's mail client, and putting it through dangerouslySetInnerHTML
+ * would render whatever they felt like sending; this way every character they
+ * wrote is escaped, and the only markup on the page is the anchor tags this
+ * function puts there itself.
+ */
+function linkify(text: string): ReactNode[] {
+  return splitLinks(text).map((piece, at) =>
+    typeof piece === "string" ? (
+      piece
+    ) : (
+      <a key={at} href={piece.href} target="_blank" rel="noreferrer noopener">
+        {piece.text}
+      </a>
+    ),
+  );
+}
 
 function unquote(text: string): string {
   return text
@@ -138,7 +249,13 @@ export default function MailThread({
                 <strong>{message.mine ? "You" : message.from}</strong>
                 <span>{when(message.at)}</span>
               </header>
-              <pre>{unquote(message.text) || "(no words in it)"}</pre>
+              <pre>
+                {/* An invoice arrives as a link and is the reason anybody
+                    opens one of these, so it is a link here too. */}
+                {unquote(message.text)
+                  ? linkify(unquote(message.text))
+                  : "(no words in it)"}
+              </pre>
             </article>
           ))}
           <div className="ve-actions">

@@ -8978,3 +8978,23 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
     animation: none;
   }
 }
+
+/* An address inside a reply.
+
+   A PayPal invoice link is the reason most of these conversations are opened,
+   so it is a link rather than something to select and copy. Underlined as well
+   as coloured: the message around it is already --ink-2 on a tinted panel, and
+   colour alone is a weak signal at thirteen pixels against that.
+
+   Allowed to break anywhere it has to. An invoice link is fifty characters
+   with no spaces in it, and the box it sits in is a column of a card. */
+.mail-message pre a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+.mail-message pre a:hover {
+  text-decoration-thickness: 2px;
+}
