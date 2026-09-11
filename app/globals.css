@@ -9314,3 +9314,31 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
   color: #fff;
   border-color: var(--danger-bg);
 }
+
+/* ------------------------------------------- a number counting to its value
+
+   Held to the width of the widest figure the count passes through, by drawing
+   that figure underneath at zero height and letting it set the width. Counting
+   to 1,284 runs through 999 and 1,000, and a number that changes width mid-
+   count drags the column beside it back and forth for half a second.
+
+   tabular-nums is the other half: without it the digits themselves are
+   different widths, so 111 and 888 are not the same size even at the same
+   length. */
+.tally {
+  position: relative;
+  display: inline-grid;
+  font-variant-numeric: tabular-nums;
+}
+
+.tally-now,
+.tally-room {
+  grid-area: 1 / 1;
+}
+
+/* There only to hold the space. Kept out of the accessibility tree by the
+   markup and out of sight here. */
+.tally-room {
+  visibility: hidden;
+  pointer-events: none;
+}

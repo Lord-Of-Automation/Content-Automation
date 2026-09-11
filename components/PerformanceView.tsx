@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useReveal } from "@/lib/reveal";
+import Tally from "@/components/Tally";
 
 import DatePicker from "@/components/DatePicker";
 import { Select } from "@/components/Select";
@@ -87,6 +88,16 @@ const PAGE = 50;
 
 function whole(n: number): string {
   return new Intl.NumberFormat().format(Math.round(n));
+}
+
+/** A share, as the page has always written one. */
+function share(n: number): string {
+  return `${(n * 100).toFixed(1)}%`;
+}
+
+/** An average position, to one place. */
+function place(n: number): string {
+  return n.toFixed(1);
 }
 
 function Chevrons({ state }: { state: "none" | "asc" | "desc" }) {
@@ -337,22 +348,31 @@ export default function PerformanceView() {
           {data?.sites.length ? (
             <>
               <div className="domain-stats">
+                {/* Counted rather than swapped. Changing the range rewrites
+                    every figure here at once, and which way each one moved is
+                    the whole question somebody changing it is asking. */}
                 <div className="domain-stat is-lead">
-                  <span className="domain-stat-value">{whole(totals.clicks)}</span>
+                  <span className="domain-stat-value">
+                    <Tally value={totals.clicks} format={whole} />
+                  </span>
                   <span className="domain-stat-label">clicks</span>
                 </div>
                 <div className="domain-stat">
-                  <span className="domain-stat-value">{whole(totals.impressions)}</span>
+                  <span className="domain-stat-value">
+                    <Tally value={totals.impressions} format={whole} />
+                  </span>
                   <span className="domain-stat-label">impressions</span>
                 </div>
                 <div className="domain-stat">
                   <span className="domain-stat-value">
-                    {(totals.ctr * 100).toFixed(1)}%
+                    <Tally value={totals.ctr} format={share} />
                   </span>
                   <span className="domain-stat-label">click-through</span>
                 </div>
                 <div className={totals.silent ? "domain-stat is-warn" : "domain-stat"}>
-                  <span className="domain-stat-value">{totals.silent}</span>
+                  <span className="domain-stat-value">
+                    <Tally value={totals.silent} format={whole} />
+                  </span>
                   <span className="domain-stat-label">with no impressions</span>
                 </div>
                 {totals.broken ? (
@@ -443,19 +463,31 @@ export default function PerformanceView() {
                         </a>
                       </td>
                       {columns.shown("clicks") ? (
-                        <td className={columns.cell("clicks", "mid")}>{whole(s.clicks)}</td>
+                        <td className={columns.cell("clicks", "mid")}>
+                          <Tally value={s.clicks} format={whole} />
+                        </td>
                       ) : null}
                       {columns.shown("impressions") ? (
-                        <td className={columns.cell("impressions", "mid")}>{whole(s.impressions)}</td>
+                        <td className={columns.cell("impressions", "mid")}>
+                          <Tally value={s.impressions} format={whole} />
+                        </td>
                       ) : null}
                       {columns.shown("ctr") ? (
                         <td className={columns.cell("ctr", "mid")}>
-                          {s.impressions ? `${(s.ctr * 100).toFixed(1)}%` : <span className="quiet">—</span>}
+                          {s.impressions ? (
+                            <Tally value={s.ctr} format={share} />
+                          ) : (
+                            <span className="quiet">—</span>
+                          )}
                         </td>
                       ) : null}
                       {columns.shown("position") ? (
                         <td className={columns.cell("position", "mid")}>
-                          {s.position ? s.position.toFixed(1) : <span className="quiet">—</span>}
+                          {s.position ? (
+                            <Tally value={s.position} format={place} />
+                          ) : (
+                            <span className="quiet">—</span>
+                          )}
                         </td>
                       ) : null}
                       <td className="detail">
