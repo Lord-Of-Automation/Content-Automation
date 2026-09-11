@@ -386,7 +386,9 @@ export default function RunProgress({
       {execution.status === "success" ? (
         <div className="alert alert-ok" style={{ marginTop: 16 }}>
           <strong>Finished.</strong>{" "}
-          {execution.runMode === "prospects"
+          {execution.runMode === "outreach"
+            ? "Every publisher has their own article, in its own document, and the email offering it."
+            : execution.runMode === "prospects"
             ? "The prospects sheet has been updated with the current figures."
             : execution.runMode === "build"
               ? "The site has been written. It is on the AI Websites page, ready to edit."

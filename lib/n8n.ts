@@ -42,7 +42,7 @@ export type ExecutionDetail = ExecutionSummary & {
    * are live in WordPress after a run that only read a spreadsheet is a small
    * lie the console used to tell every time.
    */
-  runMode: "optimise" | "gap" | "casino_gap" | "build" | "prospects" | null;
+  runMode: "optimise" | "gap" | "casino_gap" | "build" | "prospects" | "outreach" | null;
 };
 
 export type StartRunInput = {
