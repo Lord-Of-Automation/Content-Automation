@@ -47,6 +47,8 @@ export default function MailingView() {
   const [view, setView] = useState<"inbox" | "campaign" | "runs" | "history">("inbox");
   /** Show only the replies that name a way to be paid, which is the answer. */
   const [paidOnly, setPaidOnly] = useState(false);
+  /** Words to look for. Searched over the messages too, not only the headings. */
+  const [find, setFind] = useState("");
 
 
   const [loading, setLoading] = useState(true);
@@ -244,8 +246,38 @@ export default function MailingView() {
    * is done, and leaving it among the ones still being chased means reading
    * past it every time. It is not hidden, it is below.
    */
-  const owed = threads.filter((one) => !one.paidAt);
-  const paid = threads.filter((one) => one.paidAt);
+  /*
+   * What a search looks at.
+   *
+   * The words of the messages as well as the addresses and subjects, because
+   * the thing somebody is usually hunting for is something a publisher said —
+   * a price, a name, a condition — and searching only the headings would find
+   * none of it. Every conversation on this page is already loaded with its
+   * messages, so this costs nothing and needs no round trip.
+   *
+   * Every word has to appear somewhere, in any order and any field. Two words
+   * typed together nearly always means "the one that is both", and requiring
+   * them adjacent would make a search for "turbogeek paypal" find nothing.
+   */
+  const found = (one: Thread): boolean => {
+    const wanted = find.trim().toLowerCase();
+    if (!wanted) return true;
+
+    const haystack = [
+      one.email,
+      one.domain,
+      one.subject,
+      one.from ?? "",
+      ...one.messages.map((message) => `${message.from} ${message.text}`),
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return wanted.split(/\s+/).every((word) => haystack.includes(word));
+  };
+
+  const owed = threads.filter((one) => !one.paidAt && found(one));
+  const paid = threads.filter((one) => one.paidAt && found(one));
 
   const showing = paidOnly ? owed.filter((one) => one.paypal) : owed;
 
@@ -407,30 +439,42 @@ export default function MailingView() {
           ) : connected ? (
             <div className="mail-only">
                 <div className="editor-body-head">
-                <span className="field-label">
-                  Inbox{owed.length ? ` (${showing.length})` : ""}
-                </span>
-                {/* The one filter worth having on an outreach inbox. A
-                    publisher quoting a price and saying where to send it has
-                    agreed; everything else is still a conversation. */}
-                {owed.some((one) => one.paypal) ? (
-                  <label className="check" htmlFor="mail-paid">
+                  <span className="field-label">
+                    Inbox{owed.length ? ` (${showing.length})` : ""}
+                  </span>
+
+                  <div className="mail-find">
                     <input
-                      id="mail-paid"
-                      type="checkbox"
-                      checked={paidOnly}
-                      onChange={(e) => setPaidOnly(e.target.checked)}
+                      type="search"
+                      value={find}
+                      placeholder="Search these conversations"
+                      aria-label="Search the conversations"
+                      onChange={(e) => setFind(e.target.value)}
                     />
-                    With a PayPal link
-                  </label>
-                ) : null}
+                    {/* The one filter worth having on an outreach inbox. A
+                        publisher quoting a price and saying where to send it
+                        has agreed; everything else is still a conversation. */}
+                    {threads.some((one) => one.paypal) ? (
+                      <label className="check" htmlFor="mail-paid">
+                        <input
+                          id="mail-paid"
+                          type="checkbox"
+                          checked={paidOnly}
+                          onChange={(e) => setPaidOnly(e.target.checked)}
+                        />
+                        With a PayPal link
+                      </label>
+                    ) : null}
+                  </div>
                 </div>
 
                 {!showing.length ? (
                 <p className="provider-hint">
-                  {paidOnly
-                    ? "No reply has named a way to be paid yet."
-                    : "Nothing sent yet. A conversation appears here once this platform has written to somebody, and only then."}
+                  {find.trim()
+                    ? `Nothing here matches "${find.trim()}". It searches the messages as well as the addresses and subjects.`
+                    : paidOnly
+                      ? "No reply has named a way to be paid yet."
+                      : "Nothing sent yet. A conversation appears here once this platform has written to somebody, and only then."}
                 </p>
                 ) : (
                 grouped.map(([sender, rows]) => (

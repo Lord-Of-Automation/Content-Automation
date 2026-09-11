@@ -8181,3 +8181,31 @@ code,
     max-height: 200px;
   }
 }
+
+/* The search, and the one filter, at the right of the inbox's head row. */
+.mail-find {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.mail-find input[type="search"] {
+  width: 260px;
+  max-width: 42vw;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+@media (max-width: 720px) {
+  .mail-find {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .mail-find input[type="search"] {
+    width: 100%;
+    max-width: none;
+  }
+}
