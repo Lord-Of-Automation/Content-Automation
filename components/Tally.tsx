@@ -23,12 +23,16 @@ import { useEffect, useRef, useState } from "react";
 /**
  * Short enough that the digits in between cannot be read.
  *
- * Which is the point of them. Nobody wants to know that the figure passed
- * through 816 on its way to 1,284 — what the count is for is the direction and
- * roughly the distance, and a run slow enough to read each step invites
- * somebody to try.
+ * Which is the point of them. Nobody wants to know the figure passed through
+ * 816 on its way to 1,284 — what a count is for is the direction and roughly
+ * the distance, and a run slow enough to read each step invites somebody to
+ * try reading it.
+ *
+ * At this length a count is about ten frames. Much below it there are not
+ * enough frames left to read as movement at all, and the number simply
+ * changes twice.
  */
-const RUN = 260;
+const RUN = 170;
 
 /**
  * Fast first and slow at the end.
