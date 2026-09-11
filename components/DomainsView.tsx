@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useReveal } from "@/lib/reveal";
+import { useGlide } from "@/lib/glide";
 import Tally from "@/components/Tally";
 
 import AddToCloudflare from "@/components/AddToCloudflare";
@@ -226,6 +227,10 @@ export default function DomainsView() {
   const [configError, setConfigError] = useState(false);
   const [query, setQuery] = useState("");
   const [visible, setVisible] = useState(PAGE);
+  // Rows travel to their new places when the sort changes, rather than
+  // every one of them being somewhere else in a single frame.
+  const glide = useGlide<HTMLTableSectionElement>();
+
   // Where a row revealed by Show more takes its arrival from, so a batch
   // cascades instead of landing all at once.
   const revealed = useReveal(visible);
@@ -234,6 +239,9 @@ export default function DomainsView() {
   const [only, setOnly] = useState<"all" | "soon" | "manual" | "parked" | "trouble">("all");
 
   function sortBy(key: SortKey) {
+    // Measured before the order changes, so each row can be moved from
+    // where it was to where it ends up.
+    glide.capture();
     // Same column flips; a new column starts at its own natural end rather
     // than inheriting whichever direction the last one happened to be in.
     if (key === sortKey) setDirection((d) => (d === "asc" ? "desc" : "asc"));
@@ -667,12 +675,13 @@ export default function DomainsView() {
                     <th />
                   </tr>
                 </thead>
-                <tbody>
+                <tbody ref={glide.ref}>
                   {shown.slice(0, visible).map((d, at) => {
                     const where = pointsAt(d.nameServers);
                     return (
                       <tr
                         key={d.domain}
+                        data-glide={d.domain}
                         className={picked.has(d.domain) ? "is-picked" : ""}
                         style={revealed(at)}
                       >

@@ -9413,3 +9413,48 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
     scrollbar-color: var(--scroll-thumb) transparent;
   }
 }
+
+/* ------------------------------------------- a bar that is still moving
+
+   The run detail asks the engine every four seconds. The fill used to take
+   half a second to reach each new figure and then sit still for three and a
+   half, so a job that was working looked like one that had stopped, over and
+   over.
+
+   Live, it crosses almost the whole gap at a steady rate, so something is
+   always moving. Linear on purpose: an eased crawl slows to nothing in the
+   middle of the wait, which is the opposite of what this is for. */
+.bar.is-live > span {
+  transition: width 3.6s linear;
+}
+
+/* And a stripe travelling over the fill, which is what says the run is alive
+   during the seconds when the figure has not changed at all. Drawn in the
+   accent's own light rather than white, so it reads on a recoloured palette. */
+.bar.is-live > span {
+  background-image: linear-gradient(
+    100deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent-ink) 38%, transparent) 45%,
+    transparent 90%
+  );
+  background-size: 180px 100%;
+  background-repeat: no-repeat;
+  animation: bar-alive 1.5s linear infinite;
+}
+
+@keyframes bar-alive {
+  from {
+    background-position: -180px 0;
+  }
+  to {
+    background-position: calc(100% + 180px) 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar.is-live > span {
+    animation: none;
+    transition: width 0.3s ease;
+  }
+}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useReveal } from "@/lib/reveal";
+import { useGlide } from "@/lib/glide";
 import Tally from "@/components/Tally";
 
 import DatePicker from "@/components/DatePicker";
@@ -139,6 +140,10 @@ export default function PerformanceView() {
   const [sortKey, setSortKey] = useState<SortKey>("clicks");
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
   const [visible, setVisible] = useState(PAGE);
+  // Rows travel to their new places when the sort changes, rather than
+  // every one of them being somewhere else in a single frame.
+  const glide = useGlide<HTMLTableSectionElement>();
+
   // Where a row revealed by Show more takes its arrival from, so a batch
   // cascades instead of landing all at once.
   const revealed = useReveal(visible);
@@ -192,6 +197,7 @@ export default function PerformanceView() {
   }, [query, kind, sortKey, direction, data]);
 
   function sortBy(key: SortKey) {
+    glide.capture();
     if (key === sortKey) setDirection((d) => (d === "asc" ? "desc" : "asc"));
     else {
       setSortKey(key);
@@ -449,9 +455,9 @@ export default function PerformanceView() {
                     again. Deliberately not keyed on the search box: rows that
                     re-animated on every keystroke would be unreadable while
                     being typed at. */}
-                <tbody key={kind || "all"}>
+                <tbody key={kind || "all"} ref={glide.ref}>
                   {shown.slice(0, visible).map((s, at) => (
-                    <tr key={s.siteUrl} style={revealed(at)}>
+                    <tr key={s.siteUrl} data-glide={s.siteUrl} style={revealed(at)}>
                       <td>
                         <a
                           className="domain-name"

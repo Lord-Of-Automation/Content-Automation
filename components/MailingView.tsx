@@ -6,6 +6,7 @@ import { useAsk } from "@/components/Ask";
 import CampaignHistory from "@/components/CampaignHistory";
 import MailingRuns from "@/components/MailingRuns";
 import MailThread from "@/components/MailThread";
+import { useGlide } from "@/lib/glide";
 import OutreachCampaign from "@/components/OutreachCampaign";
 import { useToasts } from "@/components/Toasts";
 import type { MailStatus, Thread } from "@/lib/mail";
@@ -78,6 +79,15 @@ export default function MailingView() {
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+
+  /*
+   * A conversation moving between the inbox and Paid.
+   *
+   * On the pane that holds both, not on either list, because the row leaves
+   * one and arrives in the other — measured across the whole thing, it is one
+   * journey rather than a disappearance and an appearance.
+   */
+  const glide = useGlide<HTMLDivElement>();
   const [error, setError] = useState<string | null>(null);
 
   /*
@@ -242,6 +252,9 @@ export default function MailingView() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "That did not work.");
 
+      // Where every conversation is now, taken before the list is read back,
+      // so the one that changed sides can be watched crossing.
+      glide.capture();
       await loadThreads();
       push("ok", paid ? `${thread.email} marked paid.` : `${thread.email} is owed again.`);
     } catch (e) {
@@ -496,7 +509,7 @@ export default function MailingView() {
               }}
             />
           ) : connected ? (
-            <div className="mail-only mail-panel" key="inbox">
+            <div className="mail-only mail-panel" key="inbox" ref={glide.ref}>
                 <div className="editor-body-head">
                   <span className="field-label">
                     Inbox{owed.length ? ` (${showing.length})` : ""}

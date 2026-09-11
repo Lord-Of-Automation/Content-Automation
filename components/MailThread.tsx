@@ -217,6 +217,9 @@ export default function MailThread({
 
   return (
     <li
+      /* Named so it can be followed when it changes sides. The address is the
+         one thing about a conversation that does not change. */
+      data-glide={thread.email}
       className={
         paid
           ? "mail-thread is-paid"

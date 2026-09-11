@@ -337,7 +337,23 @@ export default function RunProgress({
         </div>
       </div>
 
-      <div className="bar">
+      {/*
+        The bar crosses the gap between polls rather than stepping over it.
+
+        The engine is asked every four seconds, so a run that takes ten minutes
+        moves this thing about a hundred and fifty times, in a hundred and
+        fifty jumps with nearly four seconds of nothing between them. A job
+        that is working looked like a job that had stopped, repeatedly.
+
+        While it is live the fill takes almost the whole gap to reach each new
+        figure, at a steady rate, so there is always something moving. The
+        stripe over it moves on its own, which is the part that says the run is
+        alive even during the seconds when the number has not changed.
+
+        Once it is over the bar stops creeping and settles quickly, because
+        then the figure is the answer rather than the latest guess.
+      */}
+      <div className={finished ? "bar" : "bar is-live"}>
         <span style={{ width: `${progress?.percent ?? 0}%` }} />
       </div>
 

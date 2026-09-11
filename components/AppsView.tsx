@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useReveal } from "@/lib/reveal";
+import { useGlide } from "@/lib/glide";
 import Tally from "@/components/Tally";
 
 import AppCredential from "@/components/AppCredential";
@@ -202,6 +203,10 @@ export default function AppsView() {
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [direction, setDirection] = useState<"asc" | "desc">("asc");
   const [visible, setVisible] = useState(PAGE);
+  // Rows travel to their new places when the sort changes, rather than
+  // every one of them being somewhere else in a single frame.
+  const glide = useGlide<HTMLTableSectionElement>();
+
   // Where a row revealed by Show more takes its arrival from, so a batch
   // cascades instead of landing all at once.
   const revealed = useReveal(visible);
@@ -345,6 +350,7 @@ export default function AppsView() {
   }
 
   function sortBy(key: SortKey) {
+    glide.capture();
     if (key === sortKey) setDirection((d) => (d === "asc" ? "desc" : "asc"));
     else {
       setSortKey(key);
@@ -626,9 +632,9 @@ export default function AppsView() {
                     table is visibly a different set of rows instead of
                     silently becoming one. Nothing in a row holds state of its
                     own, so replacing them costs nothing. */}
-                <tbody key={server || "all"}>
+                <tbody key={server || "all"} ref={glide.ref}>
                   {shown.slice(0, visible).map((a, at) => (
-                    <tr key={a.key} style={revealed(at)}>
+                    <tr key={a.key} data-glide={a.key} style={revealed(at)}>
                       <td>
                         <div className="app-name">
                           <a
