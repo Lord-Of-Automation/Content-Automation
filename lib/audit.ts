@@ -37,6 +37,17 @@ export type AuditAction =
   | "schedule-updated"
   | "schedule-deleted"
   /**
+   * Buying a domain, which is the one thing here that spends money.
+   *
+   * Two lines per purchase, not one. The first is written before GoDaddy is
+   * asked and says what was wanted; the second says it happened. A purchase
+   * that times out on the way back still bought the domain, and a log written
+   * only on success would have no record of the one attempt somebody would
+   * need to find.
+   */
+  | "domain-buying"
+  | "domain-bought"
+  /**
    * Where a domain points, or what it answers.
    *
    * The only entry here that changes something outside this console. A wrong

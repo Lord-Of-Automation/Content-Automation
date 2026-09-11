@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+
+import { useAsk } from "@/components/Ask";
+import { Toasts, useToasts } from "@/components/Toasts";
 
 /**
  * Is this name free, and what would it cost.
@@ -124,7 +127,21 @@ function reasons(row: Checked): string[] {
 }
 
 /** One result: the name, what it costs, and the way to buy it. */
-function Card({ row, lead }: { row: Checked; lead?: boolean }) {
+function Card({
+  row,
+  lead,
+  onBuy,
+  buying,
+  bought,
+}: {
+  row: Checked;
+  lead?: boolean;
+  /** Buys it. Absent on the cards that are only showing an alternative. */
+  onBuy?: (domain: string) => void;
+  /** What this card is doing, if it is the one being bought. */
+  buying?: "quoting" | "buying" | "waiting" | null;
+  bought?: boolean;
+}) {
   const badge = BADGE[row.status];
   return (
     <div className={lead ? "dcard is-lead" : "dcard"}>
@@ -152,7 +169,38 @@ function Card({ row, lead }: { row: Checked; lead?: boolean }) {
         )}
       </div>
 
-      {row.status === "free" ? (
+      {row.status === "free" && bought ? (
+        <span className="btn dbuy is-bought">Bought</span>
+      ) : row.status === "free" && onBuy ? (
+        <>
+          {/* Bought here, on the account whose token this console already
+              holds. The link below stays for the things this cannot do:
+              choosing a different registrant, adding privacy, paying with
+              something other than the card on file. */}
+          <button
+            type="button"
+            className="btn btn-primary dbuy"
+            disabled={!!buying}
+            onClick={() => onBuy(row.domain)}
+          >
+            {buying === "quoting"
+              ? "Checking the price…"
+              : buying === "buying"
+                ? "Buying…"
+                : buying === "waiting"
+                  ? "Registering…"
+                  : `Buy for ${money(row.price, row.currency)}`}
+          </button>
+          <a
+            className="dbuy-else"
+            href={`https://www.godaddy.com/domainsearch/find?domainToCheck=${encodeURIComponent(row.domain)}`}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            or buy it at GoDaddy
+          </a>
+        </>
+      ) : row.status === "free" ? (
         <a
           className="btn btn-primary dbuy"
           href={`https://www.godaddy.com/domainsearch/find?domainToCheck=${encodeURIComponent(row.domain)}`}
@@ -184,13 +232,154 @@ function Card({ row, lead }: { row: Checked; lead?: boolean }) {
   );
 }
 
+/** Where a purchase has got to, for the one domain being bought. */
+type Buying = { domain: string; stage: "quoting" | "buying" | "waiting" } | null;
+
 export default function DomainCheck() {
+  const ask = useAsk();
+  const { toasts, push, dismiss } = useToasts();
+
+  const [buying, setBuying] = useState<Buying>(null);
+  const [bought, setBought] = useState<Set<string>>(new Set());
+
+  /*
+   * One idempotency key per domain, kept for as long as the page is open.
+   *
+   * The key is the whole defence against buying twice. A registration that
+   * times out on the way back has still been made, and a retry carrying a new
+   * key would be a second purchase rather than a second attempt at the first —
+   * so the key belongs to the domain, not to the attempt.
+   */
+  const keys = useRef(new Map<string, string>());
+
+  function keyFor(domain: string): string {
+    const had = keys.current.get(domain);
+    if (had) return had;
+    const made = crypto.randomUUID();
+    keys.current.set(domain, made);
+    return made;
+  }
+
   const [query, setQuery] = useState("");
   const [tlds, setTlds] = useState<string[]>(DEFAULT_TLDS);
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
+
+  /**
+   * Buying one.
+   *
+   * A quote first, so the dialog can name the price that will actually be
+   * charged rather than the one the availability check happened to mention.
+   * The two are usually the same and the difference is the point: a quote is a
+   * promise for ten minutes, and a price on a card is a guess.
+   *
+   * Then the purchase, then polling, because GoDaddy finishes a registration
+   * in the background. Nothing here says the domain is bought until GoDaddy
+   * says so.
+   */
+  async function buy(domain: string, years = 1) {
+    if (buying) return;
+
+    setBuying({ domain, stage: "quoting" });
+    try {
+      const asked = await fetch("/api/domains/buy", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "quote", domain, period: years }),
+      });
+      const quoted = await asked.json();
+      if (!asked.ok) throw new Error(quoted.error ?? "That price could not be checked.");
+
+      const quote = quoted.quote as {
+        price: number | null;
+        currency: string;
+        period: number;
+        quoteToken: string;
+        agreements: string[];
+        agreementTitles: string[];
+      };
+
+      setBuying(null);
+      const sure = await ask.confirm({
+        title: `Buy ${domain} for ${money(quote.price, quote.currency)}?`,
+        body: (
+          <>
+            <p className="confirm-quiet">
+              {quote.period === 1 ? "One year" : `${quote.period} years`}, charged
+              now to the payment method on the GoDaddy account. This is the
+              price GoDaddy has just quoted and held, not an estimate.
+            </p>
+            <p className="confirm-quiet">
+              It renews at whatever the renewal price is then, which is not this
+              number. Turn auto-renew off at GoDaddy if that is not wanted.
+            </p>
+            {quote.agreementTitles.length ? (
+              <p className="confirm-quiet">
+                Buying accepts {quote.agreementTitles.join(", ")}.
+              </p>
+            ) : null}
+          </>
+        ),
+        confirmLabel: "Buy it",
+      });
+      if (!sure) return;
+
+      setBuying({ domain, stage: "buying" });
+      const made = await fetch("/api/domains/buy", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          domain,
+          period: quote.period,
+          quoteToken: quote.quoteToken,
+          agreements: quote.agreements,
+          idempotencyKey: keyFor(domain),
+        }),
+      });
+      const started = await made.json();
+      if (!made.ok) throw new Error(started.error ?? "That domain could not be bought.");
+
+      // GoDaddy answers before it has finished. Waited out here rather than
+      // reported as done, because "bought" should mean bought.
+      setBuying({ domain, stage: "waiting" });
+      const id = String(started.registration?.registrationId ?? "");
+      const landed = id ? await settle(id) : "COMPLETED";
+
+      if (landed === "FAILED") {
+        throw new Error(`GoDaddy could not finish registering ${domain}.`);
+      }
+
+      setBought((was) => new Set(was).add(domain));
+      push("ok", `${domain} is yours. It appears on the Domains page shortly.`);
+    } catch (e) {
+      push("bad", e instanceof Error ? e.message : "That domain could not be bought.");
+    } finally {
+      setBuying(null);
+    }
+  }
+
+  /** Asks until it is one thing or the other, and gives up rather than hanging. */
+  async function settle(id: string): Promise<string> {
+    for (let tries = 0; tries < 40; tries += 1) {
+      await new Promise((wait) => setTimeout(wait, 1500));
+      try {
+        const response = await fetch(`/api/domains/buy?id=${encodeURIComponent(id)}`, {
+          cache: "no-store",
+        });
+        const payload = await response.json();
+        if (!response.ok) continue;
+        const status = String(payload.registration?.status ?? "");
+        if (status === "COMPLETED" || status === "FAILED") return status;
+      } catch {
+        // A dropped poll is not a failed purchase. It asks again.
+      }
+    }
+    // A minute of CONFIRMED and no answer. The charge has been made and the
+    // name is coming; saying it failed would be worse than saying it is slow.
+    return "SLOW";
+  }
 
   const lead = answer?.asked[0] ?? null;
 
@@ -326,13 +515,27 @@ export default function DomainCheck() {
 
           <div className="dcards">
             {answer.asked.map((row, i) => (
-              <Card key={row.domain} row={row} lead={i === 0} />
+              <Card
+                  key={row.domain}
+                  row={row}
+                  lead={i === 0}
+                  onBuy={buy}
+                  buying={buying?.domain === row.domain ? buying.stage : null}
+                  bought={bought.has(row.domain)}
+                />
             ))}
 
             {/* Beside the answer rather than below it when the answer was no.
                 The next thing wanted is the nearest thing available, and it
                 should not need a scroll. */}
-            {lead.status !== "free" && free.length ? <Card row={free[0]!} /> : null}
+            {lead.status !== "free" && free.length ? (
+              <Card
+                row={free[0]!}
+                onBuy={buy}
+                buying={buying?.domain === free[0]!.domain ? buying.stage : null}
+                bought={bought.has(free[0]!.domain)}
+              />
+            ) : null}
           </div>
 
           {free.length || rest.length ? (
@@ -395,15 +598,17 @@ export default function DomainCheck() {
                 <p className="domain-note">
                   Prices are GoDaddy&rsquo;s published rate for the ending at the
                   moment of the check, before any discount, promotion or
-                  multi-year term. Nothing here buys a name: a free row links to
-                  GoDaddy&rsquo;s own page, where the price you are actually
-                  charged is the one shown at checkout.
+                  multi-year term. Buying one here charges the payment method
+                  on the GoDaddy account, at the price GoDaddy quotes and holds
+                  when you press the button rather than the one on this row.
                 </p>
               </div>
             </div>
           ) : null}
         </>
       ) : null}
+
+      <Toasts toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }

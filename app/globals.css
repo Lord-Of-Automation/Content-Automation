@@ -9601,3 +9601,45 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
   max-width: 100%;
   max-height: 320px;
 }
+
+/* ------------------------------------------- buying a name from here
+
+   The primary button on a result card now buys the domain rather than sending
+   somebody to GoDaddy to do it. The link is still there, smaller, underneath:
+   this cannot choose a different registrant, add privacy, or pay with anything
+   other than the card on the account, and those are all reasons to go there
+   instead. */
+.dbuy-else {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-3);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.dbuy-else:hover {
+  color: var(--ink-2);
+}
+
+/* A name this console has just bought. Not a button any more, because there is
+   nothing left to press, and it should not look like one waiting to be. */
+.dbuy.is-bought {
+  background: var(--ok-soft);
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 30%, transparent);
+  cursor: default;
+  font-weight: 620;
+}
+
+/* Mid-purchase. The label already says which step it is on; this stops it
+   reading as merely unavailable. */
+.dbuy:disabled {
+  opacity: 1;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  cursor: progress;
+}
