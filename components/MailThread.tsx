@@ -297,12 +297,16 @@ export default function MailThread({
               void send();
             }}
           >
+            {/* Addressed to the publisher, not to us. A conversation's "from"
+                is the identity it went out as — the address this box sends
+                from, not the one it reaches — and naming that here read as
+                writing to yourself. */}
             <textarea
               className="mail-reply-box"
               value={reply}
               rows={3}
               disabled={busy || sending}
-              placeholder={`Reply to ${thread.from || thread.email}…`}
+              placeholder={`Reply to ${thread.email}…`}
               aria-label={`Reply to ${thread.email}`}
               onChange={(e) => setReply(e.target.value)}
               onKeyDown={(e) => {
