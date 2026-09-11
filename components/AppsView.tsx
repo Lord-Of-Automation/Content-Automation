@@ -573,7 +573,7 @@ export default function AppsView() {
                 </span>
               </div>
 
-              <table className="logs logs-middle">
+              <table className="logs logs-middle table-in">
                 <thead>
                   <tr>
                     {(
@@ -586,7 +586,7 @@ export default function AppsView() {
                     )
                       .filter(([key]) => columns.shown(key))
                       .map(([key, label, align]) => (
-                        <th key={key} className={align ? `${align} sortable` : "sortable"}>
+                        <th key={key} className={columns.cell(key, align ? `${align} sortable` : "sortable")}>
                           <button type="button" onClick={() => sortBy(key)}>
                             {label}
                             <Chevrons state={sortKey === key ? direction : "none"} />
@@ -598,7 +598,14 @@ export default function AppsView() {
                     <th className="act-head">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                {/* Keyed by the host being shown.
+
+                    Changing the filter replaces the rows rather than editing
+                    them in place, so the arrival animation runs again and the
+                    table is visibly a different set of rows instead of
+                    silently becoming one. Nothing in a row holds state of its
+                    own, so replacing them costs nothing. */}
+                <tbody key={server || "all"}>
                   {shown.slice(0, visible).map((a) => (
                     <tr key={a.key}>
                       <td>
@@ -621,13 +628,13 @@ export default function AppsView() {
                         ) : null}
                       </td>
                       {columns.shown("platform") ? (
-                        <td className="mid">
+                        <td className={columns.cell("platform", "mid")}>
                           {a.platformLabel}
                           {a.version ? <span className="app-sub-inline">{a.version}</span> : null}
                         </td>
                       ) : null}
                       {columns.shown("server") ? (
-                        <td className="mid">
+                        <td className={columns.cell("server", "mid")}>
                           <span className="registrar">{a.placeLabel}</span>
                           <div className="app-sub">
                             {/* The host, once there is more than one connected.
@@ -639,7 +646,7 @@ export default function AppsView() {
                         </td>
                       ) : null}
                       {columns.shown("admin") ? (
-                        <td className="mid cred-cell">
+                        <td className={columns.cell("admin", "mid cred-cell")}>
                           <AppCredential user={a.adminUser} password={a.adminPassword} />
                         </td>
                       ) : null}

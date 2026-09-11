@@ -31,13 +31,27 @@ export interface ColumnSpec {
 }
 
 interface Chosen {
-  /** Whether this column is drawn. */
+  /**
+   * Whether this column is drawn.
+   *
+   * Also true for a moment after one is turned off. A cell removed the instant
+   * it is unticked cannot be animated away — there is nothing left to animate —
+   * so it stays while it leaves and goes when it has gone.
+   */
   shown: (key: string) => boolean;
   hidden: Set<string>;
   toggle: (key: string) => void;
   showAll: () => void;
   /** How many the reader has turned off, for the button to say so. */
   count: number;
+  /**
+   * The class for a cell in this column, said once per cell.
+   *
+   * Arriving or leaving, and nothing the rest of the time — a table that is
+   * not being changed should carry no animation classes at all, or every
+   * re-render for an unrelated reason would set one off.
+   */
+  cell: (key: string, base?: string) => string | undefined;
 }
 
 /**
@@ -56,6 +70,17 @@ export function useColumns(name: string, specs: ColumnSpec[]): Chosen {
   );
 
   const [hidden, setHidden] = useState<Set<string>>(initial);
+
+  /*
+   * Which columns are mid-change, and which way.
+   *
+   * A column being turned off is still rendered while it fades, which is the
+   * only way to animate its going: the alternative is a cell that is there and
+   * then is not. Both sets empty themselves when the animation is over, so a
+   * settled table carries no animation state.
+   */
+  const [entering, setEntering] = useState<Set<string>>(new Set());
+  const [leaving, setLeaving] = useState<Set<string>>(new Set());
 
   /*
    * Read after mounting, not during.
@@ -90,23 +115,66 @@ export function useColumns(name: string, specs: ColumnSpec[]): Chosen {
     [specs],
   );
 
+  /** Long enough to see, and the same number the stylesheet animates over. */
+  const OVER = 220;
+
+  const arrive = useCallback((which: string[]) => {
+    if (!which.length) return;
+    setEntering(new Set(which));
+    window.setTimeout(() => setEntering(new Set()), OVER);
+  }, []);
+
+  const depart = useCallback(
+    (which: string[], then: () => void) => {
+      if (!which.length) {
+        then();
+        return;
+      }
+      setLeaving(new Set(which));
+      window.setTimeout(() => {
+        setLeaving(new Set());
+        then();
+      }, OVER);
+    },
+    [],
+  );
+
   const toggle = useCallback(
     (which: string) => {
       if (fixed.has(which)) return;
-      const next = new Set(hidden);
-      if (next.has(which)) next.delete(which);
-      else next.add(which);
-      remember(next);
+
+      if (hidden.has(which)) {
+        const next = new Set(hidden);
+        next.delete(which);
+        remember(next);
+        arrive([which]);
+        return;
+      }
+
+      // Kept on screen until it has finished going, then actually removed.
+      depart([which], () => remember(new Set(hidden).add(which)));
     },
-    [fixed, hidden, remember],
+    [arrive, depart, fixed, hidden, remember],
   );
 
+  const showAll = useCallback(() => {
+    arrive([...hidden]);
+    remember(new Set());
+  }, [arrive, hidden, remember]);
+
   return {
-    shown: (which: string) => fixed.has(which) || !hidden.has(which),
+    shown: (which: string) =>
+      fixed.has(which) || !hidden.has(which) || leaving.has(which),
     hidden,
     toggle,
-    showAll: () => remember(new Set()),
+    showAll,
     count: specs.filter((s) => !s.fixed && hidden.has(s.key)).length,
+    // Merged with whatever the cell already wore, so a caller says this once
+    // instead of assembling a class list at every one of them.
+    cell: (which: string, base?: string) =>
+      [base, leaving.has(which) ? "col-out" : entering.has(which) ? "col-in" : ""]
+        .filter(Boolean)
+        .join(" ") || undefined,
   };
 }
 

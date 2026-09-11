@@ -6849,8 +6849,19 @@ html {
  * hosted site looked like the same size of decision. One of them makes
  * something exist.
  */
+/*
+ * The two buttons at the top of the Hosting page, the same height.
+ *
+ * They were not. The toolbar centres what it holds rather than stretching it,
+ * so each took its natural height — and the ghost one inherits smaller type
+ * and tighter padding from elsewhere, which made it 33.5px beside a 39px
+ * primary. Sized here, on the class they share, so neither can drift from the
+ * other by inheriting something the other does not.
+ */
 .head-do {
   gap: 7px;
+  font-size: 14px;
+  padding: 8px 15px;
 }
 
 .head-do svg {
@@ -6866,7 +6877,6 @@ html {
  * this has now been scoped around in six places.
  */
 .head-do.is-new {
-  padding: 8px 15px;
   box-shadow: 0 1px 2px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
@@ -8266,6 +8276,166 @@ code,
 @media (prefers-reduced-motion: reduce) {
   .mail-panel,
   .mail-panel .mail-group {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+   Movement: columns, tables, and opening a conversation
+
+   Three places where something appears or goes, and one rule behind all of
+   them. It is short, it travels a little, and it tells you which way the
+   change went. Anything longer becomes a thing to wait through on the tenth
+   repetition, which is where every animation in a tool ends up being judged.
+   ========================================================================== */
+
+/* ------------------------------------------------------------- columns
+
+   A column turned on arrives from the left, because that is the side it grew
+   from. One turned off leaves the same way, which is why it stays rendered
+   until it has gone: a cell removed the instant it is unticked has nothing
+   left to animate. */
+@keyframes col-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+
+@keyframes col-out {
+  to {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+
+.col-in {
+  animation: col-in 220ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+.col-out {
+  animation: col-out 220ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  /* Nothing to click on the way out. A cell mid-fade is still a cell, and a
+     sort header that answers a click while disappearing is a surprise. */
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------- a table arriving
+
+   Rows a beat apart rather than all at once, so a table reads as filling in
+   rather than as a block appearing. Capped at the eighth: past that the
+   stagger has stopped being a rhythm and become a delay, and a hundred-row
+   table would take three seconds to finish arriving. */
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.table-in tbody tr {
+  animation: row-in 260ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+.table-in tbody tr:nth-child(1) { animation-delay: 0ms; }
+.table-in tbody tr:nth-child(2) { animation-delay: 25ms; }
+.table-in tbody tr:nth-child(3) { animation-delay: 50ms; }
+.table-in tbody tr:nth-child(4) { animation-delay: 75ms; }
+.table-in tbody tr:nth-child(5) { animation-delay: 100ms; }
+.table-in tbody tr:nth-child(6) { animation-delay: 125ms; }
+.table-in tbody tr:nth-child(7) { animation-delay: 150ms; }
+.table-in tbody tr:nth-child(n + 8) { animation-delay: 175ms; }
+
+/* --------------------------------------------- opening a conversation
+
+   A grid row from nothing to its own height, which is the one way to animate
+   to a height nobody knows in advance. max-height would need a number picked
+   by guesswork, and a guess too small clips a long reply while a guess too
+   large makes short ones open slowly.
+
+   The inner element needs min-height: 0 or its content sets a floor and the
+   row never collapses at all. */
+.mail-messages {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: mail-open 240ms var(--ease, cubic-bezier(0.2, 0, 0, 1));
+}
+
+@keyframes mail-open {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+
+.mail-messages > * {
+  min-height: 0;
+}
+
+/* The messages themselves, arriving a beat after the room they arrive in. */
+.mail-messages .mail-message {
+  animation: row-in 260ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation-delay: 80ms;
+}
+
+.mail-messages .mail-message:nth-child(2) { animation-delay: 120ms; }
+.mail-messages .mail-message:nth-child(n + 3) { animation-delay: 160ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .col-in,
+  .col-out,
+  .table-in tbody tr,
+  .mail-messages,
+  .mail-messages .mail-message {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------- content that arrives later
+
+   A tab animates when it is switched to, but the Runs and History panels ask
+   the engine for their contents and swap them in a moment afterwards — by
+   which time the panel has finished arriving and the answer simply appears.
+
+   So what arrives late arrives the same way, and the two reads as one motion
+   rather than a slide followed by a jolt. */
+.mail-late {
+  animation: mail-panel-in 220ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+/* The campaigns in the history, and the runs beside them, a beat apart. Same
+   rhythm as the table rows, and capped for the same reason. */
+.history > .campaign-run,
+.mail-runs-list > .mail-run {
+  animation: row-in 260ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+.history > .campaign-run:nth-child(1),
+.mail-runs-list > .mail-run:nth-child(1) { animation-delay: 40ms; }
+.history > .campaign-run:nth-child(2),
+.mail-runs-list > .mail-run:nth-child(2) { animation-delay: 70ms; }
+.history > .campaign-run:nth-child(3),
+.mail-runs-list > .mail-run:nth-child(3) { animation-delay: 100ms; }
+.history > .campaign-run:nth-child(n + 4),
+.mail-runs-list > .mail-run:nth-child(n + 4) { animation-delay: 130ms; }
+
+/* Opening a campaign, the same way a conversation opens: a grid row from
+   nothing to whatever height its contents turn out to need. */
+.campaign-run-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: mail-open 240ms var(--ease, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.campaign-run-body > * {
+  min-height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-late,
+  .history > .campaign-run,
+  .mail-runs-list > .mail-run,
+  .campaign-run-body {
     animation: none;
   }
 }

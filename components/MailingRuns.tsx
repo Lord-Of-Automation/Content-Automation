@@ -150,7 +150,7 @@ export default function MailingRuns() {
   }
 
   return (
-    <div className="mail-runs">
+    <div className="mail-runs mail-late">
       {/* The list stays beside the run rather than above it, so switching
           between two of them does not move the thing being read. */}
       <nav className="mail-runs-list" aria-label="Campaign runs">

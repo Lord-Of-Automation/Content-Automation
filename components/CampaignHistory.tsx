@@ -86,7 +86,7 @@ export default function CampaignHistory() {
   }
 
   return (
-    <ul className="history">
+    <ul className="history mail-late">
       {rows.map((one) => {
         const showing = open === one.id;
         return (

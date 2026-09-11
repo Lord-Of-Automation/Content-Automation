@@ -585,7 +585,7 @@ export default function DomainsView() {
                 ) : null}
               </div>
 
-              <table className="logs logs-middle">
+              <table className="logs logs-middle table-in">
                 <thead>
                   <tr>
                     {/* Every column sorts except the name servers themselves,
@@ -635,7 +635,7 @@ export default function DomainsView() {
                     )
                       .filter(([key]) => columns.shown(key))
                       .map(([key, label, align]) => (
-                        <th key={key} className={align ? `${align} sortable` : "sortable"}>
+                        <th key={key} className={columns.cell(key, align ? `${align} sortable` : "sortable")}>
                           <button type="button" onClick={() => sortBy(key)}>
                             {label}
                             <Chevrons state={sortKey === key ? direction : "none"} />
@@ -701,26 +701,26 @@ export default function DomainsView() {
                           ) : null}
                         </td>
                         {columns.shown("provider") ? (
-                          <td>
+                          <td className={columns.cell("provider")}>
                             <span className="registrar">{d.providerLabel}</span>
                           </td>
                         ) : null}
                         {columns.shown("status") ? (
-                          <td>
+                          <td className={columns.cell("status")}>
                             <span className={`pill pill-${statusTone(d.status)}`}>
                               {prettyStatus(d.status)}
                             </span>
                           </td>
                         ) : null}
                         {columns.shown("expires") ? (
-                          <td className="nowrap">
+                          <td className={columns.cell("expires", "nowrap")}>
                             <span className={`pill pill-${expiryTone(d.daysLeft, d.renewAuto)}`}>
                               {expiryText(d.daysLeft, d.expires)}
                             </span>
                           </td>
                         ) : null}
                         {columns.shown("renewal") ? (
-                          <td className="nowrap">
+                          <td className={columns.cell("renewal", "nowrap")}>
                             {d.renewAuto ? (
                               <span className="quiet">automatic</span>
                             ) : (
@@ -729,7 +729,7 @@ export default function DomainsView() {
                           </td>
                         ) : null}
                         {columns.shown("price") ? (
-                          <td className="mid">
+                          <td className={columns.cell("price", "mid")}>
                             {d.renewalPrice ? (
                               money(d.renewalPrice, d.currency)
                             ) : (
@@ -743,7 +743,7 @@ export default function DomainsView() {
                             to go and change. Split across two columns they made
                             the table wider to say the same thing twice. */}
                         {columns.shown("ns") ? (
-                          <td className="ns">
+                          <td className={columns.cell("ns", "ns")}>
                             {/* Stacked inside the cell rather than by making the
                                 cell a flex container. A flex <td> leaves the
                                 table's layout, so it stops sharing the row's
@@ -764,7 +764,7 @@ export default function DomainsView() {
                           </td>
                         ) : null}
                         {columns.shown("cloudflare") ? (
-                          <td className="nowrap">
+                          <td className={columns.cell("cloudflare", "nowrap")}>
                             <span
                               className={`pill pill-${CLOUDFLARE_BADGE[d.cloudflare].tone}`}
                               title={CLOUDFLARE_BADGE[d.cloudflare].text}

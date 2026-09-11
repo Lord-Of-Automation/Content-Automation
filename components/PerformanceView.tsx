@@ -395,7 +395,7 @@ export default function PerformanceView() {
                 </span>
               </div>
 
-              <table className="logs logs-middle">
+              <table className="logs logs-middle table-in">
                 <thead>
                   <tr>
                     {(
@@ -409,7 +409,7 @@ export default function PerformanceView() {
                     )
                       .filter(([key]) => columns.shown(key))
                       .map(([key, label, align]) => (
-                        <th key={key} className={align ? `${align} sortable` : "sortable"}>
+                        <th key={key} className={columns.cell(key, align ? `${align} sortable` : "sortable")}>
                           <button type="button" onClick={() => sortBy(key)}>
                             {label}
                             <Chevrons state={sortKey === key ? direction : "none"} />
@@ -433,18 +433,18 @@ export default function PerformanceView() {
                         </a>
                       </td>
                       {columns.shown("clicks") ? (
-                        <td className="mid">{whole(s.clicks)}</td>
+                        <td className={columns.cell("clicks", "mid")}>{whole(s.clicks)}</td>
                       ) : null}
                       {columns.shown("impressions") ? (
-                        <td className="mid">{whole(s.impressions)}</td>
+                        <td className={columns.cell("impressions", "mid")}>{whole(s.impressions)}</td>
                       ) : null}
                       {columns.shown("ctr") ? (
-                        <td className="mid">
+                        <td className={columns.cell("ctr", "mid")}>
                           {s.impressions ? `${(s.ctr * 100).toFixed(1)}%` : <span className="quiet">—</span>}
                         </td>
                       ) : null}
                       {columns.shown("position") ? (
-                        <td className="mid">
+                        <td className={columns.cell("position", "mid")}>
                           {s.position ? s.position.toFixed(1) : <span className="quiet">—</span>}
                         </td>
                       ) : null}
