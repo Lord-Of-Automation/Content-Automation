@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { FoldBody, FoldToggle, useFold } from "@/components/Fold";
+
 type GroupRecord = {
   type: string;
   name: string;
@@ -40,6 +42,7 @@ const blank = (): Group => ({
  * notices from the inside.
  */
 export default function DnsGroups() {
+  const fold = useFold();
   const [groups, setGroups] = useState<Group[]>([]);
   const [starter, setStarter] = useState<Group[]>([]);
   const [draft, setDraft] = useState<Group | null>(null);
@@ -120,17 +123,22 @@ export default function DnsGroups() {
   const shown = groups.length ? groups : starter;
 
   return (
-    <section className="card">
+    <section className={fold.className}>
       <div className="card-head">
         <span>DNS groups</span>
+        <div className="spacer" />
         {!draft ? (
           <button type="button" className="btn btn-ghost" onClick={() => setDraft(blank())}>
             New group
           </button>
         ) : null}
+        {/* After the card's own button, not before it: the fold is about the
+            card and the button is about what is in it. */}
+        <FoldToggle open={fold.open} what="the DNS groups" onToggle={fold.toggle} />
       </div>
 
-      <div className="card-body">
+      <FoldBody>
+        <div className="card-body">
         <p className="stage-hint" style={{ marginBottom: 16 }}>
           Record sets with a name, written into a zone when a domain is added to
           Cloudflare. Give them names you will recognise a year from now &mdash;
@@ -324,7 +332,8 @@ export default function DnsGroups() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </FoldBody>
     </section>
   );
 }

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { FoldBody, FoldToggle, useFold } from "@/components/Fold";
+
 import DatePicker from "@/components/DatePicker";
 
 type Field = {
@@ -17,7 +19,6 @@ type Spec = {
   id: string;
   label: string;
   wired: boolean;
-  blurb: string;
   fields: Field[];
 };
 
@@ -69,6 +70,7 @@ function dateOnly(iso: string | null): string {
 }
 
 export default function DomainProviders() {
+  const fold = useFold();
   const [specs, setSpecs] = useState<Spec[]>([]);
   const [statuses, setStatuses] = useState<Record<string, Status>>({});
   const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({});
@@ -242,12 +244,15 @@ export default function DomainProviders() {
   }
 
   return (
-    <section className="card">
+    <section className={fold.className}>
       <div className="card-head">
         <span>Domain providers</span>
+        <div className="spacer" />
+        <FoldToggle open={fold.open} what="the domain providers" onToggle={fold.toggle} />
       </div>
 
-      <div className="card-body">
+      <FoldBody>
+        <div className="card-body">
         <p className="stage-hint" style={{ marginBottom: 16 }}>
           Read-only credentials for the registrars this console lists domains
           from. Every secret is encrypted here and never sent back to the
@@ -282,8 +287,6 @@ export default function DomainProviders() {
                   <span className="stage-tag">stored, not yet read by the Domains page</span>
                 ) : null}
               </div>
-
-              <p className="stage-hint provider-blurb">{spec.blurb}</p>
 
               {/* The sign-in, above the fields, because it is the answer for
                   almost everybody and the service account below it is the
@@ -643,7 +646,8 @@ export default function DomainProviders() {
             </div>
           );
         })}
-      </div>
+        </div>
+      </FoldBody>
     </section>
   );
 }

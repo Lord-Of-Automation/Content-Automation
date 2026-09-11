@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { FoldBody, FoldToggle, useFold } from "@/components/Fold";
+
 type Credential = {
   name: string;
   set: boolean;
@@ -98,6 +100,7 @@ const GROUPS: Array<{ title: string; blurb: string; names: string[] }> = [
 const MULTILINE = new Set(["GOOGLE_SERVICE_ACCOUNT"]);
 
 export default function KeysView() {
+  const fold = useFold();
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -178,13 +181,19 @@ export default function KeysView() {
   const pending = Object.keys(drafts).length;
 
   return (
-    <section className="card">
+    <section className={fold.className}>
       <div className="card-head">
         <span>Keys and settings</span>
+        {/* The unsaved count stays visible folded or not. It is the one
+            thing about this card you would want to know without opening
+            it. */}
         {pending ? <span className="badge badge-waiting">{pending} unsaved</span> : null}
+        <div className="spacer" />
+        <FoldToggle open={fold.open} what="the keys and settings" onToggle={fold.toggle} />
       </div>
 
-      <div className="card-body">
+      <FoldBody>
+        <div className="card-body">
         <p className="stage-hint" style={{ marginBottom: 16 }}>
           These live on the engine, which is the thing that uses them. Values are never shown back
           here, so a field left blank means &ldquo;leave it as it is&rdquo;. Saving a blank over an
@@ -316,7 +325,8 @@ export default function KeysView() {
             </button>
           </div>
         ) : null}
-      </div>
+        </div>
+      </FoldBody>
     </section>
   );
 }

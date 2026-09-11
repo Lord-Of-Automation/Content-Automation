@@ -45,7 +45,6 @@ function payload(
       id: p.id,
       label: p.label,
       wired: p.wired,
-      blurb: p.blurb,
       // The pattern stays on the server. It is a validation rule, not a
       // description, and the message it produces is what the browser needs.
       // Hidden fields are stored but never rendered, so they do not travel to

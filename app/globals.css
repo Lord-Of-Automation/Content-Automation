@@ -3009,11 +3009,6 @@ button,
   letter-spacing: -0.01em;
 }
 
-.provider-blurb {
-  margin: 0 0 14px;
-  max-width: 62ch;
-}
-
 .provider-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -9179,6 +9174,88 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
 @media (prefers-reduced-motion: reduce) {
   .keys-group-body,
   .keys-chevron {
+    transition: none;
+  }
+}
+
+/* ------------------------------------------- folding a whole card
+
+   The same idea as the groups inside the Keys card, one level up. That page is
+   three cards of credentials and the one being changed is rarely more than one
+   of them.
+
+   The control is its own button at the end of the head rather than the whole
+   bar, which is what the groups use. A card's head often already holds a
+   button — New group, Refresh — and a button inside a button is not a thing.
+   Its own also means it is in the same place on every card whatever else is up
+   there. */
+.fold-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition:
+    background-color var(--quick, 120ms) var(--ease, ease),
+    border-color var(--quick, 120ms) var(--ease, ease),
+    color var(--quick, 120ms) var(--ease, ease);
+}
+
+.fold-toggle:hover {
+  background: var(--hover);
+  border-color: var(--line);
+  color: var(--ink-2);
+}
+
+.fold-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Down when the card is folded away, up when it is open. */
+.fold-chevron {
+  width: 17px;
+  height: 17px;
+  transition: transform 220ms var(--ease, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.card.is-open .fold-chevron {
+  transform: rotate(180deg);
+}
+
+/* Opens to whatever its contents come to, which no keyframe can know. A grid
+   row from nothing to one fraction says that, and animates both ways. */
+.fold-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 260ms var(--ease, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.card.is-open > .fold-body {
+  grid-template-rows: 1fr;
+}
+
+.fold-body > div {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* A folded card is its title bar and nothing else, so the bar should not go on
+   drawing the line that separated it from a body that is not there. */
+.card.is-foldable:not(.is-open) > .card-head {
+  border-bottom: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fold-body,
+  .fold-chevron {
     transition: none;
   }
 }

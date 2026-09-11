@@ -63,7 +63,6 @@ export interface ProviderSpec {
   label: string;
   /** Whether this provider currently feeds the Domains page. */
   wired: boolean;
-  blurb: string;
   fields: ProviderField[];
 }
 
@@ -78,10 +77,6 @@ export const PROVIDERS: ProviderSpec[] = [
     id: "godaddy",
     label: "GoDaddy",
     wired: true,
-    blurb:
-      "A Personal Access Token from Account, API Keys. It carries account-wide " +
-      "scope — the same token that lists domains could transfer them — so it is " +
-      "encrypted here and never sent to the browser.",
     fields: [
       {
         name: "token",
@@ -99,10 +94,6 @@ export const PROVIDERS: ProviderSpec[] = [
     id: "gandi",
     label: "Gandi",
     wired: true,
-    blurb:
-      "One API key, from Account, Authentication options. Gandi's own older " +
-      "documentation shows it sent as \"Apikey\", which its current API refuses " +
-      "with a 403 — it goes as a bearer token, which is what this uses.",
     fields: [
       {
         name: "apiKey",
@@ -116,15 +107,6 @@ export const PROVIDERS: ProviderSpec[] = [
     id: "cloudflare",
     label: "Cloudflare",
     wired: true,
-    blurb:
-      "Not a registrar. It runs the DNS for a domain once its name servers " +
-      "point at it, which is where the records for most of this estate actually " +
-      "live. One line per account: a token, a space, then that account's id. A " +
-      "token only ever sees the account it was issued for, so an estate spread " +
-      "over several accounts needs one line for each or most of it stays " +
-      "invisible. Each token needs Zone:Read, Zone:Edit and DNS:Edit, and " +
-      "Cache Purge as well if you want the per-site Clear cache button on " +
-      "the Applications page.",
     fields: [
       {
         name: "apiToken",
@@ -142,14 +124,6 @@ export const PROVIDERS: ProviderSpec[] = [
     id: "searchconsole",
     label: "Search Console",
     wired: true,
-    blurb:
-      "Not a registrar either. It reports what each site earns in Google, which " +
-      "is the Performance page. There is no API key for it: Google only gives " +
-      "this data to someone with access. Sign in below and it sees every " +
-      "property that account owns, including ones added later. The service " +
-      "account underneath is the alternative, and it has to be added to each " +
-      "property by hand — a property it is not on is invisible rather than " +
-      "refused, which reads exactly like an empty account.",
     fields: [
       {
         name: "clientId",
@@ -194,14 +168,6 @@ export const PROVIDERS: ProviderSpec[] = [
     id: "cloudways",
     label: "Cloudways",
     wired: true,
-    blurb:
-      "Where the sites actually run, which is the Applications page. An Access " +
-      "Token from Account, API Access — not the older API key, which needed an " +
-      "email beside it and is refused by this. Read-only permissions are enough: " +
-      "nothing here starts, stops or deploys anything. Worth knowing that " +
-      "Cloudways returns the application, database and server passwords in the " +
-      "same reply as the site list; they are dropped on arrival and never " +
-      "reach the browser.",
     fields: [
       {
         name: "apiToken",
@@ -220,14 +186,6 @@ export const PROVIDERS: ProviderSpec[] = [
     id: "hostinger",
     label: "Hostinger",
     wired: true,
-    blurb:
-      "The second host the Applications page reads. An API token from hPanel, " +
-      "under Account, API. One per line if you have more than one account: a " +
-      "token only sees the account it was issued for, so an estate spread over " +
-      "two of them needs two lines or half of it stays invisible. Hostinger's " +
-      "hosting API lists, creates and deletes websites and does no more than " +
-      "that, so cloning, domain changes, cache and stored logins are Cloudways " +
-      "only and simply do not appear on a Hostinger row.",
     fields: [
       {
         name: "apiToken",
@@ -243,11 +201,6 @@ export const PROVIDERS: ProviderSpec[] = [
     id: "anthropic",
     label: "Anthropic",
     wired: true,
-    blurb:
-      "The key behind Ask Claude, the panel on the right of every page. A key " +
-      "from console.anthropic.com, under API keys. The engine holds its own " +
-      "copy in its own environment and does not read this one: the two run on " +
-      "different machines and share nothing but a bill.",
     fields: [
       {
         name: "apiKey",
@@ -266,10 +219,6 @@ export const PROVIDERS: ProviderSpec[] = [
     id: "namecheap",
     label: "Namecheap",
     wired: false,
-    blurb:
-      "Three parts, not one. Namecheap authenticates on your username, your API " +
-      "key and the address the request comes from, and the address must be " +
-      "whitelisted under Profile, Tools, API Access before any of it works.",
     fields: [
       {
         name: "apiUser",
@@ -297,9 +246,6 @@ export const PROVIDERS: ProviderSpec[] = [
     id: "spaceship",
     label: "Spaceship",
     wired: false,
-    blurb:
-      "A key and a separate secret, both from the API Manager in your Spaceship " +
-      "account. They travel as two headers, so both are needed for any call.",
     fields: [
       { name: "apiKey", label: "API key", secret: true, placeholder: "from API Manager" },
       { name: "apiSecret", label: "API secret", secret: true, placeholder: "from API Manager" },
