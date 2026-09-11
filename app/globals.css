@@ -9342,3 +9342,74 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
   visibility: hidden;
   pointer-events: none;
 }
+
+/* ------------------------------------------- scrollbars
+
+   Seventeen boxes on this platform scroll inside themselves — a run's output,
+   the media picker, the column list, Claude's thread, the campaign list — and
+   every one of them was drawing whatever the operating system draws. On
+   Windows that is a seventeen-pixel grey channel with square arrow buttons at
+   each end, which is wider than some of the boxes it appears in and belongs to
+   a different decade than the rest of this console.
+
+   Styled once, globally, rather than on the seventeen: the list would be
+   wrong the first time somebody added an eighteenth.
+
+   Derived from the ink rather than written out, so both themes get a thumb
+   that stands off its own background by the same amount, and so a palette
+   changed on the Appearance page takes the scrollbars with it. */
+:root {
+  --scroll-thumb: color-mix(in srgb, var(--ink) 22%, transparent);
+  --scroll-thumb-hover: color-mix(in srgb, var(--ink) 42%, transparent);
+}
+
+/*
+ * Wide to hit, thin to look at.
+ *
+ * The track is twelve pixels so there is something to grab; the thumb is drawn
+ * inside a transparent three-pixel border, so what the eye sees is six. A
+ * six-pixel bar with a six-pixel target is the version of this that everybody
+ * misses and drags the page instead.
+ */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+/* No channel. A track drawn in any colour is a permanent line down the side of
+   a box that is only sometimes scrolled. */
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--scroll-thumb);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scroll-thumb-hover);
+}
+
+/* The arrow buttons at the ends. Nobody has used them since scroll wheels. */
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+/*
+ * Firefox, which has the standard properties and none of the pseudo-elements.
+ *
+ * Scoped to where the pseudo-elements are missing rather than set everywhere,
+ * because a browser that has both ignores the pseudo-elements the moment
+ * scrollbar-color is set — which would quietly cost Chrome the inset thumb
+ * above and leave it with a plain one.
+ */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
+}
