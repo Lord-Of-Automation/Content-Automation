@@ -167,15 +167,13 @@ export default function MailingRuns() {
           >
             <StatusBadge status={one.status as never} />
             <span className="mail-run-anchor">{one.anchor || "no anchor recorded"}</span>
-            <span className="mail-run-at">
-              {/* Named the way the Runs page names it, so the same run can be
-                  found on the list that holds every kind of run. On the date
-                  line rather than beside it: this row is a two-line grid with
-                  named areas, and a third child would land somewhere nobody
-                  put it. */}
-              <span className="mail-run-id mono">{runLabel(one.id, true)}</span>
-              {when(one.startedAt) ? ` · ${when(one.startedAt)}` : ""}
-            </span>
+            {/* Named the way the Runs page names it, so the same run can be
+                found on the list that holds every kind of run. On its own line
+                beneath the anchor: it shared the date's line to begin with and
+                the two together came to more than the column is wide, so the
+                pair ran out of the card. */}
+            <span className="mail-run-id mono">{runLabel(one.id, true)}</span>
+            <span className="mail-run-at">{when(one.startedAt)}</span>
           </button>
         ))}
       </nav>

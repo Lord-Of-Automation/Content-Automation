@@ -180,8 +180,12 @@ export default function LoopRuns() {
                   <StatusBadge status={one.status} />
                   {/* The id without the prefix that identified it. Every run
                       in this list came from a loop, so saying so on each row
-                      is a word repeated as many times as there are rows. */}
-                  <span className="mail-run-anchor mono">{one.id.slice(PREFIX.length)}</span>
+                      is a word repeated as many times as there are rows.
+
+                      Its own class rather than the campaign list's, which
+                      holds an anchor phrase and sets it in bold to say so. An
+                      id is a reference, not a heading. */}
+                  <span className="loop-run-id mono">{one.id.slice(PREFIX.length)}</span>
                   <span className="mail-run-at">{when(one.startedAt)}</span>
                 </button>
               ))}

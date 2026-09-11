@@ -8136,8 +8136,12 @@ code,
 .mail-run {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
+  /* Three lines, not two. The id went on the end of the date line and the
+     pair came to more than the column is wide, so it ran out of the box. Each
+     now has the full width of the column to itself. */
   grid-template-areas:
     "badge anchor"
+    "badge id"
     "badge at";
   gap: 2px 8px;
   align-items: center;
@@ -8177,6 +8181,22 @@ code,
   font-size: 13px;
   font-weight: 600;
   color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Every line in the row is held to the width of the column.
+
+   A grid item's minimum width is the width of its contents unless it is told
+   otherwise, so a long enough id or anchor pushes past the edge of the card
+   rather than being cut off at it. min-width is what allows the shrink and
+   overflow is what does the cutting; both are needed. */
+.mail-run-at,
+.mail-run-anchor,
+.mail-run-id,
+.loop-run-id {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -8906,11 +8926,31 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
   }
 }
 
-/* The engine's own id for a campaign, on the date line beneath its anchor. A
-   shade stronger than the date beside it, because it is the half of that line
-   somebody is actually looking for when they came here to cross-reference the
-   Runs page. */
+/* The engine's own id for a campaign, on its own line under the anchor. A
+   shade stronger than the date below it, because it is what somebody came
+   here to cross-reference against the Runs page. */
 .mail-run-id {
+  grid-area: id;
   color: var(--ink-2);
   font-size: 11px;
+}
+
+/* The engine's id for a loop's run, on the row that opens it.
+
+   Sits where a campaign's anchor sits and is set differently on purpose: an
+   anchor is the phrase the campaign exists to place and reads as the title of
+   its row, while this is a reference somebody copies. Regular weight, and in
+   the mono face, because it is read character by character. */
+.loop-run-id {
+  grid-area: anchor;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mail-run.is-on .loop-run-id {
+  color: var(--ink);
 }
