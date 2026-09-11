@@ -439,20 +439,39 @@ export default function MailingView() {
                             key={thread.email}
                             className={thread.replies ? "mail-thread has-reply" : "mail-thread"}
                           >
-                            <button
-                              type="button"
-                              className="mail-thread-head"
-                              onClick={() => setOpen(isOpen ? null : thread.email)}
-                            >
-                              <span className="mail-who">{thread.email}</span>
-                              <span className="mail-subject">{thread.subject}</span>
-                              <span className="mail-count">
-                                {thread.replies
-                                  ? `${thread.replies} repl${thread.replies === 1 ? "y" : "ies"}`
-                                  : "no reply yet"}
-                              </span>
-                              <span className="mail-at">{when(thread.lastAt ?? thread.sentAt)}</span>
-                            </button>
+                            {/* The row and the one action on it, side by side.
+                                Marking an invoice paid is the commonest thing
+                                to do to a conversation and it should not need
+                                the conversation opened first — and a button
+                                inside a button is not a thing, so the row is a
+                                row with a button in it rather than one itself. */}
+                            <div className="mail-thread-row">
+                              <button
+                                type="button"
+                                className="mail-thread-head"
+                                onClick={() => setOpen(isOpen ? null : thread.email)}
+                              >
+                                <span className="mail-who">{thread.email}</span>
+                                <span className="mail-subject">{thread.subject}</span>
+                                <span className="mail-count">
+                                  {thread.replies
+                                    ? `${thread.replies} repl${thread.replies === 1 ? "y" : "ies"}`
+                                    : "no reply yet"}
+                                </span>
+                                <span className="mail-at">
+                                  {when(thread.lastAt ?? thread.sentAt)}
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-paid btn-sm mail-thread-paid"
+                                disabled={busy}
+                                title={`Mark ${thread.email} as paid`}
+                                onClick={() => void pay(thread, true)}
+                              >
+                                Paid
+                              </button>
+                            </div>
 
                             {thread.note ? (
                               <p className="notice warn mail-note">{thread.note}</p>
@@ -535,16 +554,27 @@ export default function MailingView() {
                     <ul className="mail-threads">
                       {paid.map((thread) => (
                         <li className="mail-thread is-paid" key={thread.email}>
-                          <button
-                            type="button"
-                            className="mail-thread-head"
-                            onClick={() => setOpen(open === thread.email ? null : thread.email)}
-                          >
-                            <span className="mail-who">{thread.email}</span>
-                            <span className="mail-subject">{thread.subject}</span>
-                            <span className="mail-count">paid {when(thread.paidAt)}</span>
-                            <span className="mail-at">{thread.from || ""}</span>
-                          </button>
+                          <div className="mail-thread-row">
+                            <button
+                              type="button"
+                              className="mail-thread-head"
+                              onClick={() => setOpen(open === thread.email ? null : thread.email)}
+                            >
+                              <span className="mail-who">{thread.email}</span>
+                              <span className="mail-subject">{thread.subject}</span>
+                              <span className="mail-count">paid {when(thread.paidAt)}</span>
+                              <span className="mail-at">{thread.from || ""}</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm mail-thread-paid"
+                              disabled={busy}
+                              title="Put it back among the ones still owed"
+                              onClick={() => void pay(thread, false)}
+                            >
+                              Not paid
+                            </button>
+                          </div>
 
                           {open === thread.email ? (
                             <div className="mail-messages">
@@ -569,14 +599,6 @@ export default function MailingView() {
                                 >
                                   Open in Gmail
                                 </a>
-                                <button
-                                  type="button"
-                                  className="btn btn-ghost btn-sm"
-                                  disabled={busy}
-                                  onClick={() => void pay(thread, false)}
-                                >
-                                  Not paid after all
-                                </button>
                                 <button
                                   type="button"
                                   className="btn btn-danger btn-sm"
