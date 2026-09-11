@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 
 import { auth } from "@/auth";
 import Ask from "@/components/Ask";
+import PageFrame from "@/components/PageFrame";
 import AskClaude from "@/components/AskClaude";
 import "./globals.css";
 
@@ -92,7 +93,9 @@ export default async function RootLayout({
       <body>
         {/* Above everything, because anything may need to ask something. */}
         <Ask>
-          {children}
+          {/* Keyed on the path inside, so a page arrives on every visit to it
+              and not only on the first. */}
+          <PageFrame>{children}</PageFrame>
           {session?.user ? <AskClaude /> : null}
         </Ask>
       </body>

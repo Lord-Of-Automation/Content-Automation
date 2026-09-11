@@ -8252,14 +8252,14 @@ code,
 }
 
 .mail-panel {
-  animation: mail-panel-in 180ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation: mail-panel-in 180ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
 }
 
 /* The rows inside the inbox follow a beat later, so a list of conversations
    arrives as a list rather than as one block. Capped: past the fifth the
    stagger stops being a rhythm and starts being a delay. */
 .mail-panel .mail-group {
-  animation: mail-panel-in 200ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation: mail-panel-in 200ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
 }
 
 .mail-panel .mail-group:nth-of-type(2) {
@@ -8313,7 +8313,7 @@ code,
 }
 
 .col-in {
-  animation: col-in 220ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation: col-in 220ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
 }
 
 .col-out {
@@ -8337,7 +8337,7 @@ code,
 }
 
 .table-in tbody tr {
-  animation: row-in 260ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation: row-in 260ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
 }
 
 .table-in tbody tr:nth-child(1) { animation-delay: 0ms; }
@@ -8377,7 +8377,7 @@ code,
 
 /* The messages themselves, arriving a beat after the room they arrive in. */
 .mail-messages .mail-message {
-  animation: row-in 260ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation: row-in 260ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
   animation-delay: 80ms;
 }
 
@@ -8394,6 +8394,23 @@ code,
   }
 }
 
+/* ------------------------------------------- why these fill backwards
+
+   Every arrival below is "backwards" rather than "both", and the difference
+   matters more than it looks.
+
+   Backwards holds the opening keyframe during the stagger delay, which is what
+   keeps a row that has not started yet from showing at full strength and then
+   jumping. Forwards would also pin the closing keyframe in place for good —
+   and a transform pinned in place is a containing block for anything fixed
+   inside it, even when the transform is only the identity. The full-screen
+   preview in the website editor opened trapped inside its own card, at the
+   card's size and offset, for exactly that reason.
+
+   So: hold the start, never the end. The one exception is col-out, which
+   fades a column away and does have to hold where it landed, and is removed
+   from the page a frame later anyway. */
+
 /* ------------------------------------------- content that arrives later
 
    A tab animates when it is switched to, but the Runs and History panels ask
@@ -8403,14 +8420,14 @@ code,
    So what arrives late arrives the same way, and the two reads as one motion
    rather than a slide followed by a jolt. */
 .mail-late {
-  animation: mail-panel-in 220ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation: mail-panel-in 220ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
 }
 
 /* The campaigns in the history, and the runs beside them, a beat apart. Same
    rhythm as the table rows, and capped for the same reason. */
 .history > .campaign-run,
 .mail-runs-list > .mail-run {
-  animation: row-in 260ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation: row-in 260ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
 }
 
 .history > .campaign-run:nth-child(1),
@@ -8458,7 +8475,7 @@ code,
    Keyed on the run's own id in RunProgress, so this plays when the run being
    looked at changes and not on the four-second poll that keeps it current. */
 .run-box {
-  animation: run-box-in 300ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation: run-box-in 300ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
 }
 
 @keyframes run-box-in {
@@ -8473,7 +8490,7 @@ code,
    cannot know that number, and a transition does not run on the first frame
    an element exists. */
 .run-box .bar > span {
-  animation: bar-sweep 520ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) 120ms both;
+  animation: bar-sweep 520ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) 120ms backwards;
   transform-origin: left center;
 }
 
@@ -8491,13 +8508,13 @@ code,
 .run-box .current-page,
 .run-box .done-pages,
 .run-box .inputs {
-  animation: row-in 260ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) 140ms both;
+  animation: row-in 260ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) 140ms backwards;
 }
 
 /* The stages, in the order they run in. Capped at the eighth: a long list
    dealing itself out one line at a time is slower to read, not better. */
 .run-box .stages > .stage {
-  animation: row-in 300ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation: row-in 300ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
 }
 
 .run-box .stages > .stage:nth-child(1) { animation-delay: 180ms; }
@@ -8512,7 +8529,7 @@ code,
 /* Last, because they are what you read last: the bill, and the buttons. */
 .run-box .cost,
 .run-box .run-actions {
-  animation: row-in 280ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) 300ms both;
+  animation: row-in 280ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) 300ms backwards;
 }
 
 /* ------------------------------------------- the loops, arriving
@@ -8525,7 +8542,7 @@ code,
    Keyed by schedule id in LoopView, so switching one on or saving one does not
    send the whole list through this again. */
 .loop-list > .loop {
-  animation: row-in 300ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation: row-in 300ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
 }
 
 .loop-list > .loop:nth-child(1) { animation-delay: 0ms; }
@@ -8543,11 +8560,11 @@ code,
    Keyed on which loop is being edited, so clicking Edit on one and then on
    another plays it again instead of quietly swapping the values. */
 .loop-form {
-  animation: run-box-in 300ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation: run-box-in 300ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
 }
 
 .loop-form .card-body form > * {
-  animation: row-in 280ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation: row-in 280ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
 }
 
 .loop-form .card-body form > *:nth-child(1) { animation-delay: 90ms; }
@@ -8582,7 +8599,7 @@ code,
    beside them comes in from its own edge, because it is a panel rather than a
    card and it opens from the side it lives on. */
 .editor-in > .card {
-  animation: run-box-in 320ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation: run-box-in 320ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
 }
 
 .editor-in > .card:nth-child(1) { animation-delay: 0ms; }
@@ -8594,7 +8611,7 @@ code,
 .editor-in .editor-sections,
 .editor-in .sheet-section,
 .editor-in .editor-body-head {
-  animation: row-in 300ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) 120ms both;
+  animation: row-in 300ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) 120ms backwards;
 }
 
 @keyframes editor-aside-in {
@@ -8606,7 +8623,7 @@ code,
 
 .editor-in > .sa-panel,
 .editor-in > aside {
-  animation: editor-aside-in 320ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) both;
+  animation: editor-aside-in 320ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -8616,6 +8633,78 @@ code,
   .editor-in .editor-body-head,
   .editor-in > .sa-panel,
   .editor-in > aside {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------- a page, arriving
+
+   Every page on this console, on every visit to it, in two layers.
+
+   The page itself only fades. That is not a stylistic choice — a transform or
+   a filter on <main> would make it the containing block for everything fixed
+   inside it, and the toasts, the bulk bar and the full-screen preview all sit
+   in there. Opacity has no such effect, so the outer layer is opacity and
+   nothing else.
+
+   The movement is one level in, on the blocks a page is actually built from,
+   a beat apart. Which is what makes this read as a page assembling rather than
+   a page being switched on: the eye is given an order to follow, top to
+   bottom, instead of a whole screen changing in one frame.
+
+   Fast on purpose. All of it is over inside half a second, because this fires
+   on every navigation and an animation you wait for twice is an animation you
+   start resenting. */
+main {
+  animation: page-fade 240ms var(--ease, cubic-bezier(0.2, 0, 0, 1));
+}
+
+@keyframes page-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/*
+ * The blocks, wherever the page keeps them.
+ *
+ * A stack and a grid are arrangements rather than things — nobody looks at a
+ * stack — so they hand the arrival down to what they are arranging, and a card
+ * sitting directly in the page takes it itself. Which is why the :not() is
+ * there: without it a page whose whole content is one stack would animate the
+ * stack and everything in it, and the two movements would fight.
+ */
+main > *:not(.stack):not(.grid),
+main > .stack > *,
+main > .grid > * {
+  animation: page-block-in 340ms var(--ease, cubic-bezier(0.2, 0, 0, 1)) backwards;
+}
+
+@keyframes page-block-in {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+}
+
+main > *:nth-child(1),
+main > .stack > *:nth-child(1),
+main > .grid > *:nth-child(1) { animation-delay: 0ms; }
+main > *:nth-child(2),
+main > .stack > *:nth-child(2),
+main > .grid > *:nth-child(2) { animation-delay: 55ms; }
+main > *:nth-child(3),
+main > .stack > *:nth-child(3),
+main > .grid > *:nth-child(3) { animation-delay: 95ms; }
+main > *:nth-child(n + 4),
+main > .stack > *:nth-child(n + 4),
+main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  main,
+  main > *:not(.stack):not(.grid),
+  main > .stack > *,
+  main > .grid > * {
     animation: none;
   }
 }
