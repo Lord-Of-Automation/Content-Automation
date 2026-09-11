@@ -1,7 +1,7 @@
 import TopBar from "@/components/TopBar";
 import WebsiteEditor from "@/components/WebsiteEditor";
 
-export const metadata = { title: "Edit website — SEO Automation" };
+export const metadata = { title: "Edit website | SEO Automation" };
 export const dynamic = "force-dynamic";
 
 export default async function WebsitePage({

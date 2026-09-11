@@ -1,6 +1,6 @@
 import LoginForm from "@/components/LoginForm";
 
-export const metadata = { title: "Sign in — Content Automation" };
+export const metadata = { title: "Sign in | Content Automation" };
 
 export default function LoginPage() {
   return (

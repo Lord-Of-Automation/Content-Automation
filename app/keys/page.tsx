@@ -3,7 +3,7 @@ import KeysView from "@/components/KeysView";
 import DomainProviders from "@/components/DomainProviders";
 import DnsGroups from "@/components/DnsGroups";
 
-export const metadata = { title: "Keys — Content Automation" };
+export const metadata = { title: "Keys | Content Automation" };
 export const dynamic = "force-dynamic";
 
 export default function KeysPage() {
