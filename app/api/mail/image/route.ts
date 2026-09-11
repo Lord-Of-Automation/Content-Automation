@@ -5,6 +5,15 @@ import { threadImage } from "@/lib/mail";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/*
+ * Two calls to Gmail, not one.
+ *
+ * The thread is read first to check the picture belongs to it, and only then
+ * are the bytes fetched. Left at the default this gets ten seconds for both,
+ * and a large screenshot on a slow answer runs out — which arrives on the page
+ * as a broken image and nothing else.
+ */
+export const maxDuration = 60;
 
 /**
  * One picture out of one conversation, as bytes.
@@ -40,7 +49,15 @@ export async function GET(request: Request) {
     return new Response(new Uint8Array(bytes), {
       headers: {
         "content-type": picture.mime,
-        "content-length": String(bytes.length),
+        /*
+         * No content-length of its own.
+         *
+         * Whatever serves this is free to compress the body on the way out,
+         * and a length measured before that describes a body that is no longer
+         * being sent. A browser handed a picture with the wrong length stops
+         * reading where it was told to and shows a broken image. The runtime
+         * sets the right one.
+         */
         /*
          * Kept for a while, and privately.
          *
