@@ -99,6 +99,8 @@ export type Thread = {
   replies: number;
   /** Whether anything they wrote back names a way to be paid. */
   paypal?: boolean;
+  /** When the invoice was paid, set by hand. Null while it is still owed. */
+  paidAt?: string | null;
   lastAt?: string;
   messages: ThreadMessage[];
   note?: string;
@@ -389,4 +391,12 @@ export async function mailOpportunities(
 export async function mailCampaigns(): Promise<Campaign[]> {
   const { campaigns } = await call<{ campaigns: Campaign[] }>("/mail/campaigns");
   return campaigns ?? [];
+}
+
+/** Marks one paid, or puts it back. */
+export async function setThreadPaid(email: string, paid: boolean): Promise<void> {
+  await call(`/mail/threads/${encodeURIComponent(email)}/paid`, {
+    method: "POST",
+    body: JSON.stringify({ paid }),
+  });
 }

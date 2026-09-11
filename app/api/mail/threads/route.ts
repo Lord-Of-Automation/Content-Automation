@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
-import { forgetThread, mailThreads } from "@/lib/mail";
+import { forgetThread, mailThreads, setThreadPaid } from "@/lib/mail";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +24,34 @@ export async function GET() {
 
   try {
     return NextResponse.json(await mailThreads());
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+/**
+ * Marking one paid, or putting it back.
+ *
+ * Audited like the sending is. It is the record of money having changed hands,
+ * which is the kind of thing worth being able to say who set and when.
+ */
+export async function POST(request: Request) {
+  const denied = await requireSession();
+  if (denied) return denied;
+
+  const session = await auth();
+  const actor = session?.user?.name ?? "unknown";
+
+  try {
+    const body = (await request.json()) as Record<string, unknown>;
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const paid = body.paid !== false;
+
+    if (!email) return NextResponse.json({ error: "No address was given." }, { status: 400 });
+
+    await setThreadPaid(email, paid);
+    await record(actor, paid ? "mail-paid" : "mail-unpaid", email);
+    return NextResponse.json({ paid });
   } catch (error) {
     return errorResponse(error);
   }

@@ -7999,3 +7999,42 @@ code,
     gap: 2px;
   }
 }
+
+/* ------------------------------------------------------------------ paid
+
+   The button that says money arrived. Green rather than the usual grey,
+   because it is the one outcome the whole page is working towards, and it sits
+   in a row beside a delete. */
+.btn-paid {
+  color: var(--ok);
+  background: var(--ok-soft);
+  border-color: color-mix(in srgb, var(--ok) 30%, transparent);
+}
+
+.btn-paid:hover:not(:disabled) {
+  color: var(--accent-ink);
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+/* Below the inbox, after everything still being chased. Set apart by a rule
+   rather than by a colour: these are finished, and finished should be quiet. */
+.mail-paid {
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 2px solid var(--line);
+}
+
+.mail-thread.is-paid {
+  border-left-color: var(--ok);
+  /* Dimmed, not hidden. Still the record of a link that was bought. */
+  opacity: 0.82;
+}
+
+.mail-thread.is-paid:hover {
+  opacity: 1;
+}
+
+.mail-thread.is-paid .mail-count {
+  color: var(--ok);
+}

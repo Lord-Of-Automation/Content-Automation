@@ -157,6 +157,53 @@ export default function MailingView() {
     }
   }
 
+  /**
+   * Says an invoice has been settled, or takes it back.
+   *
+   * Nothing here can work this out on its own: the money moves in PayPal and
+   * the only person who sees that is the one who moved it. So it is a button,
+   * and it is reversible, because it sits beside one that deletes things.
+   *
+   * Only marking asks first. Unmarking is how a mistake is undone, and putting
+   * a question in front of the undo makes the mistake harder to fix than it was
+   * to make.
+   */
+  async function pay(thread: Thread, paid: boolean) {
+    if (paid) {
+      const sure = await ask.confirm({
+        title: `Mark ${thread.email} as paid?`,
+        body: (
+          <>
+            It moves out of the inbox and into Paid, so it stops competing for
+            attention with the ones still being chased. Nothing is sent, the
+            publisher is told nothing, and the conversation itself is untouched.
+            You can put it back.
+          </>
+        ),
+        confirmLabel: "Yes, it is paid",
+      });
+      if (!sure) return;
+    }
+
+    setBusy(true);
+    try {
+      const response = await fetch("/api/mail/threads", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: thread.email, paid }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "That did not work.");
+
+      await loadThreads();
+      push("ok", paid ? `${thread.email} marked paid.` : `${thread.email} is owed again.`);
+    } catch (e) {
+      push("bad", e instanceof Error ? e.message : "That did not work.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function forget(email: string) {
     const sure = await ask.confirm({
       title: `Forget the conversation with ${email}?`,
@@ -189,7 +236,17 @@ export default function MailingView() {
     }
   }
 
-  const showing = paidOnly ? threads.filter((one) => one.paypal) : threads;
+  /*
+   * Paid ones leave the inbox.
+   *
+   * Which is the point of marking them: a conversation that has ended in money
+   * is done, and leaving it among the ones still being chased means reading
+   * past it every time. It is not hidden, it is below.
+   */
+  const owed = threads.filter((one) => !one.paidAt);
+  const paid = threads.filter((one) => one.paidAt);
+
+  const showing = paidOnly ? owed.filter((one) => one.paypal) : owed;
 
   if (loading) return <div className="empty">Reading the mailbox…</div>;
 
@@ -334,12 +391,12 @@ export default function MailingView() {
             <div className="mail-only">
                 <div className="editor-body-head">
                 <span className="field-label">
-                  Inbox{threads.length ? ` (${showing.length})` : ""}
+                  Inbox{owed.length ? ` (${showing.length})` : ""}
                 </span>
                 {/* The one filter worth having on an outreach inbox. A
                     publisher quoting a price and saying where to send it has
                     agreed; everything else is still a conversation. */}
-                {threads.some((one) => one.paypal) ? (
+                {owed.some((one) => one.paypal) ? (
                   <label className="check" htmlFor="mail-paid">
                     <input
                       id="mail-paid"
@@ -434,6 +491,16 @@ export default function MailingView() {
                                   </a>
                                   <button
                                     type="button"
+                                    className={
+                                      thread.paidAt ? "btn btn-ghost btn-sm" : "btn btn-paid btn-sm"
+                                    }
+                                    disabled={busy}
+                                    onClick={() => void pay(thread, !thread.paidAt)}
+                                  >
+                                    {thread.paidAt ? "Not paid after all" : "Paid"}
+                                  </button>
+                                  <button
+                                    type="button"
                                     className="btn btn-danger btn-sm"
                                     disabled={busy}
                                     onClick={() => void forget(thread.email)}
@@ -450,6 +517,82 @@ export default function MailingView() {
                     </section>
                   ))
                 )}
+
+                {/* Below the inbox, not hidden from it.
+
+                    A conversation that ended in money is finished as far as
+                    the work goes, so it stops competing for attention with the
+                    ones still being chased. It is still the record of a link
+                    that was bought, and that is worth being able to find. */}
+                {paid.length ? (
+                  <section className="mail-group mail-paid">
+                    <h3 className="mail-group-head">
+                      <span>Paid</span>
+                      <span className="mail-group-count">
+                        {paid.length} conversation{paid.length === 1 ? "" : "s"}
+                      </span>
+                    </h3>
+                    <ul className="mail-threads">
+                      {paid.map((thread) => (
+                        <li className="mail-thread is-paid" key={thread.email}>
+                          <button
+                            type="button"
+                            className="mail-thread-head"
+                            onClick={() => setOpen(open === thread.email ? null : thread.email)}
+                          >
+                            <span className="mail-who">{thread.email}</span>
+                            <span className="mail-subject">{thread.subject}</span>
+                            <span className="mail-count">paid {when(thread.paidAt)}</span>
+                            <span className="mail-at">{thread.from || ""}</span>
+                          </button>
+
+                          {open === thread.email ? (
+                            <div className="mail-messages">
+                              {thread.messages.map((message) => (
+                                <article
+                                  key={message.id}
+                                  className={message.mine ? "mail-message is-mine" : "mail-message"}
+                                >
+                                  <header>
+                                    <strong>{message.mine ? "You" : message.from}</strong>
+                                    <span>{when(message.at)}</span>
+                                  </header>
+                                  <pre>{message.text.trim() || "(no words in it)"}</pre>
+                                </article>
+                              ))}
+                              <div className="ve-actions">
+                                <a
+                                  className="btn btn-ghost btn-sm"
+                                  href={`https://mail.google.com/mail/u/0/#all/${thread.threadId}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Open in Gmail
+                                </a>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  disabled={busy}
+                                  onClick={() => void pay(thread, false)}
+                                >
+                                  Not paid after all
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-danger btn-sm"
+                                  disabled={busy}
+                                  onClick={() => void forget(thread.email)}
+                                >
+                                  Forget
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
             </div>
           ) : null}
         </div>
