@@ -83,7 +83,6 @@ export default function OutreachCampaign({
   const [priceMax, setPriceMax] = useState("");
   const [geo, setGeo] = useState("");
   const [language, setLanguage] = useState("");
-  const [unwritten, setUnwritten] = useState(true);
 
   const [chosen, setChosen] = useState<Set<string>>(new Set());
 
@@ -173,13 +172,12 @@ export default function OutreachCampaign({
 
       if (wantedLanguage && !one.language.toLowerCase().includes(wantedLanguage)) return false;
 
-      if (unwritten && one.sent > 0) return false;
 
       return true;
     });
   }, [
     rows, drMin, drMax, trafficMin, trafficMax, priceMin, priceMax,
-    geo, language, unwritten,
+    geo, language,
   ]);
 
   const picked = showing.filter((one) => chosen.has(one.domain));
@@ -383,18 +381,6 @@ export default function OutreachCampaign({
                   disabled={!!has && !has.language}
                   onChange={(e) => setLanguage(e.target.value)}
                 />
-              </div>
-
-              <div className="field">
-                <label className="check" htmlFor="c-unwritten">
-                  <input
-                    id="c-unwritten"
-                    type="checkbox"
-                    checked={unwritten}
-                    onChange={(e) => setUnwritten(e.target.checked)}
-                  />
-                  Not written to yet
-                </label>
               </div>
             </div>
           </section>
