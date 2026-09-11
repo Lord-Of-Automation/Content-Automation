@@ -280,7 +280,7 @@ export default function MailingView() {
       {error ? <div className="notice bad">{error}</div> : null}
 
       <div className="card">
-        <div className="card-head">
+        <div className="card-head has-mid">
           <div>
             <h2>Mailing</h2>
             <p className="quiet">
@@ -291,7 +291,10 @@ export default function MailingView() {
                   : `${boxes.length} mailboxes connected`}
             </p>
           </div>
-          <div className="app-head-actions">
+          {/* Its own part of the head, between the title and the buttons,
+              so it sits in the middle of the card rather than wherever the
+              two of them happen to leave room. */}
+          <div className="card-head-mid">
             <div className="seg seg-sm">
               <button
                 type="button"
@@ -320,6 +323,9 @@ export default function MailingView() {
                 History
               </button>
             </div>
+          </div>
+
+          <div className="app-head-actions">
             {connected ? (
               <button
                 type="button"

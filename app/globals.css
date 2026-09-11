@@ -7460,6 +7460,43 @@ code,
   min-width: 0;
 }
 
+/* ------------------------------------------------- tabs in the middle
+
+   Centred in the card, not merely between the title and the buttons.
+
+   The head is a flex row and those two are different widths, so anything
+   sitting between them lands off to one side by the difference. Absolutely
+   positioned instead, which is the one way to be in the middle of a box
+   regardless of what is either side, with the space it would have taken kept
+   by an equal margin so the buttons never slide under it. */
+.card-head-mid {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+}
+
+/* Said by the markup rather than worked out with :has(). If that selector were
+   ever not understood, the strip would position itself against whatever
+   ancestor happened to be positioned, which is a long way from the middle of
+   this card. A class cannot fail that way. */
+.card-head.has-mid {
+  position: relative;
+}
+
+/* Below that, three things do not fit on one line and the middle one stops
+   being a middle. It goes back into the flow, on its own row, centred there. */
+@media (max-width: 900px) {
+  .card-head-mid {
+    position: static;
+    transform: none;
+    width: 100%;
+    justify-content: center;
+    order: 3;
+  }
+}
+
 /* Always there, rather than appearing under the pointer. It is the action the
    row exists to make easy, and one that only shows itself once you have found
    it is one most people never find. */
