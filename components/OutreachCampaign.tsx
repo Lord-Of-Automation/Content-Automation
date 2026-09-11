@@ -268,7 +268,7 @@ export default function OutreachCampaign({
       {!connected ? (
         <div className="notice warn">
           <strong>No mailbox is connected.</strong> A campaign ends in email, so
-          connect one on the Conversations tab before starting one.
+          connect one on the Inbox tab before starting one.
         </div>
       ) : null}
 

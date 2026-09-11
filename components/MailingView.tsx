@@ -41,8 +41,8 @@ export default function MailingView() {
   const [status, setStatus] = useState<MailStatus | null>(null);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [open, setOpen] = useState<string | null>(null);
-  /** Which half of the page. Conversations first: it is what you come back to. */
-  const [view, setView] = useState<"conversations" | "campaign">("conversations");
+  /** Which half of the page. The inbox first: it is what you come back to. */
+  const [view, setView] = useState<"inbox" | "campaign">("inbox");
   /** Show only the replies that name a way to be paid, which is the answer. */
   const [paidOnly, setPaidOnly] = useState(false);
 
@@ -237,10 +237,10 @@ export default function MailingView() {
             <div className="seg seg-sm">
               <button
                 type="button"
-                className={view === "conversations" ? "seg-btn is-on" : "seg-btn"}
-                onClick={() => setView("conversations")}
+                className={view === "inbox" ? "seg-btn is-on" : "seg-btn"}
+                onClick={() => setView("inbox")}
               >
-                Conversations
+                Inbox
                 {threads.filter((one) => one.paypal).length ? (
                   <span className="seg-count is-paid">
                     {threads.filter((one) => one.paypal).length}
@@ -313,7 +313,7 @@ export default function MailingView() {
               onStarted={() => {
                 // The first email lands within a minute or two, so the list is
                 // worth another look shortly. Switching tabs is the cue.
-                setView("conversations");
+                setView("inbox");
                 void loadThreads().catch(() => {});
               }}
             />
@@ -321,7 +321,7 @@ export default function MailingView() {
             <div className="mail-only">
                 <div className="editor-body-head">
                 <span className="field-label">
-                  Conversations{threads.length ? ` (${showing.length})` : ""}
+                  Inbox{threads.length ? ` (${showing.length})` : ""}
                 </span>
                 {/* The one filter worth having on an outreach inbox. A
                     publisher quoting a price and saying where to send it has
@@ -343,7 +343,7 @@ export default function MailingView() {
                 <p className="provider-hint">
                   {paidOnly
                     ? "No reply has named a way to be paid yet."
-                    : "Nothing sent yet. Conversations appear here once this platform has written to somebody, and only those."}
+                    : "Nothing sent yet. A conversation appears here once this platform has written to somebody, and only then."}
                 </p>
                 ) : (
                 grouped.map(([sender, rows]) => (
