@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { useAsk } from "@/components/Ask";
 import CampaignHistory from "@/components/CampaignHistory";
+import MailingRuns from "@/components/MailingRuns";
 import OutreachCampaign from "@/components/OutreachCampaign";
 import { useToasts } from "@/components/Toasts";
 import type { MailStatus, Thread } from "@/lib/mail";
@@ -43,7 +44,7 @@ export default function MailingView() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   /** Which half of the page. The inbox first: it is what you come back to. */
-  const [view, setView] = useState<"inbox" | "campaign" | "history">("inbox");
+  const [view, setView] = useState<"inbox" | "campaign" | "runs" | "history">("inbox");
   /** Show only the replies that name a way to be paid, which is the answer. */
   const [paidOnly, setPaidOnly] = useState(false);
 
@@ -317,6 +318,13 @@ export default function MailingView() {
               </button>
               <button
                 type="button"
+                className={view === "runs" ? "seg-btn is-on" : "seg-btn"}
+                onClick={() => setView("runs")}
+              >
+                Runs
+              </button>
+              <button
+                type="button"
                 className={view === "history" ? "seg-btn is-on" : "seg-btn"}
                 onClick={() => setView("history")}
               >
@@ -377,7 +385,11 @@ export default function MailingView() {
             </div>
           ) : null}
 
-          {view === "history" ? (
+          {view === "runs" ? (
+            <div className="mail-only">
+              <MailingRuns />
+            </div>
+          ) : view === "history" ? (
             <div className="mail-only">
               <CampaignHistory />
             </div>
@@ -386,11 +398,10 @@ export default function MailingView() {
               connected={connected}
               senders={status?.senders ?? []}
               onStarted={() => {
-                // Straight to the history, which is where the campaign just
-                // started can be watched. The replies take longer than the
-                // sending does, so the inbox is the wrong place to be told to
-                // look first.
-                setView("history");
+                // Straight to the run, which is the thing that has just begun.
+                // The sending takes minutes and the replies take days, so
+                // neither the inbox nor the history is where to look first.
+                setView("runs");
               }}
             />
           ) : connected ? (

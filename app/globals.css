@@ -8095,3 +8095,89 @@ code,
 .mail-thread.is-paid .mail-count {
   color: var(--ok);
 }
+
+/* ------------------------------------------------------- runs, on this page
+
+   The Runs page lists every run this platform has ever done and a campaign is
+   one row among hundreds. Right place for it, wrong place to watch it from.
+
+   The list sits beside the run rather than above it, so switching between two
+   of them does not move the thing being read. */
+.mail-runs {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.mail-runs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Long enough to scroll on its own once a few dozen campaigns have run,
+     rather than pushing the run itself off the bottom of the card. */
+  max-height: 62vh;
+  overflow-y: auto;
+}
+
+.mail-run {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "badge anchor"
+    "badge at";
+  gap: 2px 8px;
+  align-items: center;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mail-run:hover {
+  background: var(--hover);
+}
+
+.mail-run.is-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.mail-run > .pill {
+  grid-area: badge;
+}
+
+/* The anchor, which is what a campaign was for and the only thing that tells
+   two of them apart at a glance. */
+.mail-run-anchor {
+  grid-area: anchor;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mail-run-at {
+  grid-area: at;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.mail-runs-one {
+  min-width: 0;
+}
+
+/* One column each is too narrow to read a step list in. */
+@media (max-width: 1000px) {
+  .mail-runs {
+    grid-template-columns: 1fr;
+  }
+
+  .mail-runs-list {
+    max-height: 200px;
+  }
+}
