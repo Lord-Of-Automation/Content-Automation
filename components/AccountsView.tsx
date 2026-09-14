@@ -140,7 +140,7 @@ export default function AccountsView() {
           ) : accounts.length === 0 ? (
             <div className="empty">No accounts configured.</div>
           ) : (
-            <ul className="runs">
+            <ul className="account-list">
               {accounts.map((name) => {
                 const granted = permissions[name] ?? [];
                 const role = roleOf(name, granted, admin);

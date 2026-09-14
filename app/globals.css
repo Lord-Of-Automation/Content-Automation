@@ -9752,10 +9752,27 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
 
    A row per account: the name, one word for how much damage it could do, the
    count behind that word, and the way in. */
+/* Its own list rather than the run list's.
+   That one is flush to the card on purpose — its rows are full-width buttons
+   and a padded gutter beside them would read as a margin somebody forgot. These
+   are boxes, so they need the card's own padding around them and air between
+   them, which is what the run list deliberately does not have. */
+.account-list {
+  list-style: none;
+  margin: 0;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .account-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  /* Wider than a toolbar's, because these are four unrelated things rather
+     than a row of buttons: a name, a badge, a count and a way in. Read at a
+     glance they need telling apart more than they need packing in. */
+  gap: 14px;
   flex-wrap: wrap;
   padding: 10px 12px;
   border: 1px solid var(--line);
