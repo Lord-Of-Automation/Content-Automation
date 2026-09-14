@@ -20,15 +20,15 @@ import type { Opportunity } from "./mail";
  * table said anything.
  */
 export const COLUMNS = [
-  ["domain", "Domain", "asc"],
-  ["rating", "DR", "desc"],
-  ["traffic", "Traffic", "desc"],
-  ["price", "Price", "asc"],
-  ["geo", "GEO", "asc"],
-  ["language", "Language", "asc"],
-  ["sender", "Send from", "asc"],
-  ["email", "Email", "asc"],
-  ["notes", "Notes", "asc"],
+  ["domain", "Domain", "asc", "text"],
+  ["rating", "DR", "desc", "number"],
+  ["traffic", "Traffic", "desc", "number"],
+  ["price", "Price", "asc", "number"],
+  ["geo", "GEO", "asc", "text"],
+  ["language", "Language", "asc", "text"],
+  ["sender", "Send from", "asc", "text"],
+  ["email", "Email", "asc", "text"],
+  ["notes", "Notes", "asc", "text"],
 ] as const;
 
 export type SortKey = (typeof COLUMNS)[number][0];
@@ -37,6 +37,46 @@ export type Direction = "asc" | "desc";
 export const FIRST_DIRECTION: Record<SortKey, Direction> = Object.fromEntries(
   COLUMNS.map(([key, , first]) => [key, first]),
 ) as Record<SortKey, Direction>;
+
+/** Which columns are quantities, whatever shape their values arrive in. */
+const NUMERIC: Record<SortKey, boolean> = Object.fromEntries(
+  COLUMNS.map(([key, , , kind]) => [key, kind === "number"]),
+) as Record<SortKey, boolean>;
+
+/**
+ * A cell in a number column, as a number.
+ *
+ * The three quantity columns are read out of a spreadsheet, and a spreadsheet
+ * holds whatever somebody typed: 12,500 with a comma, 12.5K, $120, 70/100,
+ * 45 %. The engine converts what it recognises, but it is one parser against
+ * every way a person writes a number, and anything it does not recognise
+ * arrives here as the text it was.
+ *
+ * Comparing that text would order 9 after 100, because "9" comes after "1".
+ * So it is read as a quantity here too, and a cell with no number in it at all
+ * counts as missing and sinks, which is what an empty cell does.
+ */
+export function quantity(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string") return null;
+
+  const said = value.trim().toLowerCase();
+  if (!said) return null;
+
+  // The first run of digits, and any thousand marks or decimal point inside
+  // it. Whatever surrounds it -- a currency, a slash, a per cent, a word -- is
+  // not part of the quantity.
+  const found = /[0-9][0-9,. ]*/.exec(said);
+  if (!found) return null;
+
+  const digits = Number(found[0].replace(/[, ]/g, "").replace(/\.$/, ""));
+  if (!Number.isFinite(digits)) return null;
+
+  // A K or an M immediately after it, which is how traffic is usually written.
+  const after = said.slice(found.index + found[0].length).trimStart();
+  const scale = after.startsWith("k") ? 1_000 : after.startsWith("m") ? 1_000_000 : 1;
+  return digits * scale;
+}
 
 /**
  * One column's worth of ordering.
@@ -48,10 +88,22 @@ export const FIRST_DIRECTION: Record<SortKey, Direction> = Object.fromEntries(
  */
 export function order(rows: Opportunity[], key: SortKey, direction: Direction): Opportunity[] {
   const sign = direction === "asc" ? 1 : -1;
+  const asNumbers = NUMERIC[key];
+
+  // Read once per row rather than once per comparison: a sort over a few
+  // thousand rows asks for the same cell a great many times.
+  const value = new Map<string, number | string | null>();
+  for (const row of rows) {
+    const raw = row[key];
+    value.set(
+      row.domain,
+      asNumbers ? quantity(raw) : String(raw ?? "").trim().toLowerCase(),
+    );
+  }
 
   return [...rows].sort((a, b) => {
-    const left = a[key];
-    const right = b[key];
+    const left = value.get(a.domain) ?? null;
+    const right = value.get(b.domain) ?? null;
 
     const leftMissing = left === null || left === "";
     const rightMissing = right === null || right === "";
