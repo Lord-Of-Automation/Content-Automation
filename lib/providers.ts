@@ -299,6 +299,24 @@ async function slotFor(id: ProviderId): Promise<string> {
   return `${id}@${who || "-"}`;
 }
 
+/**
+ * The row to read for one provider, including the one nobody owns.
+ *
+ * Before the hosts were kept per person there was a single row per provider,
+ * saved by whoever set the platform up. Splitting the slot left that row where
+ * it was and stopped anything asking for it, so a working Hosting page went to
+ * "no credentials set" overnight, with the token still sitting in the store.
+ *
+ * So: this person's own row, and failing that the shared one that predates the
+ * split. It was visible to everybody before, and reading it is the state of
+ * things as they were rather than a new way to see somebody else's host. A
+ * save writes to the person's own slot, which is how the shared row stops
+ * being used without anybody being asked to find their token again.
+ */
+function rowFor(store: Store, id: ProviderId, slot: string): StoredProvider | undefined {
+  return store[slot] ?? (PER_USER.includes(id) ? store[id] : undefined);
+}
+
 /** What the browser may see. Never a secret. */
 export interface ProviderStatus {
   id: ProviderId;
@@ -605,7 +623,7 @@ function fromEnvironment(id: ProviderId): Record<string, string> | null {
 }
 
 function statusOf(spec: ProviderSpec, store: Store, slot: string): ProviderStatus {
-  const row = store[slot];
+  const row = rowFor(store, spec.id, slot);
 
   if (row) {
     const shown: Record<string, string> = {};
@@ -716,7 +734,9 @@ export async function saveProvider(
 
   const store = await read();
   const slot = await slotFor(spec.id);
-  const existing = store[slot];
+  // Reads the shared row as the starting point too, so somebody changing one
+  // field of an inherited credential does not lose the others.
+  const existing = rowFor(store, spec.id, slot);
   const next: Record<string, string> = { ...(existing?.values ?? {}) };
 
   /**
@@ -786,7 +806,11 @@ export async function clearProvider(id: string): Promise<SaveResult> {
   if (!spec) return { ok: false, error: "There is no such provider." };
 
   const store = await read();
-  delete store[await slotFor(spec.id)];
+  const slot = await slotFor(spec.id);
+  // Their own row if they have one. Removing an inherited credential removes
+  // the shared row, which is what somebody pressing Remove on it means.
+  if (store[slot]) delete store[slot];
+  else if (PER_USER.includes(spec.id)) delete store[spec.id];
   await write(store);
   return { ok: true };
 }
@@ -803,7 +827,7 @@ export async function credentialFor(id: ProviderId): Promise<Record<string, stri
   if (!spec) return null;
 
   const store = await read();
-  const row = store[await slotFor(id)];
+  const row = rowFor(store, id, await slotFor(id));
 
   if (row) {
     const out: Record<string, string> = {};
