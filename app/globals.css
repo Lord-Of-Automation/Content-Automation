@@ -7798,6 +7798,13 @@ code,
   margin: 16px 20px 0;
 }
 
+/* The box it sits in has no padding of its own, so the panel below it supplies
+   the bottom edge. With nothing connected there is no panel, and the notice
+   ends up resting on the border. */
+.mail-notice:last-child {
+  margin-bottom: 16px;
+}
+
 /* The head row's own top margin is for sitting under an editor toolbar. Here
    it is the first thing in a padded box and does not need it. */
 .mail-only > .editor-body-head {
