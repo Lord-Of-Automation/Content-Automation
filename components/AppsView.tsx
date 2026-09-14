@@ -15,6 +15,7 @@ import { HOSTS, type HostId } from "@/lib/hosts";
 import { ColumnPicker, useColumns, type ColumnSpec } from "@/components/Columns";
 import { SkeletonTable } from "@/components/Skeleton";
 import Chevrons from "@/components/SortMark";
+import RefreshIcon from "@/components/RefreshIcon";
 
 /**
  * The columns, and which may be turned off.
@@ -48,22 +49,6 @@ const COLUMNS: ColumnSpec[] = [
  * Refresh spins its own icon while it reads rather than swapping its label for
  * a longer one, which resizes a button somebody's pointer is still on.
  */
-function RefreshIcon({ spinning }: { spinning?: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      className={spinning ? "spin" : undefined}
-      aria-hidden
-    >
-      <path d="M20 11a8 8 0 1 0-1.6 5.2" />
-      <path d="M20 4v7h-7" />
-    </svg>
-  );
-}
-
 function PlusIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>

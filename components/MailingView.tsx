@@ -9,6 +9,7 @@ import MailThread from "@/components/MailThread";
 import { useGlide } from "@/lib/glide";
 import type { Picture } from "@/lib/picture";
 import OutreachCampaign from "@/components/OutreachCampaign";
+import RefreshIcon from "@/components/RefreshIcon";
 import { useToasts } from "@/components/Toasts";
 import type { MailStatus, Thread } from "@/lib/mail";
 
@@ -83,13 +84,22 @@ export default function MailingView() {
   /** Which half of the page. The inbox first: it is what you come back to. */
   const [view, setView] = useState<"inbox" | "campaign" | "runs" | "history">("inbox");
   /** Show only the replies that name a way to be paid, which is the answer. */
-  const [paidOnly, setPaidOnly] = useState(false);
+  /*
+   * On to begin with.
+   *
+   * A publisher quoting a price and saying where to send it has agreed, and
+   * that is the one kind of reply with something to do about it today. The
+   * rest are conversations, and they are still a click away.
+   */
+  const [paidOnly, setPaidOnly] = useState(true);
   /** Words to look for. Searched over the messages too, not only the headings. */
   const [find, setFind] = useState("");
 
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  /** Its own, not the page's: Refresh should not go quiet because a send is in flight. */
+  const [refreshing, setRefreshing] = useState(false);
 
   /*
    * A conversation moving between the inbox and Paid.
@@ -134,6 +144,28 @@ export default function MailingView() {
     if (!response.ok) throw new Error(payload.error ?? "The conversations could not be read.");
     setThreads(payload.threads ?? []);
   }, []);
+
+  /**
+   * The same read, with something to watch.
+   *
+   * Held for a moment longer than the request takes. Most of the time the
+   * answer is already there and the turn would be over within a frame or two,
+   * which is indistinguishable from the button doing nothing at all -- and a
+   * button that looks inert gets pressed again, and again.
+   */
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    const started = Date.now();
+    try {
+      await loadThreads();
+    } catch (e) {
+      push("bad", e instanceof Error ? e.message : String(e));
+    } finally {
+      const left = 550 - (Date.now() - started);
+      if (left > 0) await new Promise((done) => setTimeout(done, left));
+      setRefreshing(false);
+    }
+  }, [loadThreads, push]);
 
   useEffect(() => {
     void (async () => {
@@ -436,7 +468,13 @@ export default function MailingView() {
   const owed = threads.filter((one) => !one.paidAt && found(one));
   const paid = threads.filter((one) => one.paidAt && found(one));
 
-  const showing = paidOnly ? owed.filter((one) => one.paypal) : owed;
+  /*
+   * The switch is only offered when some conversation carries a link, so the
+   * filter only bites then too. Otherwise an inbox with no invoices in it
+   * would open empty, filtered by a control that is nowhere on the page.
+   */
+  const anyPaypal = threads.some((one) => one.paypal);
+  const showing = paidOnly && anyPaypal ? owed.filter((one) => one.paypal) : owed;
 
   if (loading) return <div className="empty">Reading the mailbox…</div>;
 
@@ -505,17 +543,22 @@ export default function MailingView() {
 
           <div className="app-head-actions">
             {connected ? (
+              /* Reading, rather than doing: quiet, and it says so by turning
+                 its own mark rather than by changing into a different word
+                 that resizes the button under the pointer. */
               <button
                 type="button"
-                className="btn btn-ghost bar-btn"
-                disabled={busy}
-                onClick={() => void loadThreads().catch((e) => push("bad", String(e.message)))}
+                className="btn btn-ghost head-do"
+                disabled={busy || refreshing}
+                title="Read every conversation again"
+                onClick={() => void refresh()}
               >
-                Refresh
+                <RefreshIcon spinning={refreshing} />
+                {refreshing ? "Reading…" : "Refresh"}
               </button>
             ) : null}
             {ready ? (
-              <a className="btn btn-primary bar-btn" href="/api/mail/connect">
+              <a className="btn btn-primary head-do is-new" href="/api/mail/connect">
                 {boxes.length ? "Connect another" : "Connect Gmail"}
               </a>
             ) : null}
