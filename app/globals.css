@@ -9717,3 +9717,33 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
   min-width: 118px;
   white-space: nowrap;
 }
+
+/* ------------------------------------------- more than one link in an article
+
+   The first pair of boxes is the campaign's own and cannot be taken away. The
+   rows under it can, so each carries its own Remove, and they are inset a
+   little to read as belonging to the pair above rather than as a second
+   unrelated form. */
+.anchor-more {
+  align-items: flex-end;
+  margin-top: 10px;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+}
+
+/* Level with the inputs beside it rather than with their labels, since it acts
+   on the row and not on a field. */
+.anchor-drop {
+  flex: 0 0 auto;
+  margin-bottom: 1px;
+}
+
+.anchor-drop:hover:not(:disabled) {
+  background: var(--bad-soft);
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 35%, var(--line-2));
+}
+
+.anchor-add {
+  margin-top: 12px;
+}

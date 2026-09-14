@@ -88,6 +88,20 @@ export default function OutreachCampaign({
 
   const [anchor, setAnchor] = useState("");
   const [anchorUrl, setAnchorUrl] = useState("");
+
+  /*
+   * Any links beyond the first.
+   *
+   * Separate from the pair above rather than a list holding all of them,
+   * because the first is the one every campaign has: making it row one of a
+   * list you can empty would let somebody start a campaign with nothing to
+   * place, which is the one thing a campaign cannot be.
+   */
+  const [extra, setExtra] = useState<Array<{ text: string; url: string }>>([]);
+
+  function setExtraAt(at: number, part: Partial<{ text: string; url: string }>) {
+    setExtra((was) => was.map((one, i) => (i === at ? { ...one, ...part } : one)));
+  }
   const [brief, setBrief] = useState("");
   /** A Google Doc of house style, for campaigns where the voice matters. */
   const [briefDoc, setBriefDoc] = useState("");
@@ -257,6 +271,9 @@ export default function OutreachCampaign({
           })),
           anchor_text: anchor,
           anchor_url: anchorUrl,
+          // Half-filled rows are dropped here as well as on the engine. A row
+          // somebody added and thought better of is not a link.
+          extra_anchors: extra.filter((one) => one.text.trim() && one.url.trim()),
           article_brief: brief,
           brief_doc_id: briefDoc.trim(),
           mail_subject: subject,
@@ -514,11 +531,60 @@ export default function OutreachCampaign({
                 />
               </div>
             </div>
+            {extra.map((one, at) => (
+              <div className="site-row anchor-more" key={at}>
+                <div>
+                  <label className="field-label" htmlFor={`c-anchor-${at}`}>
+                    Anchor text
+                  </label>
+                  <input
+                    id={`c-anchor-${at}`}
+                    type="text"
+                    value={one.text}
+                    placeholder="withdrawal times"
+                    onChange={(e) => setExtraAt(at, { text: e.target.value })}
+                  />
+                </div>
+                <div className="site-row-wide">
+                  <label className="field-label" htmlFor={`c-anchor-url-${at}`}>
+                    Links to
+                  </label>
+                  <input
+                    id={`c-anchor-url-${at}`}
+                    type="url"
+                    className="mono"
+                    value={one.url}
+                    placeholder="https://oursite.com/withdrawal-times/"
+                    onChange={(e) => setExtraAt(at, { url: e.target.value.trim() })}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm anchor-drop"
+                  title="Take this link off the campaign"
+                  onClick={() => setExtra((was) => was.filter((_, i) => i !== at))}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+
+            {/* Five, because past that the article is a link farm and no
+                editor takes it. The engine holds to the same number. */}
+            {extra.length < 4 ? (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm anchor-add"
+                onClick={() => setExtra((was) => [...was, { text: "", url: "" }])}
+              >
+                Add another link
+              </button>
+            ) : null}
+
             <p className="provider-hint">
-              One link per article, placed inside a paragraph already about that
-              subject rather than in a closing line written to hold it. An
-              article that comes back without it is not sent, because an article
-              that reads well and carries no link bought nothing.
+              {extra.length
+                ? "Each link goes inside a paragraph already about that subject, and they are spread across the article rather than gathered at the end. An article that comes back without one of them is not sent."
+                : "One link per article, placed inside a paragraph already about that subject rather than in a closing line written to hold it. An article that comes back without it is not sent, because an article that reads well and carries no link bought nothing."}
             </p>
 
             <label className="field-label" htmlFor="c-brief">What the article should be about</label>

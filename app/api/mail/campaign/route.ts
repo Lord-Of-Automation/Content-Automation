@@ -55,6 +55,9 @@ export async function POST(request: Request) {
       outreach_targets: targets,
       anchor_text: String(body.anchor_text ?? ""),
       anchor_url: String(body.anchor_url ?? ""),
+      // Any links beyond the first. The engine drops half-filled rows and caps
+      // the count, so this only has to carry them.
+      extra_anchors: Array.isArray(body.extra_anchors) ? body.extra_anchors : [],
       article_brief: String(body.article_brief ?? ""),
       // Optional. The engine takes the id out of an address if that is
       // what was pasted, and says so in the log when it cannot be read.
