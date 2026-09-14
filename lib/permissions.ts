@@ -61,7 +61,24 @@ function tidy(user: string): string {
 export async function permissionsOf(user: string): Promise<string[]> {
   const who = tidy(user);
   if (!who) return [];
-  if (who === adminUser()) return [...EVERY_PERMISSION];
+
+  /*
+   * Nothing is restricted until somebody is in charge.
+   *
+   * With no ADMIN_USER named, nobody holds the permission to grant
+   * permissions — and the default set deliberately does not include it, so
+   * there is no way to grant it to anybody either. That is a locked door with
+   * the key inside: a platform that was working yesterday would refuse its own
+   * owner the page that fixes it, and refuse it in a way that reads as a bug.
+   *
+   * So the whole thing is inert until an admin exists. Naming one is what
+   * switches it on, which is also the honest description of what naming one
+   * does — before that there is nobody to be restricted on behalf of.
+   */
+  const admin = adminUser();
+  if (!admin) return [...EVERY_PERMISSION];
+
+  if (who === admin) return [...EVERY_PERMISSION];
 
   const store = await read();
   return store[who] ?? [...DEFAULT_PERMISSIONS];
@@ -85,7 +102,17 @@ export async function setPermissions(user: string, granted: string[]): Promise<S
   const who = tidy(user);
   if (!who) return { ok: false, error: "No account was named." };
 
-  if (who === adminUser()) {
+  const admin = adminUser();
+  if (!admin) {
+    return {
+      ok: false,
+      error:
+        "No admin account is named, so permissions are not in force and there " +
+        "is nothing to save. Set ADMIN_USER to a username on this console, " +
+        "redeploy, and everybody else drops to the default set.",
+    };
+  }
+  if (who === admin) {
     return {
       ok: false,
       error:

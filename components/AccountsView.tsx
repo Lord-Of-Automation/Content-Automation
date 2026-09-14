@@ -135,6 +135,21 @@ export default function AccountsView() {
         </div>
         <div className="card-body tight">
           {error ? <div className="notice bad">{error}</div> : null}
+
+          {/* Said here rather than discovered at the Save button. With no
+              admin named, everybody below holds everything and nothing on
+              this page can be changed — so the badges are honest but the
+              buttons are not, and the gap needs a sentence. */}
+          {!loading && !admin ? (
+            <div className="notice warn">
+              No admin account is named, so permissions are not in force yet and
+              every account below can do everything. Set ADMIN_USER to a
+              username on this console and redeploy. That account keeps
+              everything, everybody else drops to the default set, and this page
+              starts working.
+            </div>
+          ) : null}
+
           {loading ? (
             <SkeletonLines count={3} />
           ) : accounts.length === 0 ? (
