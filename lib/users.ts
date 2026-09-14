@@ -1,13 +1,23 @@
 /**
- * The user list lives in an env var rather than a database. There is no signup,
- * no password reset and no per-user state to store, so a table would be pure
- * overhead. Generate the value with `npm run users -- alice bob`.
+ * Who can sign in.
+ *
+ * Two sources, and the order matters. AUTH_USERS is the seed: set in the
+ * environment, never written to, and the reason a store that is empty,
+ * unreachable or misconfigured cannot lock everybody out. The store holds
+ * everybody added since, which is what makes adding somebody a thing you do on
+ * the accounts page rather than a value you paste into a deployment and
+ * redeploy for.
  *
  * AUTH_USERS='[{"username":"alice","passwordHash":"$2a$12$..."}]'
+ *
+ * An account in both is the stored one, so a password can be changed later
+ * without the seed overriding it on every read.
  *
  * Entries keyed on "email" from before usernames existed still work: the email
  * is treated as the login name, so an older AUTH_USERS cannot lock anyone out.
  */
+
+import { kvConfigured, kvGetJSON, kvSetJSON } from "./kv";
 export type AppUser = {
   /** What the person types to sign in. Lowercased. */
   username: string;
@@ -65,15 +75,14 @@ function loginNameOf(raw: RawUser): string | null {
   return null;
 }
 
+/** Reads only the environment. The seed, which is never written to. */
 export function getUsers(): AppUser[] {
   if (cached) return cached;
 
   const raw = process.env.AUTH_USERS;
-  if (!raw) {
-    throw new Error(
-      "AUTH_USERS is not set. Add a JSON array of {username, passwordHash} to your environment."
-    );
-  }
+  // No seed is not an error on its own any more: the store may hold the lot.
+  // Whether anybody can sign in at all is settled in everyUser.
+  if (!raw) return [];
 
   let parsed: unknown;
   try {
@@ -113,9 +122,55 @@ export function getUsers(): AppUser[] {
   return cached;
 }
 
-export function findUser(username: string): AppUser | undefined {
+const KEY = "content-automation:accounts";
+
+/** The accounts added since, which live where the rest of this app's state does. */
+export async function storedUsers(): Promise<AppUser[]> {
+  if (!kvConfigured()) return [];
+  const rows = await kvGetJSON<AppUser[]>(KEY);
+  if (!Array.isArray(rows)) return [];
+
+  const users: AppUser[] = [];
+  for (const row of rows) {
+    const username = loginNameOf((row ?? {}) as RawUser);
+    if (!username) continue;
+    if (typeof row?.passwordHash !== "string" || !row.passwordHash) continue;
+    users.push({ username, passwordHash: row.passwordHash });
+  }
+  return users;
+}
+
+export async function putStoredUsers(users: AppUser[]): Promise<boolean> {
+  if (!kvConfigured()) return false;
+  return kvSetJSON(KEY, users);
+}
+
+/**
+ * Everybody, seed and stored together.
+ *
+ * A stored account shadows a seed one of the same name, so a password changed
+ * here is not undone by the value still sitting in the environment.
+ */
+export async function everyUser(): Promise<AppUser[]> {
+  const seed = getUsers();
+  const stored = await storedUsers();
+
+  const merged = new Map<string, AppUser>();
+  for (const user of seed) merged.set(user.username, user);
+  for (const user of stored) merged.set(user.username, user);
+
+  if (merged.size === 0) {
+    throw new Error(
+      "There are no accounts. Set AUTH_USERS to a JSON array of " +
+        "{username, passwordHash} in your environment, or generate one with: npm run users",
+    );
+  }
+  return [...merged.values()];
+}
+
+export async function findUser(username: string): Promise<AppUser | undefined> {
   const needle = username.trim().toLowerCase();
-  return getUsers().find((u) => u.username === needle);
+  return (await everyUser()).find((u) => u.username === needle);
 }
 
 /** Drop the memoised list so the next read sees a freshly set AUTH_USERS. */

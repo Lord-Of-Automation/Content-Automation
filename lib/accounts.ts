@@ -2,7 +2,14 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { randomInt } from "node:crypto";
 import bcrypt from "bcryptjs";
 
-import { encodeUsers, getUsers, refresh, type AppUser } from "./users";
+import {
+  encodeUsers,
+  everyUser,
+  putStoredUsers,
+  refresh,
+  storedUsers,
+  type AppUser,
+} from "./users";
 
 // No look-alike characters: someone will retype this from a screen.
 const ALPHABET = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -25,18 +32,30 @@ export type AddResult = {
   password: string;
   /** The complete AUTH_USERS value, for pasting wherever this is deployed. */
   authUsers: string;
-  /** True when .env.local was updated and this instance already sees it. */
+  /** True when the account was saved somewhere, rather than only returned. */
   persisted: boolean;
+  /**
+   * Which of the three it was. The page needs this rather than persisted
+   * alone: an account in the store needs nothing pasted anywhere, one written
+   * to a local file still does for every other environment.
+   */
+  where: "store" | "file" | "nowhere";
   note: string;
 };
 
 /**
- * Accounts live in AUTH_USERS, an environment variable, so there is nothing to
- * write to in the general case. Where the filesystem is writable, .env.local is
- * updated and the in-process cache is refreshed so the account works at once.
- * Where it is not, which is every serverless deployment, the caller is handed
- * the value to paste. Either way the new value is returned, because the local
- * file is not the source of truth for a deployment.
+ * Adding somebody, in the order of what actually persists.
+ *
+ * The store first. That is where the rest of this app's state lives, every
+ * instance reads the same one, and an account written there works on the next
+ * request with no deployment involved — which is the whole point, because
+ * pasting a value into a dashboard and redeploying to add a colleague is not
+ * something anybody should have to do twice.
+ *
+ * Then .env.local, for running this on a laptop where there is no store.
+ *
+ * Only if neither can hold it is the value handed back to paste, which is the
+ * old behaviour kept for the case where it is the only thing left.
  */
 export async function addAccount(
   usernameRaw: string,
@@ -57,10 +76,10 @@ export async function addAccount(
 
   let current: AppUser[];
   try {
-    current = getUsers();
+    current = await everyUser();
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : "Could not read AUTH_USERS.",
+      error: error instanceof Error ? error.message : "Could not read the account list.",
     };
   }
 
@@ -73,6 +92,28 @@ export async function addAccount(
   const passwordHash = await bcrypt.hash(password, 12);
   const next = [...current, { username, passwordHash }];
   const authUsers = encodeUsers(next);
+
+  // Where it belongs, if there is one. Only the accounts added here are stored;
+  // the seed stays in the environment, untouched, so a store that is empty or
+  // unreachable still leaves somebody able to sign in.
+  try {
+    const kept = await storedUsers();
+    if (await putStoredUsers([...kept, { username, passwordHash }])) {
+      return {
+        username,
+        password,
+        authUsers,
+        persisted: true,
+        where: "store",
+        note:
+          "Saved. The account works everywhere this platform runs, from the " +
+          "next sign-in. Nothing to paste and nothing to redeploy.",
+      };
+    }
+  } catch {
+    // Fall through to the file, then to the paste. A store that did not take
+    // the write is not a reason to lose the account somebody just made.
+  }
 
   let persisted = false;
   try {
@@ -98,6 +139,7 @@ export async function addAccount(
     password,
     authUsers,
     persisted,
+    where: persisted ? "file" : "nowhere",
     note: persisted
       ? "Written to .env.local and live on this instance. Update AUTH_USERS wherever else this runs, then redeploy."
       : "This environment has a read-only filesystem, so nothing was saved. Set AUTH_USERS to the value below and redeploy.",
@@ -105,6 +147,6 @@ export async function addAccount(
 }
 
 /** Usernames only. Hashes never leave the server. */
-export function listAccounts(): string[] {
-  return getUsers().map((u) => u.username);
+export async function listAccounts(): Promise<string[]> {
+  return (await everyUser()).map((u) => u.username);
 }

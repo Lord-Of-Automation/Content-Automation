@@ -10,6 +10,8 @@ type Added = {
   password: string;
   authUsers: string;
   persisted: boolean;
+  /** Where it was saved. "store" means nothing has to be carried anywhere. */
+  where?: "store" | "file" | "nowhere";
   note: string;
 };
 
@@ -271,6 +273,9 @@ export default function AccountsView() {
                 </div>
               </div>
 
+              {/* Only when something still has to be carried by hand. An
+                  account in the store is already everywhere. */}
+              {added.where === "store" ? null : (
               <div className="field">
                 <label>AUTH_USERS, for every other environment</label>
                 <textarea readOnly rows={3} value={added.authUsers} className="mono" />
@@ -287,6 +292,7 @@ export default function AccountsView() {
                   </span>
                 </div>
               </div>
+              )}
             </div>
           ) : null}
         </div>

@@ -16,7 +16,7 @@ export async function GET() {
   if (denied) return denied;
 
   try {
-    const accounts = listAccounts();
+    const accounts = await listAccounts();
     return NextResponse.json({
       accounts,
       // What each of them may do, and the list of everything that can be
@@ -64,7 +64,7 @@ export async function PUT(request: Request) {
 
     await record(actor, "permissions-changed", `${user}: ${granted.join(", ") || "nothing"}`);
 
-    const accounts = listAccounts();
+    const accounts = await listAccounts();
     return NextResponse.json({
       accounts,
       permissions: await permissionsFor(accounts),

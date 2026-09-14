@@ -22,7 +22,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (!username || !password) return null;
 
-        const user = findUser(username);
+        // A store that cannot be reached is a failed sign-in, not a crash.
+        // The seed accounts in AUTH_USERS are still readable either way.
+        let user;
+        try {
+          user = await findUser(username);
+        } catch {
+          user = undefined;
+        }
 
         // Compare against a structurally valid throwaway hash when the user is
         // unknown, so an unknown email and a wrong password cost the same time
