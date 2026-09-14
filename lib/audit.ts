@@ -56,6 +56,8 @@ export type AuditAction =
    */
   | "prompt-saved"
   | "prompt-deleted"
+  /** What somebody is allowed to do, changed. Always worth a line. */
+  | "permissions-changed"
   /**
    * Where a domain points, or what it answers.
    *

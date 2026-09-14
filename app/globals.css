@@ -9747,3 +9747,145 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
 .anchor-add {
   margin-top: 12px;
 }
+
+/* ------------------------------------------- who can do what
+
+   A row per account: the name, one word for how much damage it could do, the
+   count behind that word, and the way in. */
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+}
+
+/* The badge answers "could this person do something I would rather they
+   could not", because that is the question somebody scanning the list has.
+   Three values, since a badge with more stops being read. */
+.account-role {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.account-role.is-admin {
+  background: var(--pin-soft);
+  color: var(--pin);
+  border: 1px solid var(--pin-line);
+}
+
+.account-role.is-full {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.account-role.is-limited {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.account-role.is-none {
+  background: var(--line);
+  color: var(--ink-3);
+}
+
+/* ------------------------------------------- the permissions sheet */
+.perms {
+  width: min(680px, calc(100vw - 32px));
+}
+
+.perm-group {
+  margin-bottom: 18px;
+}
+
+.perm-group h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* The whole row is the label, so the sentence explaining a permission is also
+   the thing you click to grant it. */
+.perm {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 9px 11px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background-color var(--quick, 120ms) var(--ease, ease);
+}
+
+.perm:hover {
+  background: var(--hover);
+}
+
+.perm input {
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+
+.perm-what {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.perm-what strong {
+  font-size: 13.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.perm-note {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+/* Marked rather than forbidden. These are people who already have an account;
+   the point is that a list where everything looks the same is one where the
+   dangerous ones get granted without being read. */
+.perm-flag {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.perm.is-weighty:hover {
+  background: color-mix(in srgb, var(--warn) 7%, transparent);
+}
+
+.perm-both {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.sheet-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+}

@@ -4,6 +4,9 @@ import { auth } from "@/auth";
 import { errorResponse, requireSession } from "@/lib/api-guard";
 import { addAccount, listAccounts } from "@/lib/accounts";
 import { record } from "@/lib/audit";
+import { adminUser } from "@/lib/actor";
+import { may, permissionsFor, setPermissions } from "@/lib/permissions";
+import { PERMISSIONS } from "@/lib/permissionlist";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +16,52 @@ export async function GET() {
   if (denied) return denied;
 
   try {
-    return NextResponse.json({ accounts: listAccounts() });
+    const accounts = listAccounts();
+    return NextResponse.json({
+      accounts,
+      // What each of them may do, and the list of everything that can be
+      // granted. Both travel with the accounts because the page is useless
+      // without either and a second request would be a second chance to be
+      // looking at a stale answer.
+      permissions: await permissionsFor(accounts),
+      catalogue: PERMISSIONS,
+      admin: adminUser(),
+    });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+/** Changing what one account may do. */
+export async function PUT(request: Request) {
+  const denied = await requireSession();
+  if (denied) return denied;
+
+  const session = await auth();
+  const actor = session?.user?.name ?? "unknown";
+
+  // Only somebody who may change permissions can change permissions. Without
+  // this the page is a suggestion, since the request behind it is one anybody
+  // signed in could make by hand.
+  if (!(await may(actor, "accounts"))) {
+    return NextResponse.json(
+      { error: "You are not allowed to change what people can do." },
+      { status: 403 },
+    );
+  }
+
+  try {
+    const body = (await request.json()) as Record<string, unknown>;
+    const user = String(body.user ?? "").trim();
+    const granted = Array.isArray(body.permissions) ? body.permissions.map(String) : [];
+
+    const saved = await setPermissions(user, granted);
+    if (!saved.ok) return NextResponse.json({ error: saved.error }, { status: 400 });
+
+    await record(actor, "permissions-changed", `${user}: ${granted.join(", ") || "nothing"}`);
+
+    const accounts = listAccounts();
+    return NextResponse.json({ accounts, permissions: await permissionsFor(accounts) });
   } catch (error) {
     return errorResponse(error);
   }

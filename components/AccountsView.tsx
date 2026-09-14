@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { SkeletonLines } from "@/components/Skeleton";
+import PermissionsDialog from "@/components/PermissionsDialog";
+import { roleOf, type Permission } from "@/lib/permissionlist";
 
 type Added = {
   username: string;
@@ -40,6 +42,13 @@ export default function AccountsView() {
   const [added, setAdded] = useState<Added | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
+  /** What each account may do, and everything that could be granted. */
+  const [permissions, setPermissions] = useState<Record<string, string[]>>({});
+  const [catalogue, setCatalogue] = useState<Permission[]>([]);
+  const [admin, setAdmin] = useState("");
+  /** The account whose permissions are open, if any. */
+  const [editing, setEditing] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     try {
       const response = await fetch("/api/accounts", { cache: "no-store" });
@@ -49,10 +58,16 @@ export default function AccountsView() {
       }
       const payload = (await response.json()) as {
         accounts?: string[];
+        permissions?: Record<string, string[]>;
+        catalogue?: Permission[];
+        admin?: string;
         error?: string;
       };
       if (!response.ok) throw new Error(payload.error ?? `HTTP ${response.status}`);
       setAccounts(payload.accounts ?? []);
+      setPermissions(payload.permissions ?? {});
+      setCatalogue(payload.catalogue ?? []);
+      setAdmin(payload.admin ?? "");
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load accounts.");
@@ -126,14 +141,35 @@ export default function AccountsView() {
             <div className="empty">No accounts configured.</div>
           ) : (
             <ul className="runs">
-              {accounts.map((name) => (
-                <li key={name}>
-                  <div className="run" style={{ cursor: "default" }}>
-                    <span className="run-id">{name}</span>
-                    <span className="run-meta">can sign in</span>
-                  </div>
-                </li>
-              ))}
+              {accounts.map((name) => {
+                const granted = permissions[name] ?? [];
+                const role = roleOf(name, granted, admin);
+                return (
+                  <li key={name}>
+                    <div className="account-row">
+                      <span className="run-id">{name}</span>
+                      {/* What this account could do, in one word. The list is
+                          read to find the person who should not have
+                          something, so the badge answers that rather than
+                          counting permissions. */}
+                      <span className={`account-role is-${role.tone}`}>{role.label}</span>
+                      <span className="run-meta">
+                        {name === admin
+                          ? "everything, set by ADMIN_USER"
+                          : `${granted.length} of ${catalogue.length} permissions`}
+                      </span>
+                      <div className="spacer" />
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setEditing(name)}
+                      >
+                        Edit permissions
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -237,6 +273,16 @@ export default function AccountsView() {
           ) : null}
         </div>
       </div>
+
+      {editing ? (
+        <PermissionsDialog
+          user={editing}
+          granted={permissions[editing] ?? []}
+          catalogue={catalogue}
+          onClose={() => setEditing(null)}
+          onSaved={(next) => setPermissions(next)}
+        />
+      ) : null}
     </div>
   );
 }
