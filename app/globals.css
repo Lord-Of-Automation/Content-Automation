@@ -1423,7 +1423,15 @@ button,
    belongs to the table rather than to the cell, so it stays behind at the top
    of the table while the heading travels, and the heading arrives underlined
    by nothing. */
-.logs thead th {
+/* Only the tables that are long enough to scroll past.
+ *
+ * A sticky heading can only stay in view by leaving the top of its own table,
+ * and on a table of three rows that means it travels down over them: the
+ * column names end up printed across the second row, which reads as the page
+ * being broken rather than as a heading following you. The short summaries
+ * that borrow these styles -- the Cloudflare tokens, the DNS records, the name
+ * suggestions -- fit on the screen whole and have nothing to follow. */
+:is(.logs.table-in, .logs.logs-middle) thead th {
   position: sticky;
   top: var(--topbar-h);
   z-index: 2;
@@ -1434,7 +1442,7 @@ button,
 
 /* Inside a dialog the window is not what scrolls, the sheet body is, and it
    starts under no top bar. */
-.sheet .logs thead th {
+.sheet :is(.logs.table-in, .logs.logs-middle) thead th {
   top: 0;
 }
 
