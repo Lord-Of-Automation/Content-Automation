@@ -19,6 +19,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+import { viewer } from "./actor";
 import { kvConfigured, kvGetJSON, kvSetJSON } from "./kv";
 
 const KEY = "content-automation:websites";
@@ -158,6 +159,14 @@ export interface PublishedTo {
 
 export interface Website {
   id: string;
+  /**
+   * Whose site it is.
+   *
+   * Absent on everything written before sites belonged to anybody, and those
+   * fall back to whoever created them, which has always been recorded. Only a
+   * site with neither is nobody's, and those are visible to full access alone.
+   */
+  owner?: string;
   name: string;
   tagline: string;
   /** The brief it was written from, kept so it can be rewritten later. */
@@ -226,21 +235,53 @@ async function write(rows: Website[]): Promise<void> {
   writeFileSync(FILE, JSON.stringify(capped, null, 2), "utf8");
 }
 
+function tidy(name: string | undefined | null): string {
+  return String(name ?? "").trim().toLowerCase();
+}
+
+/** The name a site answers to, old records included. */
+function ownerOf(site: Website): string {
+  return tidy(site.owner) || tidy(site.createdBy);
+}
+
+/*
+ * Who may see a site is settled here rather than at each route.
+ *
+ * There are eight of them reaching into this file, several by id alone, and a
+ * rule written eight times is a rule one of them will be missing — which here
+ * means somebody opening a colleague's site by guessing a URL. Every one of
+ * those routes is behind a session already, so the question of who is asking
+ * has an answer at this depth and does not need passing down.
+ */
+async function seeing(): Promise<{ name: string; admin: boolean }> {
+  return viewer();
+}
+
+function visible(site: Website, who: { name: string; admin: boolean }): boolean {
+  if (who.admin) return true;
+  const of = ownerOf(site);
+  return !!of && !!who.name && of === who.name;
+}
+
 export function newWebsiteId(): string {
   return `site-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
 
-/** Newest first: the one you just made is the one you want. */
+/** Theirs, newest first: the one you just made is the one you want. */
 export async function listWebsites(): Promise<Website[]> {
-  const rows = await read();
-  return [...rows]
+  const who = await seeing();
+  return (await read())
+    .filter((site) => visible(site, who))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .map(withDefaults);
 }
 
+/** Somebody else's site reads as no site at all, which is what it is to them. */
 export async function getWebsite(id: string): Promise<Website | null> {
+  const who = await seeing();
   const found = (await read()).find((w) => w.id === id);
-  return found ? withDefaults(found) : null;
+  if (!found || !visible(found, who)) return null;
+  return withDefaults(found);
 }
 
 export async function saveWebsite(site: Website): Promise<void> {
@@ -252,7 +293,11 @@ export async function saveWebsite(site: Website): Promise<void> {
 }
 
 export async function removeWebsite(id: string): Promise<boolean> {
+  const who = await seeing();
   const rows = await read();
+  const target = rows.find((w) => w.id === id);
+  if (!target || !visible(target, who)) return false;
+
   const left = rows.filter((w) => w.id !== id);
   if (left.length === rows.length) return false;
   await write(left);

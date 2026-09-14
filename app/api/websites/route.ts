@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
+import { currentUser } from "@/lib/actor";
 import { record } from "@/lib/audit";
 import { errorResponse, requireSession } from "@/lib/api-guard";
 import { fetchBuiltSite, startBuild } from "@/lib/engine";
@@ -124,6 +125,9 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
     const site: Website = {
       id: newWebsiteId(),
+      // The name the rest of the platform keeps work under, which is lowercase
+      // and not necessarily how the session spells it.
+      owner: await currentUser(),
       name: name || topic,
       tagline: "",
       description: brief,

@@ -49,3 +49,15 @@ export async function signedAs(): Promise<Record<string, string>> {
   if (await hasFullAccess(who)) headers["x-admin"] = "1";
   return headers;
 }
+
+/**
+ * Who is looking, and whether they see everybody's work.
+ *
+ * The pair almost every per-person question needs, fetched together because
+ * asking for one without the other is how a filter ends up ignoring full
+ * access.
+ */
+export async function viewer(): Promise<{ name: string; admin: boolean }> {
+  const name = await currentUser();
+  return { name, admin: await hasFullAccess(name) };
+}
