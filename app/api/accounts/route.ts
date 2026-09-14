@@ -5,7 +5,7 @@ import { errorResponse, requireSession } from "@/lib/api-guard";
 import { addAccount, listAccounts } from "@/lib/accounts";
 import { record } from "@/lib/audit";
 import { adminUser } from "@/lib/actor";
-import { may, permissionsFor, setPermissions } from "@/lib/permissions";
+import { may, permissionsFor, restrictionsApply, setPermissions } from "@/lib/permissions";
 import { PERMISSIONS } from "@/lib/permissionlist";
 
 export const runtime = "nodejs";
@@ -26,6 +26,10 @@ export async function GET() {
       permissions: await permissionsFor(accounts),
       catalogue: PERMISSIONS,
       admin: adminUser(),
+      // Whether any of the above is being enforced. Nobody with full access
+      // means nobody to enforce it on behalf of, so everybody has everything
+      // and the page has to say so.
+      inCharge: await restrictionsApply(),
     });
   } catch (error) {
     return errorResponse(error);
@@ -55,13 +59,17 @@ export async function PUT(request: Request) {
     const user = String(body.user ?? "").trim();
     const granted = Array.isArray(body.permissions) ? body.permissions.map(String) : [];
 
-    const saved = await setPermissions(user, granted);
+    const saved = await setPermissions(user, granted, actor);
     if (!saved.ok) return NextResponse.json({ error: saved.error }, { status: 400 });
 
     await record(actor, "permissions-changed", `${user}: ${granted.join(", ") || "nothing"}`);
 
     const accounts = listAccounts();
-    return NextResponse.json({ accounts, permissions: await permissionsFor(accounts) });
+    return NextResponse.json({
+      accounts,
+      permissions: await permissionsFor(accounts),
+      inCharge: await restrictionsApply(),
+    });
   } catch (error) {
     return errorResponse(error);
   }

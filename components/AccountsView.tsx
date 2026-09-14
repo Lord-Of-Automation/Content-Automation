@@ -46,6 +46,8 @@ export default function AccountsView() {
   const [permissions, setPermissions] = useState<Record<string, string[]>>({});
   const [catalogue, setCatalogue] = useState<Permission[]>([]);
   const [admin, setAdmin] = useState("");
+  /** Whether any of the above is being enforced yet. See the notice below. */
+  const [inCharge, setInCharge] = useState(true);
   /** The account whose permissions are open, if any. */
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -61,6 +63,7 @@ export default function AccountsView() {
         permissions?: Record<string, string[]>;
         catalogue?: Permission[];
         admin?: string;
+        inCharge?: boolean;
         error?: string;
       };
       if (!response.ok) throw new Error(payload.error ?? `HTTP ${response.status}`);
@@ -68,6 +71,7 @@ export default function AccountsView() {
       setPermissions(payload.permissions ?? {});
       setCatalogue(payload.catalogue ?? []);
       setAdmin(payload.admin ?? "");
+      setInCharge(payload.inCharge ?? true);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load accounts.");
@@ -136,17 +140,16 @@ export default function AccountsView() {
         <div className="card-body tight">
           {error ? <div className="notice bad">{error}</div> : null}
 
-          {/* Said here rather than discovered at the Save button. With no
-              admin named, everybody below holds everything and nothing on
-              this page can be changed — so the badges are honest but the
-              buttons are not, and the gap needs a sentence. */}
-          {!loading && !admin ? (
+          {/* Said here rather than discovered at the Save button. Until
+              somebody holds full access nothing on this list is in force, and
+              a page of permissions that are not in force has to admit it. */}
+          {!loading && !inCharge ? (
             <div className="notice warn">
-              No admin account is named, so permissions are not in force yet and
-              every account below can do everything. Set ADMIN_USER to a
-              username on this console and redeploy. That account keeps
-              everything, everybody else drops to the default set, and this page
-              starts working.
+              Nobody has full access yet, so permissions are not in force and
+              every account below can do everything. Give one account Full
+              access to turn them on. From that moment it sees all the work on
+              the platform and everybody else drops to the default set. Start
+              with yourself.
             </div>
           ) : null}
 
@@ -295,7 +298,12 @@ export default function AccountsView() {
           granted={permissions[editing] ?? []}
           catalogue={catalogue}
           onClose={() => setEditing(null)}
-          onSaved={(next) => setPermissions(next)}
+          onSaved={(next, nowInCharge) => {
+            setPermissions(next);
+            // Granting the first full access is what switches restrictions on,
+            // so the notice above has to go the moment it happens.
+            setInCharge(nowInCharge);
+          }}
         />
       ) : null}
     </div>

@@ -18,6 +18,19 @@
  * the card attached to it.
  */
 
+/**
+ * The permission that is not like the others.
+ *
+ * Every other one answers "may they use this page". This one answers "whose
+ * work do they see", and that is a different question — it is the only thing
+ * here that crosses from one account into another, so it is named rather than
+ * left as a string for three files to spell differently.
+ *
+ * Holding it means holding all of them. There is no sense in an account that
+ * can read everybody's mail but not open the mail page.
+ */
+export const FULL_ACCESS = "admin";
+
 export interface Permission {
   id: string;
   label: string;
@@ -129,6 +142,17 @@ export const PERMISSIONS: Permission[] = [
     group: "Administration",
     note: "See who did what, and what the platform has spent.",
   },
+  {
+    id: FULL_ACCESS,
+    label: "Full access",
+    group: "Administration",
+    weighty: true,
+    note:
+      "Everything above, plus every other person's work: their runs, their " +
+      "conversations, their hosted sites. This is the one permission that " +
+      "reaches outside its own account, and the only way to see the work from " +
+      "before accounts were separated. Grant it to a partner, not to staff.",
+  },
 ];
 
 export const EVERY_PERMISSION = PERMISSIONS.map((one) => one.id);
@@ -178,7 +202,10 @@ export function roleOf(
   granted: string[],
   admin: string,
 ): { label: string; tone: string } {
+  // Named in the environment or given it here. The badge does not distinguish
+  // them because the account cannot either: both see everything.
   if (tidy(user) === tidy(admin)) return { label: "Admin", tone: "admin" };
+  if (granted.includes(FULL_ACCESS)) return { label: "Admin", tone: "admin" };
   if (!granted.length) return { label: "No access", tone: "none" };
 
   const heavy = PERMISSIONS.filter((one) => one.weighty).map((one) => one.id);

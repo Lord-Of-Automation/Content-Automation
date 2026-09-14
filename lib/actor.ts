@@ -1,4 +1,10 @@
 import { auth } from "@/auth";
+import { adminUser, hasFullAccess } from "./permissions";
+
+// Re-exported because "who is in charge" is a question people come to this
+// file with. It is defined beside the store that can also answer it, so the
+// two cannot drift apart.
+export { adminUser };
 
 /**
  * Who is signed in, for everything that keeps data per person.
@@ -19,30 +25,27 @@ export async function currentUser(): Promise<string> {
   return String(session?.user?.name ?? "").trim().toLowerCase();
 }
 
-/**
- * The account that sees everything, named in the environment.
- *
- * The same name the engine is given, and it has to be the same name or the two
- * halves disagree about who the admin is. It exists for support, for knowing
- * what the platform spends, and for the duller reason that the data written
- * before any of this existed has no owner and somebody must still be able to
- * reach it.
- */
-export function adminUser(): string {
-  return String(process.env.ADMIN_USER ?? "").trim().toLowerCase();
-}
-
+/** Whether whoever is signed in sees everybody's work rather than their own. */
 export async function isAdmin(): Promise<boolean> {
-  const admin = adminUser();
-  return !!admin && (await currentUser()) === admin;
+  return hasFullAccess(await currentUser());
 }
 
 /**
- * The header every engine call carries.
+ * The headers every engine call carries.
  *
  * One place, so the name the engine is told is the name this console decided
  * and not something a route assembled on its own.
+ *
+ * Two things are said, not one: who this is, and whether they see everything.
+ * The second has to be said here because it is not a fact about the engine —
+ * full access is granted on the accounts page, which is this side, and the
+ * engine has no session, no account list and no way to look it up. It takes
+ * this console's word for who somebody is already; this is the same word about
+ * the same person, sent the same way.
  */
 export async function signedAs(): Promise<Record<string, string>> {
-  return { "x-user": await currentUser() };
+  const who = await currentUser();
+  const headers: Record<string, string> = { "x-user": who };
+  if (await hasFullAccess(who)) headers["x-admin"] = "1";
+  return headers;
 }

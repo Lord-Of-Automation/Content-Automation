@@ -34,8 +34,8 @@ export default function PermissionsDialog({
   granted: string[];
   catalogue: Permission[];
   onClose: () => void;
-  /** Hands back what the server says each account may do now. */
-  onSaved: (permissions: Record<string, string[]>) => void;
+  /** Hands back what the server says is set now, and whether it is in force. */
+  onSaved: (permissions: Record<string, string[]>, inCharge: boolean) => void;
 }) {
   const shell = useRef<HTMLDialogElement>(null);
 
@@ -82,7 +82,7 @@ export default function PermissionsDialog({
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "That could not be saved.");
-      onSaved(payload.permissions ?? {});
+      onSaved(payload.permissions ?? {}, payload.inCharge ?? true);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "That could not be saved.");
