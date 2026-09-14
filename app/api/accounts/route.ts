@@ -21,6 +21,9 @@ export async function GET() {
   const denied = await requireSession();
   if (denied) return denied;
 
+  const session = await auth();
+  const actor = session?.user?.name ?? "unknown";
+
   try {
     const accounts = await listAccounts();
     return NextResponse.json({
@@ -39,6 +42,15 @@ export async function GET() {
       // Set to a name nobody can sign in as, which does nothing and looks
       // exactly like doing something.
       adminMissing: await adminIsMissing(),
+      /*
+       * Whether the person reading this may change any of it.
+       *
+       * Sent rather than worked out in the browser, because the browser has no
+       * way to know: the permissions store is on this side. Without it the
+       * page can only show every button to everybody and let the server refuse
+       * afterwards, which is a page that lies about what it can do.
+       */
+      mayEdit: await may(actor, "accounts"),
     });
   } catch (error) {
     return errorResponse(error);
@@ -87,6 +99,19 @@ export async function PUT(request: Request) {
 export async function POST(request: Request) {
   const denied = await requireSession();
   if (denied) return denied;
+
+  // Creating an account is changing what people can do, by the shortest route
+  // there is: a new account arrives with the default set, and whoever made it
+  // knows its password. Guarded like the edit beside it, and for the same
+  // reason -- the page is a convenience, the request behind it is something
+  // anybody signed in could make by hand.
+  const who = await auth();
+  if (!(await may(who?.user?.name ?? "unknown", "accounts"))) {
+    return NextResponse.json(
+      { error: "You are not allowed to add accounts." },
+      { status: 403 },
+    );
+  }
 
   let body: unknown;
   try {

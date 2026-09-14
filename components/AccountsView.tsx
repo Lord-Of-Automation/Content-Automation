@@ -52,6 +52,14 @@ export default function AccountsView() {
   const [inCharge, setInCharge] = useState(true);
   /** ADMIN_USER naming somebody who cannot sign in. */
   const [adminMissing, setAdminMissing] = useState(false);
+  /*
+   * Whether this account may change any of this.
+   *
+   * Starts closed. The alternative flashes the buttons on every load and takes
+   * them away a moment later, which reads as a permission being revoked while
+   * somebody watches.
+   */
+  const [mayEdit, setMayEdit] = useState(false);
   /** The account whose permissions are open, if any. */
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -69,6 +77,7 @@ export default function AccountsView() {
         admin?: string;
         inCharge?: boolean;
         adminMissing?: boolean;
+        mayEdit?: boolean;
         error?: string;
       };
       if (!response.ok) throw new Error(payload.error ?? `HTTP ${response.status}`);
@@ -78,6 +87,7 @@ export default function AccountsView() {
       setAdmin(payload.admin ?? "");
       setInCharge(payload.inCharge ?? true);
       setAdminMissing(payload.adminMissing ?? false);
+      setMayEdit(payload.mayEdit ?? false);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load accounts.");
@@ -193,13 +203,19 @@ export default function AccountsView() {
                           : `${granted.length} of ${catalogue.length} permissions`}
                       </span>
                       <div className="spacer" />
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => setEditing(name)}
-                      >
-                        Edit permissions
-                      </button>
+                      {/* Only for somebody who could actually save the change.
+                          A button that answers "you are not allowed" is worse
+                          than no button: it reads as a fault rather than as an
+                          answer. */}
+                      {mayEdit ? (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => setEditing(name)}
+                        >
+                          Edit permissions
+                        </button>
+                      ) : null}
                     </div>
                   </li>
                 );
@@ -209,6 +225,9 @@ export default function AccountsView() {
         </div>
       </div>
 
+      {/* Adding somebody is changing what people can do by the shortest route
+          there is, so it keeps the same company as the buttons above. */}
+      {mayEdit ? (
       <div className="card">
         <div className="card-head">
           <div>
@@ -311,6 +330,7 @@ export default function AccountsView() {
           ) : null}
         </div>
       </div>
+      ) : null}
 
       {editing ? (
         <PermissionsDialog
