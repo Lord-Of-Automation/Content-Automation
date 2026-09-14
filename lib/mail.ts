@@ -15,6 +15,7 @@
  * Google to the droplet, and is never written down here or returned to a page.
  */
 
+import { signedAs } from "./actor";
 import { backend } from "./backend";
 import { oauthClient } from "./googleoauth";
 
@@ -185,6 +186,10 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers: {
       authorization: `Bearer ${token()}`,
       "content-type": "application/json",
+      // Who this is for. The engine keeps records per person and takes this
+      // console's word for who somebody is, because it is the half with a
+      // login on it.
+      ...(await signedAs()),
       ...(init.headers ?? {}),
     },
     // Reading a dozen conversations is a dozen calls to Gmail on the other

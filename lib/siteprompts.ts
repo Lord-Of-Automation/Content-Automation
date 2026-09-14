@@ -12,6 +12,8 @@
  * rules here would disagree with it the first time either changed.
  */
 
+import { signedAs } from "./actor";
+
 export interface SitePrompt {
   /** The bare host: no scheme, no www, lower-cased. */
   domain: string;

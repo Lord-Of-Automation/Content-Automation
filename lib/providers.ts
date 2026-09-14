@@ -17,6 +17,7 @@
  * set, the last four characters of each, and when the credential expires.
  */
 
+import { currentUser } from "./actor";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -265,7 +266,38 @@ type StoredProvider = {
   savedBy: string;
 };
 
-type Store = Partial<Record<ProviderId, StoredProvider>>;
+/**
+ * The saved credentials, by slot.
+ *
+ * A slot is usually just the provider's id, and the store is one row per
+ * provider as it always was. For the two hosts it is the id and a person: two
+ * people signing in bring their own Cloudways and their own Hostinger, and
+ * Hosting is their own list of servers because it is their own account.
+ *
+ * Keyed by string rather than by ProviderId for that reason. Anything reading
+ * a row goes through slotFor, which is the only thing that knows which
+ * providers are shared and which are not.
+ */
+type Store = Record<string, StoredProvider>;
+
+/**
+ * The providers kept per person.
+ *
+ * Only the hosts. A registrar token lists the domains the business owns and a
+ * Search Console sign-in is an estate everybody works on, so those stay shared
+ * — splitting them would mean the Domains page emptying for everybody but one
+ * person, which is not what anybody asked for.
+ */
+const PER_USER: ProviderId[] = ["cloudways", "hostinger"];
+
+/** Where one provider's credentials live, for whoever is asking. */
+async function slotFor(id: ProviderId): Promise<string> {
+  if (!PER_USER.includes(id)) return id;
+  const who = await currentUser();
+  // Signed in as nobody reads and writes nothing rather than falling back to
+  // a shared row, which would hand one person's host to the next visitor.
+  return `${id}@${who || "-"}`;
+}
 
 /** What the browser may see. Never a secret. */
 export interface ProviderStatus {
@@ -572,8 +604,8 @@ function fromEnvironment(id: ProviderId): Record<string, string> | null {
   return null;
 }
 
-function statusOf(spec: ProviderSpec, store: Store): ProviderStatus {
-  const row = store[spec.id];
+function statusOf(spec: ProviderSpec, store: Store, slot: string): ProviderStatus {
+  const row = store[slot];
 
   if (row) {
     const shown: Record<string, string> = {};
@@ -656,7 +688,11 @@ function statusOf(spec: ProviderSpec, store: Store): ProviderStatus {
 
 export async function allStatuses(): Promise<ProviderStatus[]> {
   const store = await read();
-  return PROVIDERS.map((spec) => statusOf(spec, store));
+  // The slots first, because two of them depend on who is asking and this is
+  // the one place that asks for every provider at once.
+  const slots = new Map<ProviderId, string>();
+  for (const spec of PROVIDERS) slots.set(spec.id, await slotFor(spec.id));
+  return PROVIDERS.map((spec) => statusOf(spec, store, slots.get(spec.id)!));
 }
 
 export type SaveResult = { ok: true } | { ok: false; error: string };
@@ -679,7 +715,8 @@ export async function saveProvider(
   if (!spec) return { ok: false, error: "There is no such provider." };
 
   const store = await read();
-  const existing = store[spec.id];
+  const slot = await slotFor(spec.id);
+  const existing = store[slot];
   const next: Record<string, string> = { ...(existing?.values ?? {}) };
 
   /**
@@ -733,7 +770,7 @@ export async function saveProvider(
     when = new Date(at).toISOString();
   }
 
-  store[spec.id] = {
+  store[slot] = {
     values: next,
     expiresAt: when,
     savedAt: new Date().toISOString(),
@@ -749,7 +786,7 @@ export async function clearProvider(id: string): Promise<SaveResult> {
   if (!spec) return { ok: false, error: "There is no such provider." };
 
   const store = await read();
-  delete store[spec.id];
+  delete store[await slotFor(spec.id)];
   await write(store);
   return { ok: true };
 }
@@ -766,7 +803,7 @@ export async function credentialFor(id: ProviderId): Promise<Record<string, stri
   if (!spec) return null;
 
   const store = await read();
-  const row = store[id];
+  const row = store[await slotFor(id)];
 
   if (row) {
     const out: Record<string, string> = {};

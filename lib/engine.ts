@@ -13,6 +13,7 @@
  * create because it never stores one.
  */
 
+import { currentUser, signedAs } from "./actor";
 import type { CostBreakdown } from "./cost";
 import type { RunInputs } from "./inputs";
 import type { Progress, ProgressStage, StageState } from "./progress";
@@ -66,6 +67,10 @@ async function call<T>(
     headers: {
       authorization: `Bearer ${token()}`,
       "content-type": "application/json",
+      // Who this is for. The engine keeps records per person and takes this
+      // console's word for who somebody is, because it is the half with a
+      // login on it.
+      ...(await signedAs()),
       ...(init.headers ?? {}),
     },
     signal: AbortSignal.timeout(timeoutMs),
@@ -276,6 +281,15 @@ export async function startRun(
 
   const body = {
     ...input,
+    /*
+     * Whose run this is.
+     *
+     * On the body as well as in the header, because the two answer different
+     * questions: the header says who is asking, and this is written onto the
+     * record and outlives the request. A retry months later by somebody else
+     * is still a retry of this person's run.
+     */
+    owner: await currentUser(),
     ...(resumeFrom ? { resume_from: resumeFrom } : {}),
     ...(credentials
       ? {
@@ -372,7 +386,11 @@ export async function startBuild(input: {
 }): Promise<{ executionId: string; note: string | null }> {
   const result = await call<{ id: string; note?: string }>(
     "/runs",
-    { method: "POST", body: JSON.stringify({ ...input, mode: "build" }) },
+    {
+      method: "POST",
+      // Same as an ordinary run: the record keeps who it was for.
+      body: JSON.stringify({ ...input, owner: await currentUser(), mode: "build" }),
+    },
     30_000,
   );
   return { executionId: result.id, note: result.note ?? null };
