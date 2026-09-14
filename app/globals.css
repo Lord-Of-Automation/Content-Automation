@@ -9826,12 +9826,24 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
   width: min(680px, calc(100vw - 32px));
 }
 
+/* The body has no side padding of its own: a sheet is normally built from
+   sections that bring their own. This one is a list, so the padding is here,
+   and it stops short of the 20px the head uses because the rows add the rest
+   themselves -- that way their hover highlight reaches past the words without
+   the words moving. */
+.perms .sheet-body {
+  padding-left: 9px;
+  padding-right: 9px;
+}
+
 .perm-group {
   margin-bottom: 18px;
 }
 
+/* The 11px is the row padding, so a group title lines up with the permission
+   names under it rather than with the edge of their highlight. */
 .perm-group h3 {
-  margin: 0 0 8px;
+  margin: 0 0 8px 11px;
   font-size: 12px;
   font-weight: 650;
   letter-spacing: 0.04em;
@@ -9902,6 +9914,7 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
 .perm-both {
   display: flex;
   gap: 8px;
+  margin: 0 11px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
