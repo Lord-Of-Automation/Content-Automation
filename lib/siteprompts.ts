@@ -40,6 +40,10 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers: {
       authorization: `Bearer ${token()}`,
       "content-type": "application/json",
+      // Who is asking. Without it the engine is told nobody is, files the
+      // instruction under nobody, and then shows nobody's instructions back --
+      // which is a save that reports success and leaves the list empty.
+      ...(await signedAs()),
       ...(init.headers ?? {}),
     },
     signal: AbortSignal.timeout(30_000),
