@@ -267,6 +267,8 @@ export default function DomainProviders() {
           const status = statuses[spec.id];
           const note = expiryNote(status?.daysLeft ?? null);
           const draft = drafts[spec.id] ?? {};
+          // The fields this provider actually has something saved for.
+          const stored = spec.fields.filter((field) => status?.shown?.[field.name]);
           const touched = Object.values(draft).some((v) => v.trim());
           const dateChanged = (dates[spec.id] ?? "") !== dateOnly(status?.expiresAt ?? null);
 
@@ -557,12 +559,11 @@ export default function DomainProviders() {
               <div className="provider-fields">
                 {spec.id === "cloudflare" ? null : spec.fields.map((field) => (
                   <div className="provider-field" key={field.name}>
-                    <label htmlFor={`${spec.id}-${field.name}`}>
-                      {field.label}
-                      {status?.shown?.[field.name] ? (
-                        <span className="provider-current">{status.shown[field.name]}</span>
-                      ) : null}
-                    </label>
+                    {/* What is stored used to be crammed into the label as a
+                        pill. It is in the table below the inputs now, where a
+                        client ID has room to be read rather than truncated
+                        against the field name. */}
+                    <label htmlFor={`${spec.id}-${field.name}`}>{field.label}</label>
                     {/* A textarea where the value holds several lines. A
                         password input would collapse them and hide which line
                         was wrong. */}
@@ -614,6 +615,47 @@ export default function DomainProviders() {
                 </div>
                 )}
               </div>
+
+              {/* What this provider is holding, under the fields that set it.
+                  The same shape the Cloudflare tokens are listed in, because it
+                  is the same question asked of a different provider: what is
+                  saved here, and is it the one I think it is.
+
+                  Anything that is not a secret is shown whole. A client ID is
+                  public, and being able to read it is how somebody tells two
+                  Google projects apart. The secrets say their last four
+                  characters, which is enough to match against whatever issued
+                  them and no use to anybody else. */}
+              {spec.id !== "cloudflare" && stored.length ? (
+                <table className="logs cred-summary">
+                  <thead>
+                    <tr>
+                      <th>Field</th>
+                      <th>Stored</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stored.map((field) => (
+                      <tr key={field.name}>
+                        <td className="nowrap">{field.label}</td>
+                        <td className="detail">
+                          <span className="rr-value">{status!.shown[field.name]}</span>
+                        </td>
+                      </tr>
+                    ))}
+                    {status?.expiresAt ? (
+                      <tr>
+                        <td className="nowrap">Expires</td>
+                        <td className="detail">
+                          <span className="rr-value">
+                            {new Date(status.expiresAt).toLocaleDateString()}
+                          </span>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              ) : null}
 
               <div className="provider-actions">
                 {spec.id === "cloudflare" ? null : (

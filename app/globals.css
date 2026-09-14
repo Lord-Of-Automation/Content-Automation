@@ -3623,15 +3623,23 @@ input.input-fancy {
 
 /* The check, under the fields it reports on. Bordered off so it reads as an
    answer rather than as more form. */
-.cf-summary {
+.cf-summary,
+.cred-summary {
   margin-top: 14px;
   border: 1px solid var(--line);
   border-radius: 9px;
   overflow: hidden;
 }
 
-.cf-summary th {
+.cf-summary th,
+.cred-summary th {
   background: var(--panel-2);
+}
+
+/* The field name reads as a label rather than as data, so the value beside it
+   is the thing the eye lands on. */
+.cred-summary td:first-child {
+  color: var(--ink-3);
 }
 
 /* Which zone the records below belong to. Beside the heading rather than under
