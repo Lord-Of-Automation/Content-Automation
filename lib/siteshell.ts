@@ -187,13 +187,27 @@ h1 {
   line-height: 1.08; letter-spacing: -0.033em;
   font-weight: 730; margin: 0 0 20px;
 }
+/*
+ * Headings sit close to what comes before them.
+ *
+ * The gap above was a third of a screen on a phone, and on a page that turns
+ * over every few paragraphs it read as the article stopping and starting
+ * rather than as one piece with sections in it.
+ *
+ * In em, so it follows the heading's own size rather than staying put while
+ * the type around it scales. It collapses against the paragraph's own bottom
+ * margin, so the gap above a heading settles at whatever separates two
+ * paragraphs -- and each heading keeps less space beneath it than above, which
+ * is what makes it read as belonging to the text it introduces rather than
+ * floating between the two.
+ */
 h2 {
   font-size: clamp(24px, 3vw, 30px);
   line-height: 1.22; letter-spacing: -0.02em;
-  font-weight: 680; margin: 52px 0 14px;
+  font-weight: 680; margin: 0.5em 0 14px;
 }
-h3 { font-size: 20px; line-height: 1.3; font-weight: 640; margin: 34px 0 10px; letter-spacing: -0.011em; }
-h4 { font-size: 17px; font-weight: 640; margin: 26px 0 8px; }
+h3 { font-size: 20px; line-height: 1.3; font-weight: 640; margin: 0.5em 0 10px; letter-spacing: -0.011em; }
+h4 { font-size: 17px; font-weight: 640; margin: 0.5em 0 8px; }
 p, ul, ol { margin: 0 0 19px; }
 ul, ol { padding-left: 24px; }
 li { margin-bottom: 8px; }
