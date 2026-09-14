@@ -505,8 +505,18 @@ export default function OutreachCampaign({
                     <tbody ref={glide.ref}>
                       {showing.map((one) => (
                         <tr
-                          key={one.domain}
-                          data-glide={one.domain}
+                          /*
+                           * The sheet's own row number, not the domain.
+                           *
+                           * A prospect list has the same domain on more than
+                           * one line often enough -- two contacts, two prices,
+                           * one added twice -- and React cannot reorder a list
+                           * whose keys repeat. It reuses the wrong rows and the
+                           * table stays as it was, which looks exactly like
+                           * sorting doing nothing.
+                           */
+                          key={`${one.row}-${one.domain}`}
+                          data-glide={`${one.row}-${one.domain}`}
                           className={chosen.has(one.domain) ? "is-chosen" : undefined}
                           onClick={() => toggle(one.domain)}
                         >

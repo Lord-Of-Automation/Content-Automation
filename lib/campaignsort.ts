@@ -90,20 +90,28 @@ export function order(rows: Opportunity[], key: SortKey, direction: Direction): 
   const sign = direction === "asc" ? 1 : -1;
   const asNumbers = NUMERIC[key];
 
-  // Read once per row rather than once per comparison: a sort over a few
-  // thousand rows asks for the same cell a great many times.
-  const value = new Map<string, number | string | null>();
-  for (const row of rows) {
-    const raw = row[key];
-    value.set(
-      row.domain,
-      asNumbers ? quantity(raw) : String(raw ?? "").trim().toLowerCase(),
-    );
-  }
+  /*
+   * Each row carried beside the one value being sorted on.
+   *
+   * Read once per row rather than once per comparison, because a sort over a
+   * few thousand rows asks for the same cell a great many times. Carried
+   * alongside rather than looked up by domain: the same domain appears twice
+   * in a prospect list often enough, and a lookup would give both lines
+   * whichever of the two values was read last.
+   */
+  const marked = rows.map((row) => ({
+    row,
+    value: asNumbers
+      ? quantity(row[key])
+      : String(row[key] ?? "").trim().toLowerCase(),
+  }));
 
-  return [...rows].sort((a, b) => {
-    const left = value.get(a.domain) ?? null;
-    const right = value.get(b.domain) ?? null;
+  return marked
+    .sort((one, two) => {
+    const a = one.row;
+    const b = two.row;
+    const left = one.value;
+    const right = two.value;
 
     const leftMissing = left === null || left === "";
     const rightMissing = right === null || right === "";
@@ -122,5 +130,6 @@ export function order(rows: Opportunity[], key: SortKey, direction: Direction): 
     // Equal on the column asked for. The domain settles it, so the order is
     // the same every time rather than depending on how the sheet was read.
     return a.domain.localeCompare(b.domain);
-  });
+    })
+    .map((each) => each.row);
 }
