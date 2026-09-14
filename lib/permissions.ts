@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { kvConfigured, kvGetJSON, kvSetJSON } from "./kv";
 import { DEFAULT_PERMISSIONS, EVERY_PERMISSION, FULL_ACCESS } from "./permissionlist";
+import { everyUser } from "./users";
 
 /**
  * Who has which permissions.
@@ -75,9 +76,43 @@ export function adminUser(): string {
  * admin who removes their own full access does not lock the platform, they
  * return it to the state where anybody can claim it again.
  */
-function anyoneInCharge(store: Store): boolean {
-  if (adminUser()) return true;
-  return Object.values(store).some((granted) => granted.includes(FULL_ACCESS));
+async function anyoneInCharge(store: Store): Promise<boolean> {
+  if (Object.values(store).some((granted) => granted.includes(FULL_ACCESS))) return true;
+
+  /*
+   * A name in the environment only counts if somebody can sign in as it.
+   *
+   * Setting ADMIN_USER to a name that is not an account is the easiest
+   * mistake to make here, and it used to be the worst: the platform would
+   * decide it was under management, drop everybody to the default set, and
+   * wait to be rescued by an account that does not exist. The misconfiguration
+   * and the lockout looked identical from the outside, which is what made it
+   * expensive.
+   */
+  const named = adminUser();
+  if (!named) return false;
+  try {
+    return (await everyUser()).some((one) => one.username === named);
+  } catch {
+    // No account list to check against is not a reason to enforce anything.
+    return false;
+  }
+}
+
+/**
+ * Whether ADMIN_USER names somebody who cannot sign in.
+ *
+ * Worth saying out loud on the page, because the variable looks set and does
+ * nothing, and the two are indistinguishable otherwise.
+ */
+export async function adminIsMissing(): Promise<boolean> {
+  const named = adminUser();
+  if (!named) return false;
+  try {
+    return !(await everyUser()).some((one) => one.username === named);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -101,7 +136,7 @@ export async function permissionsOf(user: string): Promise<string[]> {
   if (granted?.includes(FULL_ACCESS)) return [...EVERY_PERMISSION];
 
   // Nobody in charge means nothing is in force. See anyoneInCharge.
-  if (!anyoneInCharge(store)) return [...EVERY_PERMISSION];
+  if (!(await anyoneInCharge(store))) return [...EVERY_PERMISSION];
 
   return granted ?? [...DEFAULT_PERMISSIONS];
 }
@@ -180,7 +215,8 @@ export async function setPermissions(
   const kept = [...new Set(granted.map(String).filter((one) => EVERY_PERMISSION.includes(one)))];
 
   const store = await read();
-  const was = store[who] ?? (anyoneInCharge(store) ? DEFAULT_PERMISSIONS : EVERY_PERMISSION);
+  const was =
+    store[who] ?? ((await anyoneInCharge(store)) ? DEFAULT_PERMISSIONS : EVERY_PERMISSION);
 
   /*
    * Only somebody who already has full access can hand it out or take it back.

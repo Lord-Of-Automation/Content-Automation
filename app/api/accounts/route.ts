@@ -5,7 +5,13 @@ import { errorResponse, requireSession } from "@/lib/api-guard";
 import { addAccount, listAccounts } from "@/lib/accounts";
 import { record } from "@/lib/audit";
 import { adminUser } from "@/lib/actor";
-import { may, permissionsFor, restrictionsApply, setPermissions } from "@/lib/permissions";
+import {
+  adminIsMissing,
+  may,
+  permissionsFor,
+  restrictionsApply,
+  setPermissions,
+} from "@/lib/permissions";
 import { PERMISSIONS } from "@/lib/permissionlist";
 
 export const runtime = "nodejs";
@@ -30,6 +36,9 @@ export async function GET() {
       // means nobody to enforce it on behalf of, so everybody has everything
       // and the page has to say so.
       inCharge: await restrictionsApply(),
+      // Set to a name nobody can sign in as, which does nothing and looks
+      // exactly like doing something.
+      adminMissing: await adminIsMissing(),
     });
   } catch (error) {
     return errorResponse(error);

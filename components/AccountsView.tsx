@@ -50,6 +50,8 @@ export default function AccountsView() {
   const [admin, setAdmin] = useState("");
   /** Whether any of the above is being enforced yet. See the notice below. */
   const [inCharge, setInCharge] = useState(true);
+  /** ADMIN_USER naming somebody who cannot sign in. */
+  const [adminMissing, setAdminMissing] = useState(false);
   /** The account whose permissions are open, if any. */
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -66,6 +68,7 @@ export default function AccountsView() {
         catalogue?: Permission[];
         admin?: string;
         inCharge?: boolean;
+        adminMissing?: boolean;
         error?: string;
       };
       if (!response.ok) throw new Error(payload.error ?? `HTTP ${response.status}`);
@@ -74,6 +77,7 @@ export default function AccountsView() {
       setCatalogue(payload.catalogue ?? []);
       setAdmin(payload.admin ?? "");
       setInCharge(payload.inCharge ?? true);
+      setAdminMissing(payload.adminMissing ?? false);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load accounts.");
@@ -145,6 +149,16 @@ export default function AccountsView() {
           {/* Said here rather than discovered at the Save button. Until
               somebody holds full access nothing on this list is in force, and
               a page of permissions that are not in force has to admit it. */}
+          {!loading && adminMissing ? (
+            <div className="notice warn">
+              ADMIN_USER is set to <code>{admin}</code>, and no account by that
+              name can sign in. It is being ignored rather than obeyed, because
+              a platform managed by an account nobody can use is a platform
+              nobody can manage. Either correct the spelling or leave it unset
+              and give an account Full access below.
+            </div>
+          ) : null}
+
           {!loading && !inCharge ? (
             <div className="notice warn">
               Nobody has full access yet, so permissions are not in force and
