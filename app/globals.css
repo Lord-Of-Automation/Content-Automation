@@ -9706,3 +9706,14 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* A Buy button in a table row.
+
+   Narrower than the one on a result card, and held to one width whatever the
+   label says. The label changes as a purchase runs — the price, then checking,
+   then buying, then registering — and a column that resized on every step
+   would shuffle the table under the pointer mid-purchase. */
+.gen-buy {
+  min-width: 118px;
+  white-space: nowrap;
+}

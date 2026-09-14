@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from "react";
 
+import { Toasts, useToasts } from "@/components/Toasts";
+import { useBuyDomain } from "@/lib/buydomain";
+
 type Candidate = {
   domain: string;
   suffix: string;
@@ -45,6 +48,11 @@ const ORIGIN_NOTE: Record<Candidate["origin"], string> = {
 };
 
 export default function NameGenerator() {
+  const { toasts, push, dismiss } = useToasts();
+  // The same flow the availability page uses, so a name found here is
+  // bought the same way as a name looked up there.
+  const { buy, buying, bought, labelFor } = useBuyDomain(push);
+
   const [seed, setSeed] = useState("");
   const [tlds, setTlds] = useState<string[]>(DEFAULT_TLDS);
   const [extra, setExtra] = useState("");
@@ -233,6 +241,7 @@ export default function NameGenerator() {
                     <th className="num">First year</th>
                     <th className="num">Renews for</th>
                     <th>Came from</th>
+                    <th className="mid">Buy</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -257,6 +266,23 @@ export default function NameGenerator() {
                       <td className="detail">
                         <span className="registrar">{ORIGIN_NOTE[c.origin]}</span>
                       </td>
+                      <td className="mid">
+                        {/* Every row, because the whole point of this page is
+                            that the good one is somewhere in a list of fifty
+                            and you want it before somebody else does. */}
+                        {bought.has(c.domain) ? (
+                          <span className="pill pill-ok">Bought</span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm gen-buy"
+                            disabled={!!buying}
+                            onClick={() => void buy(c.domain)}
+                          >
+                            {labelFor(c.domain, c.price, c.currency)}
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -264,14 +290,17 @@ export default function NameGenerator() {
             )}
 
             <p className="domain-note">
-              Availability and price come from GoDaddy and are read only &mdash;
-              nothing here registers anything. The first year is often a
-              promotion and the renewal is what you pay every year after, which
-              is why both are shown.
+              Availability and price come from GoDaddy. Buying one charges the
+              payment method on that account, at the price GoDaddy quotes and
+              holds when you press the button rather than the one on this row.
+              The first year is often a promotion and the renewal is what you
+              pay every year after, which is why both are shown.
             </p>
           </div>
         </div>
       ) : null}
+
+      <Toasts toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }
