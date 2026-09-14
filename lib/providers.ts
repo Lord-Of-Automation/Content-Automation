@@ -17,7 +17,7 @@
  * set, the last four characters of each, and when the credential expires.
  */
 
-import { currentUser } from "./actor";
+import { currentUser, isAdmin } from "./actor";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -300,21 +300,41 @@ async function slotFor(id: ProviderId): Promise<string> {
 }
 
 /**
- * The row to read for one provider, including the one nobody owns.
+ * The row to read for one provider, the person who saved it included.
  *
- * Before the hosts were kept per person there was a single row per provider,
- * saved by whoever set the platform up. Splitting the slot left that row where
- * it was and stopped anything asking for it, so a working Hosting page went to
- * "no credentials set" overnight, with the token still sitting in the store.
+ * Before the hosts were kept per person there was a single row per provider.
+ * Splitting the slot left that row where it was and stopped anything asking
+ * for it, so a working Hosting page went to "no credentials set" overnight
+ * with the token still in the store.
  *
- * So: this person's own row, and failing that the shared one that predates the
- * split. It was visible to everybody before, and reading it is the state of
- * things as they were rather than a new way to see somebody else's host. A
- * save writes to the person's own slot, which is how the shared row stops
- * being used without anybody being asked to find their token again.
+ * It is not nobody's, though, and the first attempt at this treated it as if
+ * it were: every account inherited it, which put everyone back on one set of
+ * hosts. Every row records who saved it, so the row goes to that person and to
+ * nobody else. Whoever set the platform up keeps their hosts and everybody
+ * else sees an empty page, which is what a colleague who has not connected
+ * anything should see.
+ *
+ * A row saved by nobody recorded goes to an account with full access, on the
+ * same rule the rest of the platform uses for work that predates owners.
  */
-function rowFor(store: Store, id: ProviderId, slot: string): StoredProvider | undefined {
-  return store[slot] ?? (PER_USER.includes(id) ? store[id] : undefined);
+function rowFor(
+  store: Store,
+  id: ProviderId,
+  slot: string,
+  who: string,
+  admin: boolean,
+): StoredProvider | undefined {
+  const own = store[slot];
+  if (own) return own;
+  if (!PER_USER.includes(id)) return undefined;
+
+  const shared = store[id];
+  if (!shared) return undefined;
+
+  const saved = String(shared.savedBy ?? "").trim().toLowerCase();
+  if (saved && saved === who) return shared;
+  if (!saved && admin) return shared;
+  return undefined;
 }
 
 /** What the browser may see. Never a secret. */
@@ -622,8 +642,14 @@ function fromEnvironment(id: ProviderId): Record<string, string> | null {
   return null;
 }
 
-function statusOf(spec: ProviderSpec, store: Store, slot: string): ProviderStatus {
-  const row = rowFor(store, spec.id, slot);
+function statusOf(
+  spec: ProviderSpec,
+  store: Store,
+  slot: string,
+  who: string,
+  admin: boolean,
+): ProviderStatus {
+  const row = rowFor(store, spec.id, slot, who, admin);
 
   if (row) {
     const shown: Record<string, string> = {};
@@ -710,7 +736,9 @@ export async function allStatuses(): Promise<ProviderStatus[]> {
   // the one place that asks for every provider at once.
   const slots = new Map<ProviderId, string>();
   for (const spec of PROVIDERS) slots.set(spec.id, await slotFor(spec.id));
-  return PROVIDERS.map((spec) => statusOf(spec, store, slots.get(spec.id)!));
+  const who = await currentUser();
+  const admin = await isAdmin();
+  return PROVIDERS.map((spec) => statusOf(spec, store, slots.get(spec.id)!, who, admin));
 }
 
 export type SaveResult = { ok: true } | { ok: false; error: string };
@@ -736,7 +764,7 @@ export async function saveProvider(
   const slot = await slotFor(spec.id);
   // Reads the shared row as the starting point too, so somebody changing one
   // field of an inherited credential does not lose the others.
-  const existing = rowFor(store, spec.id, slot);
+  const existing = rowFor(store, spec.id, slot, await currentUser(), await isAdmin());
   const next: Record<string, string> = { ...(existing?.values ?? {}) };
 
   /**
@@ -796,6 +824,22 @@ export async function saveProvider(
     savedAt: new Date().toISOString(),
     savedBy: actor,
   };
+
+  /*
+   * The row from before the split, once its owner has one of their own.
+   *
+   * Left behind it would come back the day they removed their own row, and it
+   * would be an old token nobody had touched in months, presented as current.
+   * Only removed for the person it belonged to.
+   */
+  if (PER_USER.includes(spec.id) && slot !== spec.id) {
+    const shared = store[spec.id];
+    const saved = String(shared?.savedBy ?? "").trim().toLowerCase();
+    if (shared && saved && saved === String(actor ?? "").trim().toLowerCase()) {
+      delete store[spec.id];
+    }
+  }
+
   await write(store);
   return { ok: true };
 }
@@ -827,7 +871,7 @@ export async function credentialFor(id: ProviderId): Promise<Record<string, stri
   if (!spec) return null;
 
   const store = await read();
-  const row = rowFor(store, id, await slotFor(id));
+  const row = rowFor(store, id, await slotFor(id), await currentUser(), await isAdmin());
 
   if (row) {
     const out: Record<string, string> = {};
