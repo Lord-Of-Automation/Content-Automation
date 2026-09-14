@@ -1684,8 +1684,17 @@ button,
 }
 
 /* Leaves room for the icon, and grows the control so it does not look like a
-   afterthought next to the label. */
-.input-fancy {
+   afterthought next to the label.
+ *
+ * The element is named in the selector on purpose. The base rule further up
+ * this file is written as input[type="password"] and friends, which counts a
+ * class and an element and therefore outweighs a class on its own -- so a
+ * field with a type attribute took the base padding of 10px, put its
+ * placeholder underneath the icon, and wore the wrong border and corners
+ * while it was at it. A field with no type attribute escaped, because an
+ * attribute selector matches the attribute rather than the default, which is
+ * why the username beside it looked right. */
+input.input-fancy {
   width: 100%;
   height: 44px;
   padding: 0 14px 0 40px;
