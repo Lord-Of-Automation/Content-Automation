@@ -3,9 +3,18 @@
 import { useMemo, useState } from "react";
 
 import { useAsk } from "@/components/Ask";
+import Chevrons from "@/components/SortMark";
 import { Select } from "@/components/Select";
 import { useToasts } from "@/components/Toasts";
+import { useGlide } from "@/lib/glide";
 import { MARKETS } from "@/lib/markets";
+import {
+  COLUMNS,
+  FIRST_DIRECTION,
+  order,
+  type Direction,
+  type SortKey,
+} from "@/lib/campaignsort";
 import type { Opportunity, SheetHas } from "@/lib/mail";
 
 /**
@@ -85,6 +94,18 @@ export default function OutreachCampaign({
   const [language, setLanguage] = useState("");
 
   const [chosen, setChosen] = useState<Set<string>>(new Set());
+  /*
+   * Nothing until a heading is clicked, and the sheet's own order until then.
+   *
+   * Somebody has usually arranged that sheet themselves, with the ones they
+   * care about at the top, and opening the tab to find it rearranged loses
+   * that with no way to ask for it back.
+   */
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [direction, setDirection] = useState<Direction>("asc");
+  // Rows travel to their new places when a heading is clicked, rather than
+  // the whole table being somewhere else in a single frame.
+  const glide = useGlide<HTMLTableSectionElement>();
 
   const [anchor, setAnchor] = useState("");
   const [anchorUrl, setAnchorUrl] = useState("");
@@ -137,7 +158,7 @@ export default function OutreachCampaign({
    * one nobody has priced, and letting it through would put it in a campaign on
    * the strength of a blank cell.
    */
-  const showing = useMemo(() => {
+  const matching = useMemo(() => {
     const limits = {
       drMin: number(drMin),
       drMax: number(drMax),
@@ -195,6 +216,26 @@ export default function OutreachCampaign({
     rows, drMin, drMax, trafficMin, trafficMax, priceMin, priceMax,
     geo, language,
   ]);
+
+  // Kept apart from the filtering so that clicking a heading does not run
+  // every filter again over a sheet that can hold a few thousand rows.
+  const showing = useMemo(
+    () => (sortKey ? order(matching, sortKey, direction) : matching),
+    [matching, sortKey, direction],
+  );
+
+  function sortBy(key: SortKey) {
+    // Measured before the order changes, so each row travels from where it
+    // was rather than being somewhere else in a single frame.
+    glide.capture();
+    // The same column flips. A new one starts at its own useful end instead
+    // of inheriting whichever way the last column happened to be running.
+    if (key === sortKey) setDirection((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setDirection(FIRST_DIRECTION[key]);
+    }
+  }
 
   const picked = showing.filter((one) => chosen.has(one.domain));
 
@@ -439,21 +480,33 @@ export default function OutreachCampaign({
                     <thead>
                       <tr>
                         <th />
-                        <th>Domain</th>
-                        <th>DR</th>
-                        <th>Traffic</th>
-                        <th>Price</th>
-                        <th>GEO</th>
-                        <th>Language</th>
-                        <th>Send from</th>
-                        <th>Email</th>
-                        <th>Notes</th>
+                        {COLUMNS.map(([key, label]) => (
+                          <th
+                            key={key}
+                            className="sortable"
+                            aria-sort={
+                              sortKey === key
+                                ? direction === "asc"
+                                  ? "ascending"
+                                  : "descending"
+                                : "none"
+                            }
+                          >
+                            {/* The whole heading is the target rather than the
+                                arrow beside it, which is nine pixels wide. */}
+                            <button type="button" onClick={() => sortBy(key)}>
+                              {label}
+                              <Chevrons state={sortKey === key ? direction : "none"} />
+                            </button>
+                          </th>
+                        ))}
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody ref={glide.ref}>
                       {showing.map((one) => (
                         <tr
                           key={one.domain}
+                          data-glide={one.domain}
                           className={chosen.has(one.domain) ? "is-chosen" : undefined}
                           onClick={() => toggle(one.domain)}
                         >

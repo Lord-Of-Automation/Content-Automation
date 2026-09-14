@@ -2861,11 +2861,11 @@ button,
 
 /* The whole heading is the target, not the little arrow beside it. A 10px
    chevron is a hard thing to hit and there is no reason to make anyone try. */
-.logs th.sortable {
+:is(.logs, .campaign-table) th.sortable {
   padding: 0;
 }
 
-.logs th.sortable button {
+:is(.logs, .campaign-table) th.sortable button {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -2887,7 +2887,13 @@ button,
   justify-content: flex-end;
 }
 
-.logs th.sortable button:hover {
+/* Matching the padding this table's own cells use, so turning a heading into a
+   button does not shift the column it sits over. */
+.campaign-table th.sortable button {
+  padding: 8px 10px;
+}
+
+:is(.logs, .campaign-table) th.sortable button:hover {
   color: var(--ink);
 }
 
@@ -2910,7 +2916,7 @@ button,
   opacity: 0.2;
 }
 
-.logs th.sortable button:hover .sortmark {
+:is(.logs, .campaign-table) th.sortable button:hover .sortmark {
   color: var(--accent);
 }
 

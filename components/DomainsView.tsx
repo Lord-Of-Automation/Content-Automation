@@ -15,6 +15,7 @@ import {
 } from "@/lib/domainsort";
 import { ColumnPicker, useColumns, type ColumnSpec } from "@/components/Columns";
 import { SkeletonBarRow, SkeletonStats, SkeletonTable } from "@/components/Skeleton";
+import Chevrons from "@/components/SortMark";
 
 /**
  * The columns, and which of them a reader may turn off.
@@ -158,15 +159,6 @@ const FIRST_DIRECTION: Record<SortKey, Direction> = {
   // somebody clicks this column.
   cloudflare: "asc",
 };
-
-function Chevrons({ state }: { state: "none" | "asc" | "desc" }) {
-  return (
-    <svg className={`sortmark is-${state}`} viewBox="0 0 10 14" aria-hidden>
-      <path className="sortmark-up" d="M5 1.5 8.2 5.4H1.8z" />
-      <path className="sortmark-down" d="M5 12.5 1.8 8.6h6.4z" />
-    </svg>
-  );
-}
 
 /**
  * How urgent an expiry is.

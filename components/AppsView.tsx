@@ -14,6 +14,7 @@ import { Select } from "@/components/Select";
 import { HOSTS, type HostId } from "@/lib/hosts";
 import { ColumnPicker, useColumns, type ColumnSpec } from "@/components/Columns";
 import { SkeletonTable } from "@/components/Skeleton";
+import Chevrons from "@/components/SortMark";
 
 /**
  * The columns, and which may be turned off.
@@ -181,15 +182,6 @@ const PAGE = 50;
 /** A plain count, which is what all four of these are. */
 function count(n: number): string {
   return new Intl.NumberFormat().format(Math.round(n));
-}
-
-function Chevrons({ state }: { state: "none" | "asc" | "desc" }) {
-  return (
-    <svg className={`sortmark is-${state}`} viewBox="0 0 10 14" aria-hidden>
-      <path className="sortmark-up" d="M5 1.5 8.2 5.4H1.8z" />
-      <path className="sortmark-down" d="M5 12.5 1.8 8.6h6.4z" />
-    </svg>
-  );
 }
 
 export default function AppsView() {
