@@ -70,6 +70,26 @@ export function validateRunInput(raw: unknown): ValidationResult {
     }
   }
 
+  /*
+   * ---- source_url: the page an "add" run is written from.
+   *
+   * Its presence is what makes the run an add rather than an optimise, so it
+   * is checked here rather than trusting a mode field the browser sent: a run
+   * that says add and carries no page has nothing to write about, and one that
+   * carries a page is plainly an add whatever it called itself.
+   */
+  const sourceUrl = typeof input.source_url === "string" ? input.source_url.trim() : "";
+  if (sourceUrl) {
+    try {
+      const parsed = new URL(sourceUrl);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        errors.source_url = "Must be an http or https URL.";
+      }
+    } catch {
+      errors.source_url = "That is not a valid URL. Include https://";
+    }
+  }
+
   // ---- market
   const market = typeof input.market === "string" ? input.market.trim().toLowerCase() : "";
   if (!market) {
@@ -238,6 +258,7 @@ export function validateRunInput(raw: unknown): ValidationResult {
       exclude_paths: excludePaths,
       brief_doc_id: briefDocId,
       body_classes: bodyClasses,
+      ...(sourceUrl ? { mode: "add" as const, source_url: sourceUrl } : {}),
     },
   };
 }

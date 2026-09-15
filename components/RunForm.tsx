@@ -40,7 +40,24 @@ export type RunValues = {
    * pick it apart is the fastest way to fill this in. Split on submit.
    */
   body_classes: Record<DeclarableClass, string>;
+  /**
+   * Somebody else's page about one casino or one game.
+   *
+   * Only sent by the Add tab. Its presence is what turns the run into an add:
+   * the engine reads that page, works out what the subject is and whether it
+   * is a game or a casino, then writes a page of our own about it.
+   */
+  source_url: string;
 };
+
+/**
+ * Which of the three the form is on.
+ *
+ * "one" and "bulk" are the same job on different numbers of our own pages.
+ * "add" is a different job: the address is somebody else's, and what comes out
+ * is a page this site did not have.
+ */
+type Tab = "one" | "bulk" | "add";
 
 const STORAGE_KEY = "ca:last-input";
 
@@ -83,6 +100,7 @@ export const DEFAULT_VALUES: RunValues = {
   // Kept so switching the brief on does not mean hunting for the ID again.
   brief_doc_id: DEFAULT_BRIEF_DOC_ID,
   use_brief: false,
+  source_url: "",
   body_classes: { casino_review: "", game_review: "", promocodes: "", blog: "" },
 };
 
@@ -147,7 +165,9 @@ export default function RunForm({
   onSubmitBatch: (values: RunValues, urls: string[]) => void;
 }) {
   const [values, setValues] = useState<RunValues>(DEFAULT_VALUES);
-  const [batch, setBatch] = useState(false);
+  const [tab, setTab] = useState<Tab>("one");
+  const batch = tab === "bulk";
+  const adding = tab === "add";
   const [urlList, setUrlList] = useState("");
 
   const urls = parseUrlList(urlList);
@@ -199,9 +219,18 @@ export default function RunForm({
     // The address is remembered above but withheld here, which is what makes
     // the switch mean anything: the engine skips the brief when it is given no
     // document, so sending a blank one is how "off" is expressed to it.
-    const submitted: RunValues = values.use_brief
+    let submitted: RunValues = values.use_brief
       ? values
       : { ...values, brief_doc_id: "" };
+
+    /*
+     * The source page is sent only by the tab that asks for it.
+     *
+     * It is remembered across tabs like everything else on this form, and its
+     * presence is what makes a run an add. Left in, a page typed here once
+     * would quietly turn every later optimise run into an add.
+     */
+    if (!adding) submitted = { ...submitted, source_url: "" };
 
     if (batch) {
       onSubmitBatch(submitted, urls);
@@ -224,23 +253,27 @@ export default function RunForm({
       <div className="field">
         <div className="field-head">
           <label htmlFor={batch ? "url_list" : "website_url"}>
-            {batch ? "Pages or site URLs" : "Page or site URL"}
+            {batch ? "Pages or site URLs" : adding ? "Your site" : "Page or site URL"}
           </label>
           <div className="seg seg-sm">
-            <button
-              type="button"
-              className={batch ? "seg-btn" : "seg-btn is-on"}
-              onClick={() => setBatch(false)}
-            >
-              One
-            </button>
-            <button
-              type="button"
-              className={batch ? "seg-btn is-on" : "seg-btn"}
-              onClick={() => setBatch(true)}
-            >
-              Bulk URLs
-            </button>
+            {(
+              [
+                ["one", "One"],
+                ["bulk", "Bulk URLs"],
+                // A different job from the other two: theirs rewrite pages
+                // this site has, this one makes a page it does not.
+                ["add", "Add a page"],
+              ] as Array<[Tab, string]>
+            ).map(([which, label]) => (
+              <button
+                key={which}
+                type="button"
+                className={tab === which ? "seg-btn is-on" : "seg-btn"}
+                onClick={() => setTab(which)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -275,7 +308,9 @@ export default function RunForm({
           id="website_url"
           type="url"
           inputMode="url"
-          placeholder="https://example.com/casino/brand-review/"
+          placeholder={
+            adding ? "https://yoursite.com" : "https://example.com/casino/brand-review/"
+          }
           value={values.website_url}
           onChange={(e) => set("website_url", e.target.value)}
           aria-invalid={Boolean(fieldErrors.website_url)}
@@ -285,6 +320,11 @@ export default function RunForm({
 
         {!batch && fieldErrors.website_url ? (
           <div className="err">{fieldErrors.website_url}</div>
+        ) : adding ? (
+          <div className="note">
+            The site the new page is added to. Its own domain, not the page
+            being copied from.
+          </div>
         ) : !batch ? (
           <div className="note">
             {values.website_url === ""
@@ -295,6 +335,36 @@ export default function RunForm({
           </div>
         ) : null}
       </div>
+
+      {/* The page the new one is written from. Second, because the first
+          question is always which site this is for. */}
+      {adding ? (
+        <div className="field">
+          <label htmlFor="source_url">Page to write about</label>
+          <input
+            id="source_url"
+            type="url"
+            inputMode="url"
+            placeholder="https://someone-else.com/slots/reel-rush/"
+            value={values.source_url}
+            onChange={(e) => set("source_url", e.target.value)}
+            aria-invalid={Boolean(fieldErrors.source_url)}
+            required
+          />
+          {fieldErrors.source_url ? (
+            <div className="err">{fieldErrors.source_url}</div>
+          ) : (
+            <div className="note">
+              Anybody&rsquo;s page about <strong>one</strong> casino or{" "}
+              <strong>one</strong> game. The run reads it to work out what the
+              subject is and which of the two it is, then writes a page of your
+              own from its own research. Nothing is copied from it. A page about
+              several operators, an article or a promo code page is refused, and
+              says so.
+            </div>
+          )}
+        </div>
+      ) : null}
 
       <div className="row-2">
         <div className="field">
@@ -567,7 +637,9 @@ export default function RunForm({
           ? "Starting…"
           : batch
             ? `Start ${urls.length || ""} run${urls.length === 1 ? "" : "s"}`.replace("  ", " ")
-            : "Start run"}
+            : adding
+              ? "Read it and write the page"
+              : "Start run"}
       </button>
     </form>
   );

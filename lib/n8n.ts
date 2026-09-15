@@ -42,7 +42,7 @@ export type ExecutionDetail = ExecutionSummary & {
    * are live in WordPress after a run that only read a spreadsheet is a small
    * lie the console used to tell every time.
    */
-  runMode: "optimise" | "gap" | "casino_gap" | "build" | "prospects" | "outreach" | null;
+  runMode: "optimise" | "gap" | "casino_gap" | "build" | "prospects" | "outreach" | "add" | null;
 };
 
 export type StartRunInput = {
@@ -67,7 +67,15 @@ export type StartRunInput = {
    * caller written before there was a choice means.
    */
   /** Build joined these when a run stopped needing a site to start from. */
-  mode?: "optimise" | "gap" | "casino_gap" | "build";
+  mode?: "optimise" | "gap" | "casino_gap" | "build" | "add";
+  /**
+   * For an "add" run: somebody else's page about one casino or one game.
+   *
+   * Read to work out what the new page should be about, then used as the
+   * competitor page the research reads. Not the site the page is added to,
+   * which is website_url as everywhere else.
+   */
+  source_url?: string;
   /** The competitor crawl export a gap run works from. */
   ideas_sheet_id?: string;
 };
