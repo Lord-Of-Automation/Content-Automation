@@ -15,7 +15,7 @@
 
 import { currentUser, signedAs } from "./actor";
 import type { CostBreakdown } from "./cost";
-import type { RunInputs } from "./inputs";
+import type { CustomInputs, RunInputs } from "./inputs";
 import type { Progress, ProgressStage, StageState } from "./progress";
 import type {
   ExecutionDetail,
@@ -119,21 +119,27 @@ type EngineStep = {
   pinned?: boolean;
 };
 
+/*
+ * Most of this is optional on the way in. A run accepted but still waiting for
+ * a slot has no record on disk yet, and the engine answers for it with the
+ * little it knows — its id, its mode, what it was asked — rather than a 404
+ * that would read as a run that never existed.
+ */
 type EngineRun = {
   id: string;
   status: "queued" | "running" | "success" | "error" | "canceled";
-  finished: boolean;
-  startedAt: string;
-  stoppedAt: string | null;
-  website_url: string;
-  error: string | null;
-  progress: { done: number; total: number; percent: number };
+  finished?: boolean;
+  startedAt?: string | null;
+  stoppedAt?: string | null;
+  website_url?: string;
+  error?: string | null;
+  progress?: { done: number; total: number; percent: number };
   current?: { url: string; index: number; total: number; startedAt: string } | null;
-  result: {
-    pages_optimised: number;
-    published: Array<{ url?: string; postId?: number | string | null }>;
-    skipped: unknown[];
-  };
+  result?: {
+    pages_optimised?: number;
+    published?: Array<{ url?: string; postId?: number | string | null }>;
+    skipped?: unknown[];
+  } | null;
   input?: Record<string, unknown>;
   /** Counted by the engine as it spent it. Absent on a run older than that. */
   cost?: CostBreakdown | null;
@@ -166,10 +172,10 @@ function summarise(run: EngineRun): ExecutionSummary {
   return {
     id: run.id,
     status: statusOf(run),
-    finished: run.finished,
+    finished: Boolean(run.finished),
     mode: "api",
-    startedAt: run.startedAt,
-    stoppedAt: run.stoppedAt,
+    startedAt: run.startedAt || null,
+    stoppedAt: run.stoppedAt ?? null,
     workflowId: "engine",
   };
 }
@@ -213,11 +219,13 @@ function progressOf(run: EngineRun): Progress {
   // A run still going has one more stage in flight than it has recorded —
   // unless the engine has already opened one, in which case that IS the stage
   // in flight and a placeholder beside it would be a second, imaginary one.
+  // A queued run has not begun anything, and says that instead.
+  const queued = run.status === "queued";
   if (!run.finished && !steps.some((step) => step.status === "running")) {
     stages.push({
       key: "in-flight",
-      label: "Working",
-      hint: "the next stage is running",
+      label: queued ? "Queued" : "Working",
+      hint: queued ? "waiting for a free slot on the engine" : "the next stage is running",
       nodes: [],
       state: "active",
       nodesRun: 0,
@@ -232,7 +240,7 @@ function progressOf(run: EngineRun): Progress {
       ? null
       : ([...steps].reverse().find((step) => step.status === "running")?.name ??
          steps.at(-1)?.name ??
-         "Starting"),
+         (queued ? "Queued, waiting for a free slot" : "Starting")),
     percent: run.finished ? 100 : run.progress?.percent ?? 0,
     nodesExecuted: done,
     // Absent on a run that finished, and on any record written before the
@@ -249,12 +257,29 @@ function progressOf(run: EngineRun): Progress {
   };
 }
 
+/** What a custom run was asked to do, or null for any other run. */
+function customInputsOf(run: EngineRun): CustomInputs | null {
+  const i = run.input;
+  if (!i || run.mode !== "custom") return null;
+  const action = String(i.custom_action ?? "");
+  return {
+    action: action === "add" ? "add" : action === "design" ? "design" : "optimise",
+    page_type_id: String(i.page_type_id ?? ""),
+    page_type_owner: typeof i.page_type_owner === "string" ? i.page_type_owner : null,
+    source_url: String(i.source_url ?? ""),
+    example_urls: Array.isArray(i.example_urls) ? i.example_urls.map((one) => String(one)) : [],
+    design_note: String(i.design_note ?? ""),
+    publish_new_pages: i.publish_new_pages === true,
+  };
+}
+
 function inputsOf(run: EngineRun): RunInputs | null {
   const i = run.input;
   if (!i) return null;
   const num = (v: unknown): number | null =>
     typeof v === "number" && Number.isFinite(v) ? v : null;
   return {
+    custom: customInputsOf(run),
     website_url: (i.website_url as string) ?? null,
     market: (i.market as string) ?? null,
     language: (i.language as string) ?? null,
@@ -270,8 +295,29 @@ function inputsOf(run: EngineRun): RunInputs | null {
   };
 }
 
+/**
+ * What starting a custom run takes.
+ *
+ * Not the optimiser's input: a custom run has no crawl limit, no pages to
+ * choose and no brief, and the engine does not ask it for any. Sending them
+ * anyway only filled its record with settings that read as a whole-site crawl.
+ */
+export type CustomRunInput = Pick<
+  StartRunInput,
+  | "website_url"
+  | "market"
+  | "language"
+  | "custom_action"
+  | "page_type_id"
+  | "page_type_owner"
+  | "example_urls"
+  | "design_note"
+  | "publish_new_pages"
+  | "source_url"
+> & { mode: "custom" };
+
 export async function startRun(
-  input: StartRunInput,
+  input: StartRunInput | CustomRunInput,
   resumeFrom?: string,
 ): Promise<StartRunResult & { mode: string | null }> {
   const startedAt = new Date().toISOString();
@@ -337,7 +383,7 @@ export async function getExecution(id: string): Promise<ExecutionDetail> {
     runMode: run.mode ?? "optimise",
     progress: progressOf(run),
     lastNodeExecuted: run.steps?.at(-1)?.name ?? null,
-    error: run.error,
+    error: run.error ?? null,
     // The engine never withholds a payload, because it never stores one.
     dataUnavailable: null,
     // Counted by the engine while the run ran, not derived here. There is no
@@ -372,6 +418,9 @@ export async function findExecutionStartedAfter(): Promise<ExecutionSummary | nu
  * n8n could not do this — it replayed the workflow snapshot stored with the
  * original execution, which is why a retry there so often reproduced the
  * original failure exactly.
+ *
+ * Not a custom run, which reuses nothing and starts again from the beginning.
+ * See retryExecution below.
  */
 /**
  * Start a run that writes a website from nothing.
@@ -445,8 +494,50 @@ export async function fetchBuiltSite(runId: string): Promise<BuiltSite | null> {
   }
 }
 
-export async function retryExecution(id: string): Promise<{ id: string; status: N8nStatus }> {
+export async function retryExecution(
+  id: string,
+): Promise<{ id: string; status: N8nStatus; note?: string | null }> {
   const run = await call<EngineRun>(`/runs/${encodeURIComponent(id)}`);
+
+  /*
+   * A custom run starts again from the beginning.
+   *
+   * The engine's custom pipeline reads nothing from an earlier run, so naming
+   * one would buy nothing but a note claiming otherwise. A design run cannot be
+   * started again this way at all: it has no page, and drafting again from the
+   * Custom page is the way back.
+   */
+  if (run.mode === "custom") {
+    const custom = customInputsOf(run);
+    if (!custom) throw new Error(`Run ${id} has no recorded input to start again from.`);
+    if (custom.action === "design") {
+      throw new Error(
+        "A run that drafted a page type cannot be started again. Draft again from Create from examples on the Custom page.",
+      );
+    }
+    const { wp_username, wp_password, wp_domain, resume_from, ...carried } =
+      (run.input ?? {}) as Record<string, unknown>;
+    void wp_username; void wp_password; void wp_domain; void resume_from;
+    const website = String(carried.website_url ?? "");
+    if (!website) throw new Error(`Run ${id} has no recorded input to start again from.`);
+
+    // A run recorded before types were kept by owner names none. Its type was
+    // its owner's, so that is the owner sent — not whoever is retrying it.
+    const typeOwner =
+      carried.page_type_id && typeof carried.page_type_owner !== "string"
+        ? { page_type_owner: String(carried.owner ?? "").trim().toLowerCase() }
+        : {};
+
+    const started = await startRun({
+      ...(carried as Partial<CustomRunInput>),
+      ...typeOwner,
+      website_url: website,
+      market: String(carried.market ?? "gb"),
+      language: String(carried.language ?? "en"),
+      mode: "custom",
+    });
+    return { id: started.executionId ?? "", status: "new", note: started.note };
+  }
 
   /**
    * A build has no site to point at, which is the whole point of one.

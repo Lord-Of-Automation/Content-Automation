@@ -489,8 +489,11 @@ export default function Console() {
 
       // n8n makes a new execution for the retry, so follow that one.
       if (payload.id && String(payload.id) !== selectedId) {
+        // A custom run reuses nothing: the engine starts it from the top.
         setNotice(
-          `Retrying #${selectedId} as #${payload.id}, reusing its crawl and any article it finished writing.`
+          detail?.id === selectedId && detail.runMode === "custom"
+            ? `Started #${selectedId} again as #${payload.id}, from the beginning. Every step runs again.`
+            : `Retrying #${selectedId} as #${payload.id}, reusing its crawl and any article it finished writing.`
         );
         selectRun(String(payload.id));
       } else {
@@ -621,7 +624,9 @@ export default function Console() {
           loading={detailLoading}
           onCancel={cancelRun}
           cancelling={cancelling}
-          onRetry={retryRun}
+          // A run that drafted a page type has no page to start again from;
+          // the Custom page drafts again instead.
+          onRetry={detail?.inputs?.custom?.action === "design" ? undefined : retryRun}
           retrying={retrying}
           onPin={pinStep}
           pinning={pinning}

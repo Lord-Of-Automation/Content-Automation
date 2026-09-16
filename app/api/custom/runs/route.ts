@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
+import { viewer } from "@/lib/actor";
 import { record } from "@/lib/audit";
 import { errorResponse, requirePermission } from "@/lib/api-guard";
+import { engineOutdated, wordPressMissing } from "@/lib/customruns";
 import { startRun } from "@/lib/engine";
 import { LANGUAGE_CODES, MARKET_CODES } from "@/lib/markets";
 import {
-  ENGINE_OUTDATED,
   listCustomRuns,
   listPageTypes,
+  ownerOf,
   type CustomAction,
+  type PageType,
 } from "@/lib/pagetypes";
-import { credentialsFor, normaliseDomain } from "@/lib/sites";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,6 +87,15 @@ export async function POST(request: Request) {
 
   const pageTypeId = String(body.page_type_id ?? "").trim();
   if (!/^[\w.-]{0,80}$/.test(pageTypeId)) return bad("That is not a page type.");
+  // Whose type. Ids are only unique per owner, so somebody who sees everybody's
+  // types has to say which one they picked. Absent means their own.
+  const pageTypeOwner =
+    typeof body.page_type_owner === "string"
+      ? body.page_type_owner.trim().toLowerCase()
+      : undefined;
+  if (pageTypeOwner !== undefined && pageTypeOwner.length > 120) {
+    return bad("That is not a page type.");
+  }
 
   // ---- what each job needs
   let websiteUrl = "";
@@ -135,27 +146,52 @@ export async function POST(request: Request) {
   try {
     // Both jobs end by writing to WordPress. Asked now, because the engine
     // would otherwise find out only after it has paid for the page.
-    if (action !== "design" && !(await credentialsFor(websiteUrl))) {
-      return bad(
-        `No WordPress login is saved for ${normaliseDomain(websiteUrl) ?? "this site"}. ` +
-          "Add one on the Website Accounts page first.",
-      );
+    if (action !== "design") {
+      const missing = await wordPressMissing(websiteUrl);
+      if (missing) return bad(missing);
     }
 
     const { pageTypes, engineReady } = await listPageTypes();
-    if (!engineReady) {
-      return NextResponse.json({ error: ENGINE_OUTDATED, kind: "engine-outdated" }, { status: 409 });
-    }
-    // Checked here because the list is already in hand, and a run started with
-    // a type that has since been deleted fails later and less clearly.
-    if (pageTypeId && !pageTypes.some((one) => one.id === pageTypeId)) {
-      return bad("That page type no longer exists. Choose another, or let it be detected.");
+    if (!engineReady) return engineOutdated();
+
+    /*
+     * Which type, exactly, by owner and id. Checked here because the list is
+     * already in hand, and a run started with a type that has since been
+     * deleted fails later and less clearly.
+     *
+     * The same rule the engine applies when the run arrives: the owner named,
+     * or else the caller's own, or else — for somebody who sees everybody's —
+     * the only one there is with that id. The owner found is sent on, so the
+     * engine uses that type and no other, now and on every retry.
+     */
+    let chosen: PageType | null = null;
+    if (pageTypeId && action !== "design") {
+      const withId = pageTypes.filter((one) => one.id === pageTypeId);
+      if (pageTypeOwner !== undefined) {
+        chosen = withId.find((one) => ownerOf(one) === pageTypeOwner) ?? null;
+      } else {
+        const me = await viewer();
+        chosen = withId.find((one) => ownerOf(one) === me.name) ?? null;
+        if (!chosen && me.admin && withId.length > 1) {
+          return bad("Several people keep a page type with this id. Choose it from the list again.");
+        }
+        if (!chosen && me.admin && withId.length === 1) chosen = withId[0]!;
+      }
+      if (!chosen) {
+        return bad("That page type no longer exists. Choose another, or let it be detected.");
+      }
     }
 
+    /*
+     * Only what a custom run reads. The optimiser's settings used to be sent
+     * as well, at their defaults, and the run's record then read as a crawl of
+     * every page on the site.
+     */
     const result = await startRun({
       mode: "custom",
       custom_action: action,
-      page_type_id: action === "design" ? "" : pageTypeId,
+      page_type_id: chosen ? chosen.id : "",
+      ...(chosen ? { page_type_owner: ownerOf(chosen) } : {}),
       website_url: websiteUrl,
       source_url: sourceUrl,
       example_urls: exampleUrls,
@@ -163,24 +199,15 @@ export async function POST(request: Request) {
       market,
       language,
       publish_new_pages: action === "add" && body.publish_new_pages === true,
-      /*
-       * The optimiser's settings, at exactly what the engine assumes when they
-       * are absent. The type insists on them, and a custom run takes its
-       * direction from the page type rather than from any of these.
-       */
-      max_crawl_pages: 0,
-      pages_to_optimise: 0,
-      reuse_crawl_days: 0,
-      exclude_paths: [],
-      brief_doc_id: "",
-      body_classes: {},
     });
 
     const id = result.executionId ?? "";
     await record(
       actor,
       "run-started",
-      `custom ${action} ${target}` + (id ? ` → execution #${id}` : ""),
+      `custom ${action} ${target}` +
+        (chosen ? ` as ${chosen.id}${ownerOf(chosen) ? ` (${ownerOf(chosen)}'s)` : ""}` : "") +
+        (id ? ` → execution #${id}` : ""),
     );
 
     // Said loudly, because it means the engine ran something else — most

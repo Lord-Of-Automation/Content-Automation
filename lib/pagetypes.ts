@@ -24,10 +24,16 @@ import type { CustomRun, DesignDraft, PageType } from "./pagetypeshape";
 export {
   BLOCKS,
   BLOCK_LABELS,
+  PAGE_TYPE_LIMITS,
   POKER_EXAMPLE,
   SCHEMA_TYPES,
+  factKeys,
+  fnv1a,
   idOf,
   keyOf,
+  ownerOf,
+  typeKeyOf,
+  urlPatternOf,
 } from "./pagetypeshape";
 export type {
   Block,
@@ -126,16 +132,34 @@ export function isEngineOutdated(error: unknown): boolean {
 }
 
 /**
+ * A type with its owner always spelled out.
+ *
+ * The engine sends one on every type; an engine from before owners left it off
+ * an unowned one. Empty either way, so the page has one thing to compare.
+ */
+function owned(type: PageType): PageType {
+  return { ...type, owner: String(type.owner ?? "").trim().toLowerCase() };
+}
+
+/**
  * Every type the signed-in person may use, and whether the engine knows the
  * word at all.
  *
  * engineReady is the safety check for starting a run as much as it is a fact
  * for the page to show. See the note at the top of this file.
  */
-export async function listPageTypes(): Promise<{ pageTypes: PageType[]; engineReady: boolean }> {
+export async function listPageTypes(): Promise<{
+  pageTypes: PageType[];
+  engineReady: boolean;
+  problem?: string;
+}> {
   try {
-    const { pageTypes } = await call<{ pageTypes: PageType[] }>("/page-types");
-    return { pageTypes: pageTypes ?? [], engineReady: true };
+    const { pageTypes, problem } = await call<{ pageTypes: PageType[]; problem?: string }>("/page-types");
+    return {
+      pageTypes: (pageTypes ?? []).map(owned),
+      engineReady: true,
+      ...(typeof problem === "string" && problem ? { problem } : {}),
+    };
   } catch (error) {
     if (isEngineOutdated(error)) return { pageTypes: [], engineReady: false };
     throw error;
@@ -145,12 +169,20 @@ export async function listPageTypes(): Promise<{ pageTypes: PageType[]; engineRe
 /**
  * The fields a type is made of, and nothing else.
  *
- * Picked rather than spread, so what the browser adds — an owner, a date, a
- * stray field from a draft — never reaches the engine as if it had been meant.
+ * Picked rather than spread, so what the browser adds — a date, a stray field
+ * from a draft — never reaches the engine as if it had been meant.
+ *
+ * The owner goes only with an edit, where it says whose type is being edited:
+ * somebody with full access sees everybody's, and an id alone does not say
+ * which of two people's "poker-player-biography" was meant. The engine honours
+ * it only for full access and only beside an id, so a new type is always the
+ * saver's, whatever the browser sent.
  */
 function fieldsOf(type: Partial<PageType>): Record<string, unknown> {
+  const id = String(type.id ?? "");
   return {
-    id: String(type.id ?? ""),
+    id,
+    ...(id && typeof type.owner === "string" ? { owner: type.owner.trim().toLowerCase() } : {}),
     name: type.name,
     description: type.description,
     subject: type.subject,
@@ -176,15 +208,26 @@ export async function savePageType(
     method: "PUT",
     body: JSON.stringify({ ...fieldsOf(type), actor }),
   });
-  return { pageType: saved.pageType, pageTypes: saved.pageTypes ?? [] };
+  return {
+    pageType: saved.pageType ? owned(saved.pageType) : saved.pageType,
+    pageTypes: (saved.pageTypes ?? []).map(owned),
+  };
 }
 
-export async function deletePageType(id: string): Promise<PageType[]> {
+/**
+ * Deletes one type and hands back the list as it now is.
+ *
+ * With its owner whenever the page knows it, which is always for a type the
+ * engine listed. Without one the engine takes the caller's own type of that id,
+ * and refuses to guess between two other people's.
+ */
+export async function deletePageType(id: string, owner?: string | null): Promise<PageType[]> {
+  const query = typeof owner === "string" ? `?owner=${encodeURIComponent(owner.trim().toLowerCase())}` : "";
   const { pageTypes } = await call<{ deleted: unknown; pageTypes: PageType[] }>(
-    `/page-types/${encodeURIComponent(id)}`,
+    `/page-types/${encodeURIComponent(id)}${query}`,
     { method: "DELETE" },
   );
-  return pageTypes ?? [];
+  return (pageTypes ?? []).map(owned);
 }
 
 /**
@@ -197,8 +240,13 @@ export async function deletePageType(id: string): Promise<PageType[]> {
 export async function listCustomRuns(limit = 30): Promise<CustomRun[]> {
   const bounded = Math.max(1, Math.min(100, Math.round(limit) || 30));
   try {
-    const { runs } = await call<{ runs: CustomRun[] }>(`/custom/runs?limit=${bounded}`);
-    return runs ?? [];
+    const { runs } = await call<{ runs: Array<Partial<CustomRun>> }>(`/custom/runs?limit=${bounded}`);
+    // An engine from before types had owners sends no pageTypeOwner. Empty is
+    // what the page reads as "nobody's in particular", which is what it was.
+    return (runs ?? []).map((run) => ({
+      ...(run as CustomRun),
+      pageTypeOwner: String(run.pageTypeOwner ?? "").trim().toLowerCase(),
+    }));
   } catch (error) {
     if (isEngineOutdated(error)) return [];
     throw error;

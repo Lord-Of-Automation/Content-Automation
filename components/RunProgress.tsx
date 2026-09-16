@@ -8,7 +8,7 @@ import { runLabel } from "@/lib/runlabel";
 import { formatDuration, formatWhen } from "@/lib/format";
 import { LANGUAGES, MARKETS } from "@/lib/markets";
 import type { ExecutionDetail, N8nStatus } from "@/lib/n8n";
-import type { RunInputs } from "@/lib/inputs";
+import type { CustomInputs, RunInputs } from "@/lib/inputs";
 
 /**
  * Repeated from Console rather than imported from lib/n8n, which would drag the
@@ -30,11 +30,74 @@ function money(value: number): string {
   return "$" + value.toFixed(2);
 }
 
-/** The submitted values, spelled out the way the form asked for them. */
-function inputRows(inputs: RunInputs): { label: string; value: string }[] {
-  const rows: { label: string; value: string }[] = [];
+const CUSTOM_ACTIONS: Record<CustomInputs["action"], string> = {
+  optimise: "Optimise a page",
+  add: "Add a new page",
+  design: "Draft a page type",
+};
 
-  if (inputs.website_url) {
+/**
+ * What a custom run was asked, in the Custom page's words.
+ *
+ * Its own list rather than the optimiser's. A custom run records the crawl
+ * limit and the rest at their defaults, and those read "every page, every
+ * crawled page" on a run that touches one page — which looks exactly like the
+ * whole-site rewrite somebody would stop a run for.
+ */
+function customRows(
+  custom: CustomInputs,
+  inputs: RunInputs,
+  pageTypeLabel: string | undefined,
+): { label: string; value: string }[] {
+  const rows: { label: string; value: string }[] = [
+    { label: "What to do", value: CUSTOM_ACTIONS[custom.action] },
+  ];
+
+  if (custom.action === "design") {
+    if (custom.example_urls.length) {
+      rows.push({ label: "Example pages", value: custom.example_urls.join(", ") });
+    }
+    if (custom.design_note) {
+      rows.push({ label: "What kind of page", value: custom.design_note });
+    }
+    return rows;
+  }
+
+  rows.push({
+    label: "Page type",
+    value: !custom.page_type_id
+      ? "Detected automatically"
+      : (pageTypeLabel ??
+        (custom.page_type_owner
+          ? `${custom.page_type_id} (${custom.page_type_owner}'s)`
+          : custom.page_type_id)),
+  });
+
+  if (custom.action === "optimise") {
+    if (inputs.website_url) rows.push({ label: "Page", value: inputs.website_url });
+  } else {
+    if (inputs.website_url) rows.push({ label: "Website", value: inputs.website_url });
+    if (custom.source_url) rows.push({ label: "Source page", value: custom.source_url });
+    rows.push({
+      label: "Publish immediately",
+      value: custom.publish_new_pages ? "Yes" : "No — saved as a draft in WordPress",
+    });
+  }
+  return rows;
+}
+
+/** The submitted values, spelled out the way the form asked for them. */
+function inputRows(
+  inputs: RunInputs,
+  runMode: ExecutionDetail["runMode"],
+  pageTypeLabel: string | undefined,
+): { label: string; value: string }[] {
+  const rows: { label: string; value: string }[] = [];
+  const custom = runMode === "custom";
+
+  if (custom && inputs.custom) {
+    rows.push(...customRows(inputs.custom, inputs, pageTypeLabel));
+  } else if (inputs.website_url) {
     rows.push({ label: "Website", value: inputs.website_url });
   }
 
@@ -53,6 +116,9 @@ function inputRows(inputs: RunInputs): { label: string; value: string }[] {
       value: match ? `${match.label} (${match.code})` : inputs.language,
     });
   }
+
+  // Nothing below is a custom run's. See customRows.
+  if (custom) return rows;
 
   if (inputs.max_crawl_pages !== null) {
     rows.push({
@@ -268,6 +334,7 @@ export default function RunProgress({
   onPin,
   pinning,
   pinnedSteps,
+  pageTypeLabel,
 }: {
   execution: ExecutionDetail | null;
   loading: boolean;
@@ -289,6 +356,12 @@ export default function RunProgress({
    * run the step. It looked like the pin had not taken.
    */
   pinnedSteps?: Set<string>;
+  /**
+   * The page type a custom run was given, as the caller names it — its name,
+   * and whose it is where that matters. The run records only the id and the
+   * owner, so without this the panel shows those.
+   */
+  pageTypeLabel?: string;
 }) {
   const [confirming, setConfirming] = useState(false);
 
@@ -311,6 +384,9 @@ export default function RunProgress({
   // The detail carries the run's kind, unlike the list it was picked from, so
   // this is the one place that does not have to be told.
   const named = runLabel(execution.id, execution.runMode === "outreach");
+  // A custom run reuses nothing from a failed attempt: trying again starts it
+  // from the top, and every button and sentence here says so.
+  const startsOver = execution.runMode === "custom";
 
   return (
     /*
@@ -364,7 +440,7 @@ export default function RunProgress({
         <div className="inputs">
           <div className="inputs-head">What was asked for</div>
           <dl className="inputs-list">
-            {inputRows(execution.inputs).map((row) => (
+            {inputRows(execution.inputs, execution.runMode, pageTypeLabel).map((row) => (
               <div key={row.label}>
                 <dt>{row.label}</dt>
                 <dd
@@ -385,13 +461,26 @@ export default function RunProgress({
 
       {execution.error ? (
         <div className="alert alert-bad" style={{ marginTop: 16 }}>
-          <strong>Run failed.</strong> {execution.error}
+          <strong>Run failed.</strong>{" "}
+          {startsOver
+            ? // The engine tells every run a restart cut short that it can be
+              // resumed. A custom run cannot, and the sentence after this says so.
+              execution.error.replace(/\s*[—-]\s*resume to carry on from the last finished step\.?$/, ".")
+            : execution.error}
           {onRetry ? (
-            <>
-              {" "}
-              Resume from failure carries on from that node, keeping the crawl
-              and research already paid for.
-            </>
+            startsOver ? (
+              <>
+                {" "}
+                Start again runs the whole job from the beginning. Nothing from
+                this attempt is reused, so every step is paid for again.
+              </>
+            ) : (
+              <>
+                {" "}
+                Resume from failure carries on from that node, keeping the crawl
+                and research already paid for.
+              </>
+            )
           ) : null}
         </div>
       ) : null}
@@ -531,9 +620,19 @@ export default function RunProgress({
             className="btn btn-primary-soft"
             onClick={onRetry}
             disabled={retrying}
-            title="Carry on from the node that failed, keeping the work already done"
+            title={
+              startsOver
+                ? "Run the whole job again from the beginning; every step is paid for again"
+                : "Carry on from the node that failed, keeping the work already done"
+            }
           >
-            {retrying ? "Resuming…" : "Resume from failure"}
+            {startsOver
+              ? retrying
+                ? "Starting…"
+                : "Start again"
+              : retrying
+                ? "Resuming…"
+                : "Resume from failure"}
           </button>
         ) : null}
 

@@ -40,7 +40,12 @@ function refused(error: unknown): NextResponse | null {
   if (isEngineOutdated(error)) {
     return NextResponse.json({ error: ENGINE_OUTDATED, kind: "engine-outdated" }, { status: 409 });
   }
-  if (error instanceof PageTypeEngineError && (error.status === 400 || error.status === 404)) {
+  // 409 is the engine asking whose type was meant, when two people keep one
+  // with the same id and the request did not say.
+  if (
+    error instanceof PageTypeEngineError &&
+    (error.status === 400 || error.status === 404 || error.status === 409)
+  ) {
     return NextResponse.json({ error: error.message }, { status: error.status });
   }
   return null;
@@ -77,13 +82,24 @@ export async function PUT(request: Request) {
   }
 
   try {
+    const asked = String(body.id ?? "").trim();
     const saved = await savePageType(body, actor);
-    const id = saved.pageType?.id ?? "";
+    const type = saved.pageType;
+    const id = type?.id ?? "";
+    const owner = String(type?.owner ?? "");
+    /*
+     * New by what the engine did, not by what was asked. An edit of an id its
+     * owner no longer keeps comes back as a new type under an id of its own,
+     * and a type made just now carries the same moment as made and changed.
+     */
+    const wasNew =
+      !asked || id !== asked || Boolean(type?.createdAt && type.createdAt === type.updatedAt);
     await record(
       actor,
       "pagetype-saved",
-      `${saved.pageType?.name ?? body.name}${id ? ` (${id})` : ""}` +
-        (body.id ? "" : ", new"),
+      `${type?.name ?? body.name}${id ? ` (${id})` : ""}` +
+        `, ${owner ? `${owner}'s` : "nobody's"}` +
+        (wasNew ? ", new" : ""),
     );
     return NextResponse.json(saved);
   } catch (error) {
@@ -97,14 +113,22 @@ export async function DELETE(request: Request) {
 
   const actor = (await auth())?.user?.name ?? "unknown";
 
-  const id = String(new URL(request.url).searchParams.get("id") ?? "").trim();
+  const query = new URL(request.url).searchParams;
+  const id = String(query.get("id") ?? "").trim();
   if (!id) {
     return NextResponse.json({ error: "No page type was named." }, { status: 400 });
   }
+  // Whose. Present, even empty, means exactly that owner's type; absent leaves
+  // the engine to take the caller's own. See lib/pagetypes.ts.
+  const owner = query.has("owner") ? String(query.get("owner") ?? "").trim().toLowerCase() : null;
 
   try {
-    const pageTypes = await deletePageType(id);
-    await record(actor, "pagetype-deleted", id);
+    const pageTypes = await deletePageType(id, owner);
+    await record(
+      actor,
+      "pagetype-deleted",
+      owner === null ? id : `${id}, ${owner ? `${owner}'s` : "nobody's"}`,
+    );
     return NextResponse.json({ pageTypes });
   } catch (error) {
     return refused(error) ?? errorResponse(error);

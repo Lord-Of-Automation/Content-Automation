@@ -7,9 +7,13 @@ import { Select } from "@/components/Select";
 import {
   BLOCKS,
   BLOCK_LABELS,
+  PAGE_TYPE_LIMITS as LIMITS,
   SCHEMA_TYPES,
-  idOf,
+  domainOf,
+  factKeys,
   keyOf,
+  ownerOf,
+  urlPatternOf,
   type Block,
   type PageType,
   type SchemaType,
@@ -27,9 +31,13 @@ import {
  * one entry per line, and only split on the way out. A list field that splits
  * as you type eats the blank line you were about to fill in.
  *
- * Nothing is checked here beyond there being a name. The engine decides what a
- * valid type is and says why when it is not, and that sentence is shown at the
- * top of the sheet where it cannot be missed behind the backdrop.
+ * The engine decides what a valid type is and says why when it is not, and
+ * that sentence is shown at the top of the sheet where it cannot be missed
+ * behind the backdrop. What can be known before saving is said here first,
+ * beside the field: how many of each thing a type may hold, how long an entry
+ * may be, and the entries the engine would otherwise drop or refuse. It used
+ * to trim those without a word, and the sheet closed on "Saved" over a type
+ * that had quietly lost them.
  *
  * Built on <dialog> and showModal, like every other sheet here.
  */
@@ -39,6 +47,7 @@ export type EditorOrigin = "saved" | "new" | "example" | "draft";
 
 type FactRow = {
   uid: number;
+  /** What was typed as the key. Only read while keyChosen is true. */
   key: string;
   label: string;
   hint: string;
@@ -129,9 +138,17 @@ function formOf(type: PageType): Form {
   };
 }
 
-/** One entry per line, blank lines and repeats dropped. */
+/**
+ * One entry per line, blank lines and repeats dropped.
+ *
+ * Spaces inside an entry are made one first, as the engine does before it
+ * compares and counts, so two lines that differ only there are one entry here
+ * too and the count matches the engine's.
+ */
 function lines(text: string): string[] {
-  return [...new Set(text.split(/\r?\n/).map((one) => one.trim()).filter(Boolean))];
+  return [
+    ...new Set(text.split(/\r?\n/).map((one) => one.replace(/\s+/g, " ").trim()).filter(Boolean)),
+  ];
 }
 
 /**
@@ -152,9 +169,50 @@ function tokens(text: string, strip: RegExp | null = null): string[] {
   ];
 }
 
-function typeOf(form: Form): Partial<PageType> {
+/** The facts that are saved, which are the ones with a label, and their keys. */
+function savedFacts(facts: FactRow[]): { rows: FactRow[]; keys: string[] } {
+  const rows = facts.filter((fact) => fact.label.trim());
+  const keys = factKeys(
+    rows.map((fact) => ({ key: fact.keyChosen ? fact.key : "", label: fact.label })),
+  );
+  return { rows, keys };
+}
+
+/** A name the way two are compared: trimmed, one space between words, any case. */
+function sameName(raw: string): string {
+  return raw.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function clip(text: string, most = 40): string {
+  return text.length > most ? `${text.slice(0, most)}…` : text;
+}
+
+/**
+ * Why a list typed one entry per line would be refused, or null.
+ *
+ * The engine refuses more entries than it keeps and an entry longer than it
+ * keeps, naming the field; this says the same before the save.
+ */
+function listProblem(
+  entries: string[],
+  most: number,
+  longest: number,
+  what: string,
+): string | null {
+  if (entries.length > most) return `At most ${most} ${what}. There are ${entries.length}.`;
+  // Measured as the engine keeps it, with runs of spaces made one.
+  const long = entries.find((one) => one.replace(/\s+/g, " ").length > longest);
+  if (long) return `"${clip(long)}" is longer than ${longest} characters.`;
+  return null;
+}
+
+function typeOf(form: Form, owner: string | undefined): Partial<PageType> {
+  const facts = savedFacts(form.facts);
   return {
     id: form.id,
+    // Whose type an edit is, so somebody with full access edits that person's
+    // type rather than making a copy of their own. Ignored on a new type.
+    ...(form.id && owner !== undefined ? { owner } : {}),
     name: form.name.trim(),
     description: form.description.trim(),
     subject: form.subject.trim(),
@@ -164,15 +222,13 @@ function typeOf(form: Form): Partial<PageType> {
       bodyClasses: tokens(form.bodyClasses, /^\.+/),
       examples: tokens(form.examples),
     },
-    facts: form.facts
-      .filter((fact) => fact.label.trim())
-      .map((fact) => ({
-        key: keyOf(fact.key) || keyOf(fact.label),
-        label: fact.label.trim(),
-        hint: fact.hint.trim(),
-        verify: fact.verify,
-        schemaProperty: fact.schemaProperty.trim(),
-      })),
+    facts: facts.rows.map((fact, at) => ({
+      key: facts.keys[at]!,
+      label: fact.label.trim(),
+      hint: fact.hint.trim(),
+      verify: fact.verify,
+      schemaProperty: fact.schemaProperty.trim(),
+    })),
     trustedSources: tokens(form.trustedSources),
     outline: form.outline
       .filter((section) => section.heading.trim())
@@ -206,13 +262,16 @@ export default function PageTypeEditor({
   initial,
   origin,
   existing,
+  viewer,
   onClose,
   onSaved,
 }: {
   initial: PageType;
   origin: EditorOrigin;
-  /** The saved types, to warn when a new one would replace one of them. */
+  /** The saved types the viewer can see, to warn before a name is refused. */
   existing: PageType[];
+  /** Who is signed in. A new type is theirs; an edit stays with its owner. */
+  viewer: string;
   onClose: () => void;
   /** The type as the engine saved it, and the whole list as it now is. */
   onSaved: (saved: PageType, all: PageType[]) => void;
@@ -283,14 +342,14 @@ export default function PageTypeEditor({
   }, [leave, origin]);
 
   async function save() {
-    if (busy || !form.name.trim()) return;
+    if (busy || !form.name.trim() || blocked) return;
     setBusy(true);
     setError(null);
     try {
       const response = await fetch("/api/custom/types", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(typeOf(form)),
+        body: JSON.stringify(typeOf(form, form.id ? ownerOf(initial) : undefined)),
       });
       if (response.status === 401) {
         window.location.href = "/login";
@@ -315,9 +374,9 @@ export default function PageTypeEditor({
       ...current,
       facts: current.facts.map((fact) => {
         if (fact.uid !== uid) return fact;
-        const next = { ...fact, ...patch };
-        if (patch.label !== undefined && !fact.keyChosen) next.key = keyOf(patch.label);
-        return next;
+        // A key nobody chose is worked out from the label when shown and when
+        // saved, not kept here, so it cannot fall behind the label.
+        return { ...fact, ...patch };
       }),
     }));
   }
@@ -358,16 +417,105 @@ export default function PageTypeEditor({
     }));
   }
 
-  // A new type takes its id from its name, and the engine refuses a new one
-  // whose id its owner already keeps. Said before the save rather than after.
-  // Not a block: someone with full access also sees other people's types,
-  // whose names do not stand in the way of their own.
-  const replaces =
-    !form.id && form.name.trim()
-      ? existing.find((one) => one.id === idOf(form.name))
-      : undefined;
+  /*
+   * Everything that can be known to fail before saving, by field.
+   *
+   * A new type is the viewer's; an edit stays with its owner. The engine
+   * refuses a name that owner already uses on another type, when the name is
+   * new for this one — a new type, or a rename. Only that owner's types count:
+   * somebody with full access also sees other people's, whose names do not
+   * stand in the way. Two types that already shared a name can still be
+   * edited, and are only worth a word.
+   */
+  const me = viewer.trim().toLowerCase();
+  const owner = form.id ? ownerOf(initial) : me;
+  const wanted = sameName(form.name);
+  const namesake = wanted
+    ? existing.find(
+        (one) =>
+          ownerOf(one) === owner &&
+          sameName(one.name) === wanted &&
+          !(form.id && one.id === form.id),
+      )
+    : undefined;
+  const renamed = !form.id || sameName(initial.name ?? "") !== wanted;
+  const whose =
+    owner === me ? "You already have" : owner ? `${owner} already has` : "Nobody's types already include";
+
+  const facts = savedFacts(form.facts);
+  const keyByUid = new Map(facts.rows.map((fact, at) => [fact.uid, facts.keys[at]!]));
+  const firstWithKey = new Map<string, number>();
+  facts.rows.forEach((fact, at) => {
+    const key = facts.keys[at]!;
+    if (!firstWithKey.has(key)) firstWithKey.set(key, fact.uid);
+  });
+  const keyClash = (uid: number): string | null => {
+    const key = keyByUid.get(uid);
+    return key && firstWithKey.get(key) !== uid ? key : null;
+  };
+
+  const patternLines = lines(form.urlPatterns);
+  const patterns = patternLines.map(urlPatternOf);
+  // Counted the way the engine counts them: as what is kept, repeats once.
+  const classList = [
+    ...new Set(
+      tokens(form.bodyClasses, /^\.+/)
+        .map((one) => one.replace(/[^A-Za-z0-9_-]/g, ""))
+        .filter(Boolean),
+    ),
+  ];
+  const exampleList = tokens(form.examples);
+  const sourceList = tokens(form.trustedSources);
+  const domains = [...new Set(sourceList.map(domainOf).filter((one) => one.includes(".")))];
+  const ruleLines = lines(form.rules);
+  const avoidLines = lines(form.avoid);
+  const words = Number(form.words) || 0;
+
+  const problems = {
+    name:
+      namesake && renamed
+        ? `${whose} a type called ${namesake.name}. Pick another name${form.id ? "" : ", or close this and edit that one"}.`
+        : null,
+    patterns: patterns.includes("/")
+      ? "A URL pattern of just / would claim every page."
+      : listProblem([...new Set(patterns)], LIMITS.patterns, LIMITS.pattern, "address patterns"),
+    bodyClasses: listProblem(classList, LIMITS.bodyClasses, LIMITS.bodyClass, "body classes"),
+    examples:
+      listProblem(exampleList, LIMITS.examples, LIMITS.example, "examples") ??
+      (() => {
+        const wrong = exampleList.find((one) => !/^https?:\/\//i.test(one));
+        return wrong ? `${clip(wrong)} is not a web address. Include https://` : null;
+      })(),
+    facts:
+      facts.rows.length > LIMITS.facts
+        ? `At most ${LIMITS.facts} facts. There are ${facts.rows.length}.`
+        : facts.rows.some((fact) => keyClash(fact.uid))
+          ? "Two facts have the same key. Give each one a key of its own."
+          : null,
+    sources:
+      (() => {
+        const wrong = sourceList.find((one) => !domainOf(one).includes("."));
+        return wrong ? `${clip(wrong)} is not a domain. Write it like thehendonmob.com.` : null;
+      })() ?? listProblem(domains, LIMITS.sources, LIMITS.source, "trusted sources"),
+    outline:
+      form.outline.filter((one) => one.heading.trim()).length > LIMITS.outline
+        ? `At most ${LIMITS.outline} sections.`
+        : null,
+    rules: listProblem(ruleLines, LIMITS.rules, LIMITS.rule, "writing rules"),
+    avoid: listProblem(avoidLines, LIMITS.rules, LIMITS.rule, "lines of what never to do"),
+    styleFrom:
+      form.styleFrom.trim() && !/^https?:\/\//i.test(form.styleFrom.trim())
+        ? "Give the whole address, starting with https://"
+        : null,
+    words: words > LIMITS.words ? `At most ${LIMITS.words} words.` : null,
+  };
+  const blocked = Object.values(problems).some(Boolean);
+  // What the patterns are kept as, when that is not what was typed.
+  const patternsRewritten =
+    !problems.patterns && patterns.some((one, at) => one !== patternLines[at]);
 
   const title = origin === "saved" && initial.name ? `Edit ${initial.name}` : HEADINGS[origin];
+  const theirs = origin === "saved" && form.id && ownerOf(initial) !== me;
 
   return (
     <dialog className="sheet pt-sheet" ref={shell} aria-labelledby="pt-title">
@@ -377,7 +525,12 @@ export default function PageTypeEditor({
         <div className="sheet-head">
           <div>
             <h2 id="pt-title">{title}</h2>
-            <p>{INTROS[origin]}</p>
+            <p>
+              {INTROS[origin]}
+              {theirs
+                ? ` This is ${ownerOf(initial) ? `${ownerOf(initial)}'s` : "nobody's"} type, and stays theirs when saved.`
+                : ""}
+            </p>
           </div>
           <button
             type="button"
@@ -411,14 +564,17 @@ export default function PageTypeEditor({
                   id="pt-name"
                   type="text"
                   value={form.name}
-                  maxLength={80}
+                  maxLength={LIMITS.name}
                   placeholder="Poker player biography"
+                  aria-invalid={Boolean(problems.name)}
                   onChange={(e) => set("name", e.target.value)}
                 />
-                {replaces ? (
+                {problems.name ? (
+                  <div className="err">{problems.name}</div>
+                ) : namesake ? (
                   <div className="note pt-warn">
-                    A type called {replaces.name} is already saved. Pick another
-                    name, or close this and edit that one.
+                    {whose} another type called {namesake.name}. Two with one name
+                    are hard to tell apart.
                   </div>
                 ) : null}
               </div>
@@ -428,7 +584,7 @@ export default function PageTypeEditor({
                   id="pt-subject"
                   type="text"
                   value={form.subject}
-                  maxLength={40}
+                  maxLength={LIMITS.subject}
                   placeholder="player"
                   onChange={(e) => set("subject", e.target.value)}
                 />
@@ -442,10 +598,14 @@ export default function PageTypeEditor({
                 id="pt-description"
                 rows={4}
                 value={form.description}
-                maxLength={1500}
+                maxLength={LIMITS.description}
                 placeholder="A biography of a professional poker player: who they are, their biggest results… Written for poker fans who want the facts in one place."
                 onChange={(e) => set("description", e.target.value)}
               />
+              <div className="note">
+                Kept as one paragraph: line breaks are not saved.{" "}
+                {form.description.length}/{LIMITS.description}
+              </div>
             </div>
           </section>
 
@@ -467,9 +627,19 @@ export default function PageTypeEditor({
                   spellCheck={false}
                   value={form.urlPatterns}
                   placeholder={"/players/\n/poker-players/"}
+                  aria-invalid={Boolean(problems.patterns)}
                   onChange={(e) => set("urlPatterns", e.target.value)}
                 />
-                <div className="note">One per line. Part of an address that marks such a page.</div>
+                {problems.patterns ? <div className="err">{problems.patterns}</div> : null}
+                <div className="note">
+                  One per line. Part of an address that marks such a page. A
+                  whole address is cut to its path, and every pattern is kept
+                  in lower case, starting with /.{" "}
+                  {new Set(patterns).size} of {LIMITS.patterns}.
+                </div>
+                {patternsRewritten ? (
+                  <div className="note">Saved as: {patterns.join(", ")}</div>
+                ) : null}
               </div>
               <div className="field">
                 <label htmlFor="pt-classes">Body classes</label>
@@ -480,11 +650,14 @@ export default function PageTypeEditor({
                   spellCheck={false}
                   value={form.bodyClasses}
                   placeholder={"single-player"}
+                  aria-invalid={Boolean(problems.bodyClasses)}
                   onChange={(e) => set("bodyClasses", e.target.value)}
                 />
+                {problems.bodyClasses ? <div className="err">{problems.bodyClasses}</div> : null}
                 <div className="note">
                   One per line, as the site&rsquo;s theme puts them on the page.
-                  A whole class attribute pasted in is split for you.
+                  A whole class attribute pasted in is split for you.{" "}
+                  {classList.length} of {LIMITS.bodyClasses}.
                 </div>
               </div>
             </div>
@@ -498,9 +671,14 @@ export default function PageTypeEditor({
                 spellCheck={false}
                 value={form.examples}
                 placeholder="https://example.com/players/some-player/"
+                aria-invalid={Boolean(problems.examples)}
                 onChange={(e) => set("examples", e.target.value)}
               />
-              <div className="note">One per line, for reference. Up to ten.</div>
+              {problems.examples ? <div className="err">{problems.examples}</div> : null}
+              <div className="note">
+                One per line, each a whole address, for reference.{" "}
+                {exampleList.length} of {LIMITS.examples}.
+              </div>
             </div>
           </section>
 
@@ -513,83 +691,94 @@ export default function PageTypeEditor({
               not confirmed. The rest are used when the sources support them.
             </p>
 
+            {problems.facts ? <div className="err pt-list-err">{problems.facts}</div> : null}
             {form.facts.length ? (
               <ul className="pt-rows">
-                {form.facts.map((fact) => (
-                  <li className="pt-row pt-fact" key={fact.uid}>
-                    <label className="pt-cell pt-fact-label">
-                      <span className="pt-cell-name">Label</span>
-                      <input
-                        type="text"
-                        value={fact.label}
-                        maxLength={80}
-                        placeholder="Date of birth"
-                        onChange={(e) => setFact(fact.uid, { label: e.target.value })}
-                      />
-                    </label>
-                    <label className="pt-cell pt-fact-key">
-                      <span className="pt-cell-name">Key</span>
-                      <input
-                        type="text"
-                        className="mono"
-                        spellCheck={false}
-                        value={fact.key}
-                        maxLength={40}
-                        placeholder={keyOf(fact.label) || "birth_date"}
-                        onChange={(e) =>
-                          setFact(fact.uid, { key: e.target.value, keyChosen: true })
-                        }
-                        // Tidied on the way out into the shape the engine keeps,
-                        // and handed back to the label when it is emptied.
-                        onBlur={() => {
-                          const key = keyOf(fact.key) || keyOf(fact.label);
-                          const chosen = Boolean(keyOf(fact.key));
-                          if (key !== fact.key || chosen !== fact.keyChosen) {
-                            setFact(fact.uid, { key, keyChosen: chosen });
+                {form.facts.map((fact) => {
+                  const clash = keyClash(fact.uid);
+                  return (
+                    <li className="pt-row pt-fact" key={fact.uid}>
+                      <label className="pt-cell pt-fact-label">
+                        <span className="pt-cell-name">Label</span>
+                        <input
+                          type="text"
+                          value={fact.label}
+                          maxLength={LIMITS.factLabel}
+                          placeholder="Date of birth"
+                          onChange={(e) => setFact(fact.uid, { label: e.target.value })}
+                        />
+                      </label>
+                      <label className="pt-cell pt-fact-key">
+                        <span className="pt-cell-name">Key</span>
+                        <input
+                          type="text"
+                          className="mono"
+                          spellCheck={false}
+                          // A key nobody chose shows what the label makes of it —
+                          // fact_1 and so on for a label with no Latin letters —
+                          // which is exactly what is saved.
+                          value={fact.keyChosen ? fact.key : (keyByUid.get(fact.uid) ?? "")}
+                          maxLength={LIMITS.factKey}
+                          placeholder={fact.label.trim() ? "" : "made from the label"}
+                          aria-invalid={Boolean(clash)}
+                          onChange={(e) =>
+                            setFact(fact.uid, { key: e.target.value, keyChosen: true })
                           }
-                        }}
-                      />
-                    </label>
-                    <label className="pt-cell pt-fact-schema">
-                      <span className="pt-cell-name">schema.org property</span>
-                      <input
-                        type="text"
-                        className="mono"
-                        spellCheck={false}
-                        value={fact.schemaProperty}
-                        maxLength={60}
-                        placeholder="birthDate"
-                        onChange={(e) => setFact(fact.uid, { schemaProperty: e.target.value })}
-                      />
-                    </label>
-                    <label className="pt-cell pt-fact-hint">
-                      <span className="pt-cell-name">What counts as an answer</span>
-                      <input
-                        type="text"
-                        value={fact.hint}
-                        maxLength={300}
-                        placeholder="day, month and year"
-                        onChange={(e) => setFact(fact.uid, { hint: e.target.value })}
-                      />
-                    </label>
-                    <label className="check pt-fact-verify">
-                      <input
-                        type="checkbox"
-                        checked={fact.verify}
-                        onChange={(e) => setFact(fact.uid, { verify: e.target.checked })}
-                      />
-                      Must be verified
-                    </label>
-                    <button
-                      type="button"
-                      className="btn btn-remove btn-sm pt-fact-drop"
-                      aria-label={`Remove ${fact.label || "this fact"}`}
-                      onClick={() => dropFact(fact.uid)}
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
+                          // Tidied on the way out into the shape the engine keeps,
+                          // and handed back to the label when it is emptied.
+                          onBlur={() => {
+                            if (!fact.keyChosen) return;
+                            const typed = keyOf(fact.key);
+                            if (typed !== fact.key || !typed) {
+                              setFact(fact.uid, { key: typed, keyChosen: Boolean(typed) });
+                            }
+                          }}
+                        />
+                        {clash ? (
+                          <span className="err">A fact above is already {clash}.</span>
+                        ) : null}
+                      </label>
+                      <label className="pt-cell pt-fact-schema">
+                        <span className="pt-cell-name">schema.org property</span>
+                        <input
+                          type="text"
+                          className="mono"
+                          spellCheck={false}
+                          value={fact.schemaProperty}
+                          maxLength={LIMITS.schemaProperty}
+                          placeholder="birthDate"
+                          onChange={(e) => setFact(fact.uid, { schemaProperty: e.target.value })}
+                        />
+                      </label>
+                      <label className="pt-cell pt-fact-hint">
+                        <span className="pt-cell-name">What counts as an answer</span>
+                        <input
+                          type="text"
+                          value={fact.hint}
+                          maxLength={LIMITS.factHint}
+                          placeholder="day, month and year"
+                          onChange={(e) => setFact(fact.uid, { hint: e.target.value })}
+                        />
+                      </label>
+                      <label className="check pt-fact-verify">
+                        <input
+                          type="checkbox"
+                          checked={fact.verify}
+                          onChange={(e) => setFact(fact.uid, { verify: e.target.checked })}
+                        />
+                        Must be verified
+                      </label>
+                      <button
+                        type="button"
+                        className="btn btn-remove btn-sm pt-fact-drop"
+                        aria-label={`Remove ${fact.label || "this fact"}`}
+                        onClick={() => dropFact(fact.uid)}
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p className="quiet pt-none">
@@ -597,13 +786,27 @@ export default function PageTypeEditor({
               </p>
             )}
 
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => change((current) => ({ ...current, facts: [...current.facts, blankFact()] }))}
-            >
-              Add a fact
-            </button>
+            <div className="pt-add">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={form.facts.length >= LIMITS.facts}
+                onClick={() =>
+                  change((current) =>
+                    current.facts.length >= LIMITS.facts
+                      ? current
+                      : { ...current, facts: [...current.facts, blankFact()] },
+                  )
+                }
+              >
+                Add a fact
+              </button>
+              <span className="quiet">
+                {form.facts.length >= LIMITS.facts
+                  ? `That is the most a type can hold (${LIMITS.facts}).`
+                  : `${facts.rows.length} of ${LIMITS.facts}.`}
+              </span>
+            </div>
 
             <div className="field pt-after-rows">
               <label htmlFor="pt-sources">Trusted sources</label>
@@ -614,11 +817,13 @@ export default function PageTypeEditor({
                 spellCheck={false}
                 value={form.trustedSources}
                 placeholder={"thehendonmob.com\nwsop.com"}
+                aria-invalid={Boolean(problems.sources)}
                 onChange={(e) => set("trustedSources", e.target.value)}
               />
+              {problems.sources ? <div className="err">{problems.sources}</div> : null}
               <div className="note">
                 One domain per line, most trusted first. The research reads
-                these before anything else.
+                these before anything else. {domains.length} of {LIMITS.sources}.
               </div>
             </div>
           </section>
@@ -631,6 +836,7 @@ export default function PageTypeEditor({
               say {"{name}"} where the subject&rsquo;s name belongs.
             </p>
 
+            {problems.outline ? <div className="err pt-list-err">{problems.outline}</div> : null}
             {form.outline.length ? (
               <ol className="pt-rows">
                 {form.outline.map((section, at) => (
@@ -643,7 +849,7 @@ export default function PageTypeEditor({
                       <input
                         type="text"
                         value={section.heading}
-                        maxLength={120}
+                        maxLength={LIMITS.heading}
                         placeholder="Career highlights"
                         onChange={(e) => setSection(section.uid, { heading: e.target.value })}
                       />
@@ -653,7 +859,7 @@ export default function PageTypeEditor({
                       <textarea
                         rows={2}
                         value={section.guidance}
-                        maxLength={600}
+                        maxLength={LIMITS.guidance}
                         placeholder="the results and moments that define the career, in order"
                         onChange={(e) => setSection(section.uid, { guidance: e.target.value })}
                       />
@@ -695,15 +901,27 @@ export default function PageTypeEditor({
               <p className="quiet pt-none">No sections yet. A type needs at least one.</p>
             )}
 
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() =>
-                change((current) => ({ ...current, outline: [...current.outline, blankSection()] }))
-              }
-            >
-              Add a section
-            </button>
+            <div className="pt-add">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={form.outline.length >= LIMITS.outline}
+                onClick={() =>
+                  change((current) =>
+                    current.outline.length >= LIMITS.outline
+                      ? current
+                      : { ...current, outline: [...current.outline, blankSection()] },
+                  )
+                }
+              >
+                Add a section
+              </button>
+              <span className="quiet">
+                {form.outline.length >= LIMITS.outline
+                  ? `That is the most an outline can hold (${LIMITS.outline}).`
+                  : `${form.outline.length} of ${LIMITS.outline}.`}
+              </span>
+            </div>
           </section>
 
           {/* ------------------------------------------------ writing */}
@@ -722,8 +940,13 @@ export default function PageTypeEditor({
                   rows={5}
                   value={form.rules}
                   placeholder={"Write in the third person.\nGive every figure with its year."}
+                  aria-invalid={Boolean(problems.rules)}
                   onChange={(e) => set("rules", e.target.value)}
                 />
+                {problems.rules ? <div className="err">{problems.rules}</div> : null}
+                <div className="note">
+                  {ruleLines.length} of {LIMITS.rules} lines, each up to {LIMITS.rule} characters.
+                </div>
               </div>
               <div className="field">
                 <label htmlFor="pt-avoid">Never</label>
@@ -732,8 +955,13 @@ export default function PageTypeEditor({
                   rows={5}
                   value={form.avoid}
                   placeholder={"Invent quotes or anecdotes.\nGive gambling advice."}
+                  aria-invalid={Boolean(problems.avoid)}
                   onChange={(e) => set("avoid", e.target.value)}
                 />
+                {problems.avoid ? <div className="err">{problems.avoid}</div> : null}
+                <div className="note">
+                  {avoidLines.length} of {LIMITS.rules} lines, each up to {LIMITS.rule} characters.
+                </div>
               </div>
             </div>
           </section>
@@ -782,13 +1010,18 @@ export default function PageTypeEditor({
                   id="pt-words"
                   type="number"
                   min={0}
-                  max={6000}
+                  max={LIMITS.words}
                   step={50}
                   value={form.words}
                   placeholder="0"
+                  aria-invalid={Boolean(problems.words)}
                   onChange={(e) => set("words", e.target.value)}
                 />
-                <div className="note">0 lets the competing pages decide.</div>
+                {problems.words ? (
+                  <div className="err">{problems.words}</div>
+                ) : (
+                  <div className="note">0 lets the competing pages decide.</div>
+                )}
               </div>
             </div>
 
@@ -801,7 +1034,7 @@ export default function PageTypeEditor({
                   className="mono"
                   spellCheck={false}
                   value={form.postType}
-                  maxLength={40}
+                  maxLength={LIMITS.postType}
                   placeholder="page"
                   onChange={(e) => set("postType", e.target.value)}
                 />
@@ -814,25 +1047,35 @@ export default function PageTypeEditor({
                   type="url"
                   inputMode="url"
                   value={form.styleFrom}
+                  maxLength={LIMITS.styleFrom}
                   placeholder="https://yoursite.com/players/an-existing-player/"
+                  aria-invalid={Boolean(problems.styleFrom)}
                   onChange={(e) => set("styleFrom", e.target.value)}
                 />
-                <div className="note">
-                  An existing page whose template and layout new pages take.
-                </div>
+                {problems.styleFrom ? (
+                  <div className="err">{problems.styleFrom}</div>
+                ) : (
+                  <div className="note">
+                    The whole address of an existing page whose template and
+                    layout new pages take.
+                  </div>
+                )}
               </div>
             </div>
           </section>
         </div>
 
         <div className="sheet-foot">
+          {blocked ? (
+            <span className="err pt-foot-err">Fix what is marked above to save.</span>
+          ) : null}
           <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void leave()}>
             Cancel
           </button>
           <button
             type="button"
             className="btn btn-primary"
-            disabled={busy || !form.name.trim()}
+            disabled={busy || !form.name.trim() || blocked}
             onClick={() => void save()}
           >
             {busy ? "Saving…" : form.id ? "Save changes" : "Save page type"}

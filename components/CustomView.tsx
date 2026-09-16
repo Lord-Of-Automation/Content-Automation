@@ -13,6 +13,9 @@ import { LANGUAGES, MARKETS, MARKET_DEFAULT_LANGUAGE } from "@/lib/markets";
 import {
   BLOCK_LABELS,
   POKER_EXAMPLE,
+  ownerOf,
+  typeKeyOf,
+  typeKeyParts,
   type CustomAction,
   type CustomRun,
   type DesignDraft,
@@ -36,7 +39,19 @@ import type { ExecutionDetail, N8nStatus } from "@/lib/n8n";
  *
  * Kept apart from the Runs page on purpose. That page is the optimiser and has
  * years of habits built on it; nothing here changes what it does.
+ *
+ * A type is always named by its owner and its id together. Ids are only unique
+ * per person, and somebody with full access sees everybody's, so two rows here
+ * can share an id; keying, deleting, editing or running by the id alone picked
+ * whichever the engine happened to find first.
  */
+
+/** Who is looking. Passed down by the page, which has the session. */
+export interface Viewer {
+  name: string;
+  /** Sees everybody's types and runs, not only their own. */
+  admin: boolean;
+}
 
 type Tab = "types" | "design" | "run";
 
@@ -44,6 +59,11 @@ type Tab = "types" | "design" | "run";
 interface Inputs {
   action: Exclude<CustomAction, "design">;
   pageTypeId: string;
+  /**
+   * Whose type that is. Null on a choice remembered from before types had
+   * owners, which means the viewer's own, or the only one with that id.
+   */
+  pageTypeOwner: string | null;
   pageUrl: string;
   siteUrl: string;
   sourceUrl: string;
@@ -55,6 +75,7 @@ interface Inputs {
 const DEFAULT_INPUTS: Inputs = {
   action: "optimise",
   pageTypeId: "",
+  pageTypeOwner: null,
   pageUrl: "",
   siteUrl: "",
   sourceUrl: "",
@@ -94,6 +115,31 @@ const SELECTED_KEY = "ca:custom:selected";
 const DETAIL_POLL = 4_000;
 const DRAFT_POLL = 4_000;
 const LIST_POLL = 15_000;
+/**
+ * How many answers of "no such run" to sit through before believing one.
+ *
+ * A run the engine has just accepted can be waiting for a slot, and an engine
+ * that keeps no record until a run starts says it does not exist. A few polls
+ * covers that; a run that is still missing after them is really gone.
+ */
+const MISSING_GRACE = 4;
+const DRAFT_MISSING_GRACE = 5;
+
+/** What to say when the engine restarted a run under a new id. */
+const RESTARTED_NOTE =
+  "The engine restarted during this run; it continues as a new run in the list.";
+
+/**
+ * The run that carries on from this one, when the engine restarted it.
+ *
+ * An engine that restarts mid-run starts the interrupted run again under a new
+ * id on its way back up, and writes "Already auto-resumed as <id>" on the old
+ * one's error. That sentence is the only pointer there is, so it is read here.
+ */
+function successorOf(error: string | null | undefined): string | null {
+  const found = String(error ?? "").match(/auto-resumed as ([\w-]+)/);
+  return found ? found[1]! : null;
+}
 
 const ACTION_WORDS: Record<CustomAction, string> = {
   optimise: "Optimise",
@@ -157,12 +203,26 @@ function excerpt(text: string, most = 220): string {
  * answers arriving out of order are written once. The guard matters because
  * somebody clicking through the list outruns the requests: without it the
  * answer for the run they left overwrites the one they are now reading.
+ *
+ * Asked of the engine directly (/api/custom/runs/<id>), not through the Runs
+ * page's route, which goes wherever RUN_BACKEND points. Custom runs only ever
+ * run on the engine.
+ *
+ * A queued run reads as queued and is polled like any other that has not
+ * finished. A "no such run" is sat through a few times before it is believed,
+ * since a run accepted a moment ago may not have a record yet, and once it is
+ * believed the polling stops.
  */
 function useRunDetail(id: string | null, onGone: (id: string, message: string) => void) {
   const [detail, setDetail] = useState<ExecutionDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The id the engine has said, several times over, it does not have. */
+  const [lost, setLost] = useState<string | null>(null);
+  /** Still inside the grace for a run that has not appeared yet. */
+  const [waiting, setWaiting] = useState(false);
   const wanted = useRef<string | null>(null);
+  const misses = useRef<{ id: string | null; count: number }>({ id: null, count: 0 });
 
   // Held in a ref so a caller passing a fresh function each render does not
   // restart the polling every time.
@@ -173,7 +233,9 @@ function useRunDetail(id: string | null, onGone: (id: string, message: string) =
     wanted.current = runId;
     setLoading(true);
     try {
-      const response = await fetch(`/api/runs/${encodeURIComponent(runId)}`, { cache: "no-store" });
+      const response = await fetch(`/api/custom/runs/${encodeURIComponent(runId)}`, {
+        cache: "no-store",
+      });
       if (wanted.current !== runId) return;
       if (response.status === 401) {
         window.location.href = "/login";
@@ -183,10 +245,20 @@ function useRunDetail(id: string | null, onGone: (id: string, message: string) =
       if (wanted.current !== runId) return;
 
       if (response.status === 404) {
+        const seen = misses.current.id === runId ? misses.current.count + 1 : 1;
+        misses.current = { id: runId, count: seen };
+        if (seen < MISSING_GRACE) {
+          setWaiting(true);
+          return;
+        }
+        setWaiting(false);
         setDetail(null);
+        setLost(runId);
         gone.current(runId, payload.error ?? "That run no longer exists.");
         return;
       }
+      misses.current = { id: runId, count: 0 };
+      setWaiting(false);
       if (!response.ok) throw new Error(payload.error ?? "That run could not be read.");
       setDetail(payload.execution ?? null);
       setError(null);
@@ -201,8 +273,11 @@ function useRunDetail(id: string | null, onGone: (id: string, message: string) =
 
   useEffect(() => {
     wanted.current = id;
+    misses.current = { id, count: 0 };
     setDetail(null);
     setError(null);
+    setWaiting(false);
+    setLost(null);
     if (id) void load(id);
     else setLoading(false);
   }, [id, load]);
@@ -212,16 +287,19 @@ function useRunDetail(id: string | null, onGone: (id: string, message: string) =
   const current = detail && detail.id === id ? detail : null;
   const status = current?.status;
   useEffect(() => {
-    if (!id || isTerminal(status)) return;
+    if (!id || isTerminal(status) || lost === id) return;
     const timer = window.setInterval(() => void load(id), DETAIL_POLL);
     return () => window.clearInterval(timer);
-  }, [id, status, load]);
+  }, [id, status, lost, load]);
 
-  return { detail: current, loading, error, reload: load };
+  return { detail: current, loading: loading || waiting, error, reload: load };
 }
 
-export default function CustomView() {
+export default function CustomView({ viewer }: { viewer: Viewer }) {
   const ask = useAsk();
+  const me = viewer.name.trim().toLowerCase();
+  /** Whether a type or run is somebody else's, which is only ever shown to full access. */
+  const othersOwn = (owner: string) => viewer.admin && owner !== me;
   const { toasts, push, dismiss } = useToasts();
 
   const [tab, setTab] = useState<Tab>("types");
@@ -232,6 +310,7 @@ export default function CustomView() {
   const [engineReady, setEngineReady] = useState<boolean | null>(null);
   const [typesLoading, setTypesLoading] = useState(true);
   const [typesError, setTypesError] = useState<string | null>(null);
+  /** The type being deleted, as typeKeyOf names it. */
   const [deleting, setDeleting] = useState<string | null>(null);
   const [editor, setEditor] = useState<{
     type: PageType;
@@ -284,7 +363,8 @@ export default function CustomView() {
       if (!response.ok) throw new Error(payload.error ?? "The page types could not be read.");
       setPageTypes(payload.pageTypes ?? []);
       setEngineReady(payload.engineReady !== false);
-      setTypesError(null);
+      // An engine that cannot read its file lists nothing and says why.
+      setTypesError(typeof payload.problem === "string" && payload.problem ? payload.problem : null);
     } catch (e) {
       setTypesError(e instanceof Error ? e.message : "The page types could not be read.");
     } finally {
@@ -334,6 +414,23 @@ export default function CustomView() {
     setDesignError(message);
   }, []);
 
+  /*
+   * The engine restarted a run and carries it on under a new id. Noticed once
+   * per run, and the list read again so the new one is there to pick. Said
+   * out loud only where the page follows the new run by itself; a picked run
+   * says it beside the run instead.
+   */
+  const restartsSeen = useRef(new Set<string>());
+  const noteRestart = useCallback(
+    (from: string, say: boolean) => {
+      if (restartsSeen.current.has(from)) return;
+      restartsSeen.current.add(from);
+      if (say) push("ok", RESTARTED_NOTE);
+      void loadRuns();
+    },
+    [push, loadRuns],
+  );
+
   const chosen = useRunDetail(selected, forgetSelected);
   // The same run in both places is asked about once.
   const followed = useRunDetail(designRun && designRun !== selected ? designRun : null, forgetDesign);
@@ -377,10 +474,10 @@ export default function CustomView() {
     setEditor({ type, origin, key: Date.now() });
   }, []);
 
-  // A draft is always new. Whatever id the engine gave it, saving it must not
-  // land on top of a type that happens to share it.
+  // A draft is always new, and always the viewer's. Whatever id or owner the
+  // engine gave it, saving it must not land on top of a type that shares them.
   const openDraft = useCallback(
-    (draft: PageType) => openEditor({ ...draft, id: "" }, "draft"),
+    (draft: PageType) => openEditor({ ...draft, id: "", owner: undefined }, "draft"),
     [openEditor],
   );
 
@@ -410,9 +507,13 @@ export default function CustomView() {
     });
     if (!sure) return;
 
-    setDeleting(type.id);
+    const owner = ownerOf(type);
+    setDeleting(typeKeyOf(owner, type.id));
     try {
-      const response = await fetch(`/api/custom/types?id=${encodeURIComponent(type.id)}`, {
+      // With the owner, always: two people's types can share the id, and the
+      // one on this row is the one meant.
+      const query = new URLSearchParams({ id: type.id, owner });
+      const response = await fetch(`/api/custom/types?${query.toString()}`, {
         method: "DELETE",
       });
       if (response.status === 401) {
@@ -484,10 +585,31 @@ export default function CustomView() {
     return { id: String(payload.executionId), note: payload.note ? ` ${payload.note}` : "" };
   }
 
-  // A saved type that has since gone is sent as "detect", not as a dead id.
-  const typeId = pageTypes.some((one) => one.id === inputs.pageTypeId) ? inputs.pageTypeId : "";
-  const chosenType = pageTypes.find((one) => one.id === typeId) ?? null;
+  /*
+   * The type picked on the Run tab, by owner and id.
+   *
+   * A choice remembered from before owners names only an id, and means the
+   * viewer's own type, or the only one there is. A saved type that has since
+   * gone is sent as "detect", not as a dead id.
+   */
+  const chosenType = (() => {
+    if (!inputs.pageTypeId) return null;
+    const withId = pageTypes.filter((one) => one.id === inputs.pageTypeId);
+    if (inputs.pageTypeOwner !== null && inputs.pageTypeOwner !== undefined) {
+      return withId.find((one) => ownerOf(one) === inputs.pageTypeOwner) ?? null;
+    }
+    return withId.find((one) => ownerOf(one) === me) ?? (withId.length === 1 ? withId[0]! : null);
+  })();
+  const chosenKey = chosenType ? typeKeyOf(ownerOf(chosenType), chosenType.id) : "";
   const optimising = inputs.action === "optimise";
+
+  function pickType(type: PageType | null) {
+    setInputs((current) => ({
+      ...current,
+      pageTypeId: type ? type.id : "",
+      pageTypeOwner: type ? ownerOf(type) : null,
+    }));
+  }
 
   const pageProblem = (() => {
     if (!inputs.pageUrl.trim()) return null;
@@ -519,7 +641,8 @@ export default function CustomView() {
     try {
       const started = await start({
         action: inputs.action,
-        page_type_id: typeId,
+        page_type_id: chosenType ? chosenType.id : "",
+        ...(chosenType ? { page_type_owner: ownerOf(chosenType) } : {}),
         website_url: optimising ? inputs.pageUrl.trim() : inputs.siteUrl.trim(),
         source_url: optimising ? "" : inputs.sourceUrl.trim(),
         publish_new_pages: !optimising && inputs.publishNow,
@@ -596,6 +719,7 @@ export default function CustomView() {
     if (!designRun) return;
     let stopped = false;
     let timer: number | undefined;
+    let missing = 0;
 
     const check = async () => {
       try {
@@ -611,6 +735,11 @@ export default function CustomView() {
         if (stopped) return;
 
         if (!response.ok) {
+          // A run accepted a moment ago may have no record yet. Asked again a
+          // few times before it is taken for gone.
+          if (response.status === 404 && ++missing < DRAFT_MISSING_GRACE) {
+            throw new Error("the run has not started yet");
+          }
           // These will not get better by asking again.
           if ([400, 403, 404, 409].includes(response.status)) {
             setDesignError(payload.error ?? "The draft could not be read.");
@@ -619,8 +748,18 @@ export default function CustomView() {
           throw new Error(payload.error ?? "The draft could not be read.");
         }
 
+        missing = 0;
         const state = payload as DesignDraft;
         setDesignHiccup(null);
+        // The engine restarted and drafts again under a new id. Followed, so
+        // the draft still opens here when it is ready.
+        const successor = state.finished && !state.draft ? successorOf(state.error) : null;
+        if (successor && successor !== designRun) {
+          noteRestart(designRun, true);
+          setDesignError(null);
+          setDesignRun(successor);
+          return;
+        }
         if (state.finished) {
           if (state.draft) {
             setDesignDraft(state.draft);
@@ -653,7 +792,7 @@ export default function CustomView() {
       stopped = true;
       window.clearTimeout(timer);
     };
-  }, [designRun, openDraft, push]);
+  }, [designRun, openDraft, push, noteRestart]);
 
   /** A finished design run picked from the list, opened again. */
   async function reopenDraft(id: string) {
@@ -685,7 +824,9 @@ export default function CustomView() {
   async function stop(id: string, done: () => void, setBusy: (busy: boolean) => void) {
     setBusy(true);
     try {
-      const response = await fetch(`/api/runs/${encodeURIComponent(id)}/stop`, { method: "POST" });
+      const response = await fetch(`/api/custom/runs/${encodeURIComponent(id)}/stop`, {
+        method: "POST",
+      });
       if (response.status === 401) {
         window.location.href = "/login";
         return;
@@ -702,12 +843,18 @@ export default function CustomView() {
     }
   }
 
+  /**
+   * Starts the picked run again, from the beginning.
+   *
+   * The custom pipeline reuses nothing from an earlier attempt, so this is a
+   * new run doing all of the work, and it is described as one.
+   */
   async function retry() {
     if (!selected) return;
     const from = selected;
     setRetrying(true);
     try {
-      const response = await fetch(`/api/runs/${encodeURIComponent(from)}/retry`, {
+      const response = await fetch(`/api/custom/runs/${encodeURIComponent(from)}/retry`, {
         method: "POST",
       });
       if (response.status === 401) {
@@ -715,28 +862,63 @@ export default function CustomView() {
         return;
       }
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "The run could not be resumed.");
+      if (!response.ok) {
+        if (payload.kind === "engine-outdated") setEngineReady(false);
+        throw new Error(payload.error ?? "The run could not be started again.");
+      }
 
-      // The engine starts a new run for a retry, so that is the one to watch.
+      // A new run, with a new id, and that is the one to watch.
+      const note = payload.note ? ` ${payload.note}` : "";
       if (payload.id && String(payload.id) !== from) {
-        push("ok", `Retrying ${from} as ${payload.id}, reusing what the first attempt paid for.`);
+        push("ok", `Started ${from} again as ${payload.id}, from the beginning.${note}`);
         selectRun(String(payload.id));
       } else {
-        push("ok", `Resumed ${from}.`);
+        push("ok", `Started ${from} again, from the beginning.${note}`);
         void chosen.reload(from);
       }
       void loadRuns();
     } catch (e) {
-      push("bad", e instanceof Error ? e.message : "The run could not be resumed.");
+      push("bad", e instanceof Error ? e.message : "The run could not be started again.");
     } finally {
       setRetrying(false);
     }
   }
 
   const selectedRun = runs.find((one) => one.id === selected) ?? null;
+  // What the picked run was, from the run itself where it says, since the
+  // list holds only the newest thirty and may not hold this one.
+  const selectedAction = chosen.detail?.inputs?.custom?.action ?? selectedRun?.action ?? null;
+  // Where the engine carried an interrupted run on under a new id.
+  const selectedSuccessor =
+    chosen.detail && isTerminal(chosen.detail.status) ? successorOf(chosen.detail.error) : null;
   // A design run has no page to start again from, and the retry route refuses
-  // one for exactly that reason. Drafting again is the way back.
-  const retryable = selectedRun?.action !== "design";
+  // one for exactly that reason; drafting again is the way back. A run the
+  // engine already carried on would be paid for twice. And a run nothing says
+  // the kind of is not offered the button at all.
+  const retryable =
+    (selectedAction === "optimise" || selectedAction === "add") && !selectedSuccessor;
+
+  useEffect(() => {
+    if (selected && selectedSuccessor) noteRestart(selected, false);
+  }, [selected, selectedSuccessor, noteRestart]);
+
+  /** A type's name, with whose it is when that is not the viewer. */
+  const typeLabel = (name: string, owner: string) =>
+    othersOwn(owner) ? `${name} (${owner ? `${owner}'s` : "nobody's"})` : name;
+
+  // The picked run's type as the page names it. The run records the id and
+  // the owner; the name comes from the list, or from the types themselves.
+  const selectedTypeLabel = (() => {
+    const custom = chosen.detail?.inputs?.custom ?? null;
+    const id = custom?.page_type_id || selectedRun?.pageTypeId || "";
+    if (!id) return undefined;
+    const owner = custom?.page_type_owner ?? selectedRun?.pageTypeOwner ?? "";
+    const name =
+      selectedRun?.pageTypeName ||
+      pageTypes.find((one) => one.id === id && ownerOf(one) === owner)?.name ||
+      id;
+    return typeLabel(name, owner);
+  })();
 
   // ------------------------------------------------------------ render
 
@@ -862,60 +1044,69 @@ export default function CustomView() {
                 </div>
               ) : (
                 <ul className="prompt-list">
-                  {pageTypes.map((one) => (
-                    <li className="prompt" key={one.id}>
-                      <div className="prompt-head">
-                        <strong>{one.name}</strong>
-                        <span className="prompt-when">
-                          {one.updatedBy ? `${one.updatedBy}, ` : ""}
-                          {formatWhen(one.updatedAt || null)}
-                        </span>
-                        <div className="spacer" />
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          disabled={!ready}
-                          title={ready ? "Use this type on the Run tab" : "The engine needs updating first"}
-                          onClick={() => {
-                            setInput("pageTypeId", one.id);
-                            setTab("run");
-                          }}
-                        >
-                          Run with it
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          disabled={deleting === one.id}
-                          onClick={() => openEditor(one, "saved")}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm prompt-drop"
-                          disabled={deleting === one.id}
-                          onClick={() => void remove(one)}
-                        >
-                          {deleting === one.id ? "Deleting…" : "Delete"}
-                        </button>
-                      </div>
-                      {one.description ? <p className="pt-desc">{excerpt(one.description)}</p> : null}
-                      <div className="pt-tags">
-                        {one.blocks.map((block) => (
-                          <span className="pill pill-idle" key={block}>
-                            {BLOCK_LABELS[block] ?? block}
+                  {pageTypes.map((one) => {
+                    const owner = ownerOf(one);
+                    const key = typeKeyOf(owner, one.id);
+                    return (
+                      <li className="prompt" key={key}>
+                        <div className="prompt-head">
+                          <strong>{one.name}</strong>
+                          {othersOwn(owner) ? (
+                            <span className="pill pill-idle" title="Whose type this is">
+                              {owner ? `${owner}'s` : "nobody's"}
+                            </span>
+                          ) : null}
+                          <span className="prompt-when">
+                            {one.updatedBy ? `${one.updatedBy}, ` : ""}
+                            {formatWhen(one.updatedAt || null)}
                           </span>
-                        ))}
-                        {one.schemaType ? <span className="pill pill-run">{one.schemaType}</span> : null}
-                        <span className="quiet">
-                          {one.facts.length} fact{one.facts.length === 1 ? "" : "s"} ·{" "}
-                          {one.outline.length} section{one.outline.length === 1 ? "" : "s"}
-                          {one.words ? ` · about ${one.words} words` : ""}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
+                          <div className="spacer" />
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            disabled={!ready}
+                            title={ready ? "Use this type on the Run tab" : "The engine needs updating first"}
+                            onClick={() => {
+                              pickType(one);
+                              setTab("run");
+                            }}
+                          >
+                            Run with it
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            disabled={deleting === key}
+                            onClick={() => openEditor(one, "saved")}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm prompt-drop"
+                            disabled={deleting === key}
+                            onClick={() => void remove(one)}
+                          >
+                            {deleting === key ? "Deleting…" : "Delete"}
+                          </button>
+                        </div>
+                        {one.description ? <p className="pt-desc">{excerpt(one.description)}</p> : null}
+                        <div className="pt-tags">
+                          {one.blocks.map((block) => (
+                            <span className="pill pill-idle" key={block}>
+                              {BLOCK_LABELS[block] ?? block}
+                            </span>
+                          ))}
+                          {one.schemaType ? <span className="pill pill-run">{one.schemaType}</span> : null}
+                          <span className="quiet">
+                            {one.facts.length} fact{one.facts.length === 1 ? "" : "s"} ·{" "}
+                            {one.outline.length} section{one.outline.length === 1 ? "" : "s"}
+                            {one.words ? ` · about ${one.words} words` : ""}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
@@ -1077,11 +1268,29 @@ export default function CustomView() {
                 <Select
                   id="custom-type"
                   labelledBy="custom-type-label"
-                  value={typeId}
-                  onChange={(value) => setInput("pageTypeId", value)}
+                  value={chosenKey}
+                  onChange={(value) => {
+                    const parts = typeKeyParts(value);
+                    pickType(
+                      parts
+                        ? (pageTypes.find(
+                            (one) => one.id === parts.id && ownerOf(one) === parts.owner,
+                          ) ?? null)
+                        : null,
+                    );
+                  }}
                   options={[
                     { value: "", label: "Detect automatically" },
-                    ...pageTypes.map((one) => ({ value: one.id, label: one.name })),
+                    ...pageTypes.map((one) => {
+                      const owner = ownerOf(one);
+                      return {
+                        value: typeKeyOf(owner, one.id),
+                        label: one.name,
+                        // Whose, where two people's types can sit side by side.
+                        hint: othersOwn(owner) ? (owner ? `${owner}'s` : "nobody's") : undefined,
+                        search: owner,
+                      };
+                    }),
                   ]}
                 />
                 <div className="note">
@@ -1204,15 +1413,18 @@ export default function CustomView() {
         </div>
 
         <div className="card-body">
+          {/* Above the list rather than instead of it: one failed refresh of
+              the list is no reason to take away the run being watched. */}
+          {runsError && !runsLoading ? <div className="notice bad">{runsError}</div> : null}
           {runsLoading ? (
             <p className="provider-hint history-empty">Reading the runs…</p>
-          ) : runsError ? (
-            <div className="notice bad">{runsError}</div>
           ) : !runs.length && !selected ? (
-            <p className="provider-hint history-empty">
-              No custom runs yet. The first one you start appears here, and
-              stays whatever happens to it.
-            </p>
+            runsError ? null : (
+              <p className="provider-hint history-empty">
+                No custom runs yet. The first one you start appears here, and
+                stays whatever happens to it.
+              </p>
+            )
           ) : (
             <div className="mail-runs">
               {/* Beside the run rather than above it, so reading one after
@@ -1229,8 +1441,11 @@ export default function CustomView() {
                     <StatusBadge status={statusOf(one.status)} />
                     <span className="mail-run-anchor">
                       {ACTION_WORDS[one.action] ?? one.action} ·{" "}
-                      {one.pageTypeName ||
-                        (one.action === "design" ? "a new type" : "type detected")}
+                      {one.pageTypeName
+                        ? typeLabel(one.pageTypeName, one.pageTypeOwner ?? "")
+                        : one.action === "design"
+                          ? "a new type"
+                          : "type detected"}
                     </span>
                     <span className="mail-run-id mono" title={one.target}>
                       {shortAddress(one.target)}
@@ -1242,20 +1457,33 @@ export default function CustomView() {
 
               <div className="mail-runs-one">
                 {chosen.error ? <div className="notice bad">{chosen.error}</div> : null}
-                {selectedRun?.action === "design" && chosen.detail?.status === "success" ? (
+                {selected && selectedAction === "design" && chosen.detail?.status === "success" ? (
                   <div className="pt-run-tools">
                     <button
                       type="button"
                       className="btn btn-primary btn-sm"
                       disabled={reopening}
-                      onClick={() => void reopenDraft(selectedRun.id)}
+                      onClick={() => void reopenDraft(selected)}
                     >
                       {reopening ? "Opening…" : "Review the drafted page type"}
                     </button>
                   </div>
                 ) : null}
+                {selectedSuccessor ? (
+                  <div className="notice ok pt-restarted">
+                    <span>{RESTARTED_NOTE}</span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => selectRun(selectedSuccessor)}
+                    >
+                      Open the new run
+                    </button>
+                  </div>
+                ) : null}
                 <RunProgress
                   execution={chosen.detail}
+                  pageTypeLabel={selectedTypeLabel}
                   loading={chosen.loading && !chosen.detail}
                   onCancel={() =>
                     selected
@@ -1278,6 +1506,7 @@ export default function CustomView() {
           initial={editor.type}
           origin={editor.origin}
           existing={pageTypes}
+          viewer={me}
           onClose={() => setEditor(null)}
           onSaved={saved}
         />

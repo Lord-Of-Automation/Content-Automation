@@ -1,6 +1,6 @@
 import TopBar from "@/components/TopBar";
 import CustomView from "@/components/CustomView";
-import { currentUser } from "@/lib/actor";
+import { viewer } from "@/lib/actor";
 import { may } from "@/lib/permissions";
 
 export const metadata = { title: "Custom | SEO Automation" };
@@ -14,14 +14,17 @@ export const dynamic = "force-dynamic";
  * each answer "not allowed" the moment they were used.
  */
 export default async function CustomPage() {
-  const allowed = await may(await currentUser(), "custom");
+  // Who is looking, for the page to tell their own types from other people's.
+  // Only somebody with full access ever sees the second kind.
+  const who = await viewer();
+  const allowed = await may(who.name, "custom");
 
   return (
     <>
       <TopBar current="custom" />
       {allowed ? (
         <main className="wide">
-          <CustomView />
+          <CustomView viewer={who} />
         </main>
       ) : (
         <main>

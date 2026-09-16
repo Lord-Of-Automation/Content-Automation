@@ -22,6 +22,28 @@ export type RunInputs = {
    * declarations that were not made.
    */
   body_classes: BodyClasses;
+  /**
+   * What a custom run was asked to do, on the engine path only.
+   *
+   * A custom run records the optimiser's settings too, at their defaults, and
+   * those read as a whole-site crawl on a run that touches one page. The panel
+   * shows these instead whenever they are here.
+   */
+  custom?: CustomInputs | null;
+};
+
+export type CustomInputs = {
+  action: "optimise" | "add" | "design";
+  /** Empty when the type was left to be detected. */
+  page_type_id: string;
+  /** Whose that type is. Null on a run recorded before types had owners. */
+  page_type_owner: string | null;
+  /** The page an add run writes from. */
+  source_url: string;
+  /** The pages a design run reads. */
+  example_urls: string[];
+  design_note: string;
+  publish_new_pages: boolean;
 };
 
 const FIELDS = [

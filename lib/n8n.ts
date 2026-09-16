@@ -89,6 +89,12 @@ export type StartRunInput = {
   custom_action?: "optimise" | "add" | "design";
   /** A saved page type's id, or empty to let the engine work out which fits. */
   page_type_id?: string;
+  /**
+   * Whose type that is. Ids are only unique per owner, so an id alone can mean
+   * two people's types to somebody who sees both. Empty is an unowned type;
+   * absent leaves the engine to take the caller's own.
+   */
+  page_type_owner?: string;
   /** For a design run: the one to three pages of the kind to describe. */
   example_urls?: string[];
   /** For a design run: what the person asking says the kind of page is. */

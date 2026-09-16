@@ -75,11 +75,16 @@ the editor to be reviewed and saved; nothing is published. Run either optimises
 one existing page or adds a new page to your site from a page elsewhere about
 the subject, as a draft or published at once, with the type chosen or detected.
 Its runs are listed underneath with their progress, and every one costs money at
-the model like any other run. It is under the SEO menu too, but only for people
-holding the Custom page types permission, which is not granted by default: an
-admin gives it in Website Accounts, Edit permissions. If the engine has not been
-updated for page types the page says so and refuses to start anything, because
-an engine that does not know a custom run would run the optimiser instead.
+the model like any other run. A failed custom run can be started again, but it
+reuses nothing: every step runs, and is paid for, a second time. A run that only
+drafted a type cannot be started again; draft again instead. A type belongs to
+whoever saved it; somebody with full access sees everybody's, each marked with
+whose it is, and editing one leaves it with its owner. It is under the SEO menu
+too, but only for people holding the Custom page types permission, which is not
+granted by default: an admin gives it in Website Accounts, Edit permissions. If
+the engine has not been updated for page types the page says so and refuses to
+start anything, because an engine that does not know a custom run would run the
+optimiser instead.
 
 **AI Websites** (/websites) is different work: writing a site that does not
 exist yet. You describe it, name the topic and the keywords, choose WordPress or
