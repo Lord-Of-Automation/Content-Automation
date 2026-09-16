@@ -22,6 +22,33 @@
  * goes into a page that is rendered on both sides.
  */
 
+/*
+ * The one exception to "no block carries a style of its own": the FAQ.
+ *
+ * Every page this system writes -- on a WordPress site, an Elementor one or a
+ * site built here -- shows its questions as the same card, with the styles
+ * written on each element so no theme can take them away. These are the
+ * engine's own values (SEO-Automation-Backend src/steps/faqcard.ts, which the
+ * WordPress plugin also copies); change them there and here together. They are
+ * translucent, so they sit on a light site and a dark one alike.
+ */
+const FAQ_BOX_CSS =
+  "border:1px solid #8080803d !important;border-radius:10px !important;" +
+  "background-color:#8080800f !important;padding:16px 20px !important;" +
+  "margin-top:0;margin-bottom: 20px !important";
+const FAQ_SUMMARY_CSS = "cursor:pointer;line-height:45px;font-size:1rem";
+const FAQ_QUESTION_CSS = "margin:0;display:inline;font-size:1.05rem;line-height:1.4";
+const FAQ_ANSWER_CSS = "margin-top:15px !important;margin-bottom:0";
+
+function faqCard(question: string, answer: string): string {
+  return (
+    `<div class="cb-faq" style="${FAQ_BOX_CSS}"><details>` +
+    `<summary style="${FAQ_SUMMARY_CSS}"><h3 style="${FAQ_QUESTION_CSS}">${question}</h3></summary>\n` +
+    `<p style="${FAQ_ANSWER_CSS}">${answer}</p>\n` +
+    `</details></div>`
+  );
+}
+
 export interface Block {
   key: string;
   name: string;
@@ -194,18 +221,12 @@ export const BLOCKS: Block[] = [
     hint: "Three questions that open when clicked",
     group: "Facts",
     html: `<h2>Common questions</h2>
-<details>
-  <summary>The question people actually ask, in their words</summary>
-  <p>The answer, in one or two sentences, with the answer itself in the first one.</p>
-</details>
-<details>
-  <summary>The second question</summary>
-  <p>The answer.</p>
-</details>
-<details>
-  <summary>The third question</summary>
-  <p>The answer.</p>
-</details>`,
+${faqCard(
+  "The question people actually ask, in their words",
+  "The answer, in one or two sentences, with the answer itself in the first one.",
+)}
+${faqCard("The second question", "The answer.")}
+${faqCard("The third question", "The answer.")}`,
   },
 
   // ---------------------------------------------------------------- asks

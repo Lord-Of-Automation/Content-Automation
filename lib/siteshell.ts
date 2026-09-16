@@ -398,6 +398,38 @@ svg:not([width]):not([height]):not([class]) { max-height: 420px; }
   flex: none;
 }
 .btn svg:not([width]):not([height]):not([class]) { width: 1.15em; height: 1.15em; }
+
+/*
+ * FAQ cards. Their box, spacing and type are written on each element, so they
+ * look right with or without this. What cannot travel inline is movement: a
+ * turning marker and the answer easing open. Same rules as the WordPress
+ * plugin prints, so a question opens the same way on every site.
+ */
+.cb-faq summary { list-style: none; position: relative; padding-right: 30px; }
+.cb-faq summary::-webkit-details-marker { display: none; }
+.cb-faq summary::after {
+  content: ""; position: absolute; right: 8px; top: calc(50% - 6px);
+  width: 9px; height: 9px;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(45deg); transition: transform .25s ease;
+}
+.cb-faq details[open] summary::after { transform: rotate(-135deg); }
+.cb-faq details > *:not(summary) { animation: cb-faq-reveal .28s ease both; }
+@keyframes cb-faq-reveal { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@supports (interpolate-size: allow-keywords) {
+  .cb-faq details { interpolate-size: allow-keywords; }
+  .cb-faq details::details-content {
+    block-size: 0; overflow: hidden; content-visibility: hidden;
+    transition: block-size .3s ease, content-visibility .3s allow-discrete;
+  }
+  .cb-faq details[open]::details-content { block-size: auto; content-visibility: visible; }
+  .cb-faq details > *:not(summary) { animation: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cb-faq details > *:not(summary) { animation: none; }
+  .cb-faq summary::after { transition: none; }
+  .cb-faq details::details-content { transition: none; }
+}
 `;
 }
 
