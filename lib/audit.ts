@@ -56,6 +56,19 @@ export type AuditAction =
    */
   | "prompt-saved"
   | "prompt-deleted"
+  /**
+   * A page type saved on the Custom page, new or edited.
+   *
+   * Kept for the same reason as a site's instruction: every custom run that
+   * uses the type is written to it from then on, and a page that reads oddly
+   * later is traced back to the edit that made it so.
+   */
+  | "pagetype-saved"
+  /**
+   * A page type removed. Pages already written under it stay as they are;
+   * this line is what says the type they came from ever existed.
+   */
+  | "pagetype-deleted"
   /** What somebody is allowed to do, changed. Always worth a line. */
   | "permissions-changed"
   /**

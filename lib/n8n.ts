@@ -42,7 +42,17 @@ export type ExecutionDetail = ExecutionSummary & {
    * are live in WordPress after a run that only read a spreadsheet is a small
    * lie the console used to tell every time.
    */
-  runMode: "optimise" | "gap" | "casino_gap" | "build" | "prospects" | "outreach" | "add" | null;
+  runMode:
+    | "optimise"
+    | "gap"
+    | "casino_gap"
+    | "build"
+    | "prospects"
+    | "outreach"
+    | "add"
+    /** Written to a page type somebody defined. See lib/pagetypes.ts. */
+    | "custom"
+    | null;
 };
 
 export type StartRunInput = {
@@ -67,7 +77,24 @@ export type StartRunInput = {
    * caller written before there was a choice means.
    */
   /** Build joined these when a run stopped needing a site to start from. */
-  mode?: "optimise" | "gap" | "casino_gap" | "build" | "add";
+  mode?: "optimise" | "gap" | "casino_gap" | "build" | "add" | "custom";
+  /**
+   * For a "custom" run: which of its three jobs.
+   *
+   * optimise rewrites the page at website_url, add writes a new page on the
+   * site at website_url from the page at source_url, and design reads
+   * example_urls and drafts a page type for somebody to review. Only the
+   * engine running on n8n's behalf knows any of this; n8n never sees one.
+   */
+  custom_action?: "optimise" | "add" | "design";
+  /** A saved page type's id, or empty to let the engine work out which fits. */
+  page_type_id?: string;
+  /** For a design run: the one to three pages of the kind to describe. */
+  example_urls?: string[];
+  /** For a design run: what the person asking says the kind of page is. */
+  design_note?: string;
+  /** Whether a page a run creates goes live at once, rather than as a draft. */
+  publish_new_pages?: boolean;
   /**
    * For an "add" run: somebody else's page about one casino or one game.
    *

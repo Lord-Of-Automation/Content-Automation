@@ -9957,3 +9957,271 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
   padding: 14px 20px;
   border-top: 1px solid var(--line);
 }
+
+/* ------------------------------------------- custom page types
+
+   The Custom page is two cards and a sheet, and nearly all of it is made of
+   parts the console already has: the Prompts list for the saved types, the
+   Mailing runs column for the runs, the ordinary sheet for the editor. What is
+   here is only what those parts do not cover.
+
+   The editor's repeating rows are the one new shape. A fact is five inputs and
+   a switch, and a section is two inputs and three buttons; on a wide screen
+   each row is a small grid so a list of ten reads as a table, and on a narrow
+   one the same cells stack, because five inputs side by side in four hundred
+   pixels are five inputs nobody can type in.
+
+   Colours come from the tokens and nothing else, so the dark theme is the same
+   rules with different values. */
+
+/* Notices sit in the stack or in a padded body here, not in a flush table
+   card, so the inset the console gives them elsewhere is taken back. */
+.custom-view .notice {
+  margin: 0 0 12px;
+}
+
+.custom-view > .notice {
+  margin: 0;
+}
+
+/* A form stretched across a wide page is a line the eye loses. */
+.pt-form {
+  max-width: 760px;
+}
+
+.pt-cost {
+  margin: 10px 0 0;
+}
+
+/* The draft form beside the run it starts, so the two are read together. */
+.pt-split {
+  display: grid;
+  grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.pt-follow {
+  min-width: 0;
+  padding-left: 24px;
+  border-left: 1px solid var(--line);
+}
+
+.pt-follow-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.pt-follow-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 620;
+}
+
+@media (max-width: 1000px) {
+  .pt-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pt-follow {
+    padding-left: 0;
+    padding-top: 18px;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
+
+/* ---- the saved types */
+
+.pt-desc {
+  margin: 8px 0 0;
+  max-width: 90ch;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.pt-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.pt-tags .quiet {
+  margin-left: 4px;
+}
+
+.pt-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* The one action above a run's progress, when the run left something to open. */
+.pt-run-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+/* ---- the editor */
+
+.pt-sheet .notice {
+  margin: 12px 20px 0;
+}
+
+.pt-warn {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.pt-rows {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pt-row {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel-2);
+  transition: border-color var(--quick, 120ms) var(--ease, ease);
+}
+
+.pt-row:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+/* A name above an input, smaller than a field's own label: these repeat on
+   every row and are read once. */
+.pt-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pt-cell-name {
+  font-size: 11.5px;
+  font-weight: 560;
+  color: var(--ink-3);
+}
+
+.pt-fact {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label key schema drop"
+    "hint hint hint verify";
+  gap: 8px 10px;
+  align-items: end;
+}
+
+.pt-fact-label { grid-area: label; }
+.pt-fact-key { grid-area: key; }
+.pt-fact-schema { grid-area: schema; }
+.pt-fact-hint { grid-area: hint; }
+
+.pt-fact-verify {
+  grid-area: verify;
+  justify-self: end;
+}
+
+.pt-fact-drop {
+  grid-area: drop;
+  justify-self: end;
+  /* Level with the inputs beside it, which sit under their names. */
+  margin-bottom: 4px;
+}
+
+.pt-section {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.6fr) auto;
+  grid-template-areas: "num heading guidance tools";
+  gap: 8px 10px;
+  align-items: start;
+}
+
+/* The position, because order is what an outline is. */
+.pt-num {
+  grid-area: num;
+  min-width: 18px;
+  padding-top: 26px;
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  text-align: right;
+}
+
+.pt-section-heading { grid-area: heading; }
+.pt-section-guidance { grid-area: guidance; }
+
+.pt-row-tools {
+  grid-area: tools;
+  display: flex;
+  gap: 6px;
+  /* Clear of the cell names, so the buttons line up with the first input. */
+  padding-top: 20px;
+}
+
+.pt-none {
+  margin: 0 0 10px;
+}
+
+.pt-after-rows {
+  margin-top: 18px;
+}
+
+/* Below this the rows stack: every cell its own line, and the two controls
+   that end a fact share the last one. */
+@media (max-width: 720px) {
+  .pt-sheet .row-2,
+  .custom-view .row-2 {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .pt-fact {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label label"
+      "key key"
+      "schema schema"
+      "hint hint"
+      "verify drop";
+    align-items: center;
+  }
+
+  .pt-fact-verify {
+    justify-self: start;
+  }
+
+  .pt-fact-drop {
+    margin-bottom: 0;
+  }
+
+  .pt-section {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "num heading"
+      ". guidance"
+      ". tools";
+  }
+
+  .pt-row-tools {
+    padding-top: 0;
+  }
+}

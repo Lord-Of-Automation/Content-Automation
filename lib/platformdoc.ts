@@ -61,6 +61,26 @@ things and both read the same competitor crawl export.
 
 Both live under the SEO menu in the header.
 
+**Custom** (/custom) runs the engine with page types somebody defined, rather
+than the kinds built into it (game review, casino review, promo codes, blog). A
+page type is a record kept on the engine: how to recognise such a page (address
+patterns, body classes), the facts it needs and which of them must be verified,
+the sites trusted for those facts, the outline, the writing rules and what never
+to do, which shared blocks it uses (facts table, pros and cons, FAQ, table of
+contents), its schema.org type, its WordPress post type and a page to copy the
+layout from. The page has three tabs. Page types lists, creates and edits them,
+with a poker player biography as a ready-made example. Create from examples
+takes one to three example pages and has the engine draft a type, which opens in
+the editor to be reviewed and saved; nothing is published. Run either optimises
+one existing page or adds a new page to your site from a page elsewhere about
+the subject, as a draft or published at once, with the type chosen or detected.
+Its runs are listed underneath with their progress, and every one costs money at
+the model like any other run. It is under the SEO menu too, but only for people
+holding the Custom page types permission, which is not granted by default: an
+admin gives it in Website Accounts, Edit permissions. If the engine has not been
+updated for page types the page says so and refuses to start anything, because
+an engine that does not know a custom run would run the optimiser instead.
+
 **AI Websites** (/websites) is different work: writing a site that does not
 exist yet. You describe it, name the topic and the keywords, choose WordPress or
 static HTML and how many pages, and the engine writes the whole thing. What

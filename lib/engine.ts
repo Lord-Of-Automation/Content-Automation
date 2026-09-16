@@ -139,7 +139,8 @@ type EngineRun = {
   cost?: CostBreakdown | null;
   /** Which pipeline ran it. Absent on a run from before there was a choice. */
   /** Build joined these when a run stopped needing a site to start from. */
-  mode?: "optimise" | "gap" | "casino_gap" | "build" | "add";
+  /** Custom runs work to a page type somebody defined rather than a built-in kind. */
+  mode?: "optimise" | "gap" | "casino_gap" | "build" | "add" | "custom";
   steps?: EngineStep[];
 };
 
@@ -272,7 +273,7 @@ function inputsOf(run: EngineRun): RunInputs | null {
 export async function startRun(
   input: StartRunInput,
   resumeFrom?: string,
-): Promise<StartRunResult> {
+): Promise<StartRunResult & { mode: string | null }> {
   const startedAt = new Date().toISOString();
 
   // WordPress credentials travel with the run, so the console stays the one
@@ -300,7 +301,7 @@ export async function startRun(
       : {}),
   };
 
-  const result = await call<{ id: string; note?: string }>(
+  const result = await call<{ id: string; note?: string; mode?: string }>(
     "/runs",
     { method: "POST", body: JSON.stringify(body) },
     30_000,
@@ -311,6 +312,15 @@ export async function startRun(
     startedAt,
     assumed: false,
     note: result.note ?? null,
+    /*
+     * Which pipeline the engine says it started.
+     *
+     * Passed back because an engine that does not know a mode does not refuse
+     * it: it runs the optimiser, which rewrites live pages. A caller that asked
+     * for something else is the only one who can notice the two differ.
+     * Nothing that asked for the optimiser has any reason to read it.
+     */
+    mode: result.mode ?? null,
   };
 }
 

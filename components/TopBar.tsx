@@ -5,6 +5,7 @@ import { logout } from "@/app/actions";
 import NavLink from "@/components/NavLink";
 import NavMenu from "@/components/NavMenu";
 import type { Section } from "@/lib/nav";
+import { may } from "@/lib/permissions";
 import ProfileMenu from "@/components/ProfileMenu";
 
 export default async function TopBar({
@@ -13,6 +14,9 @@ export default async function TopBar({
   current: Section;
 }) {
   const session = await auth();
+  // Asked here rather than left to the page, because a menu item somebody
+  // cannot use is a page that tells them so, one click later than necessary.
+  const canCustom = session?.user ? await may(session.user.name ?? "", "custom") : false;
 
   return (
     <header className="topbar">
@@ -32,10 +36,15 @@ export default async function TopBar({
               having it done.
 
               The addresses do not move. Every bookmark, every stored selection
-              and every link in the logs points at /runs and /loop. */}
+              and every link in the logs points at /runs and /loop.
+
+              Custom is the same engine working to page types somebody wrote
+              down rather than the ones built into it, so it belongs here too.
+              Only offered to those who hold its permission: it is the one item
+              in this menu that is not granted by default. */}
           <NavMenu
             label="SEO"
-            active={current === "runs" || current === "loop"}
+            active={current === "runs" || current === "loop" || current === "custom"}
             items={[
               {
                 href: "/runs",
@@ -49,6 +58,16 @@ export default async function TopBar({
                 note: "have it run again on a schedule",
                 current: current === "loop",
               },
+              ...(canCustom
+                ? [
+                    {
+                      href: "/custom",
+                      label: "Custom",
+                      note: "page types you define, run on demand",
+                      current: current === "custom",
+                    },
+                  ]
+                : []),
             ]}
           />
           {/* Not a link. Domains is two pages now, and a parent that both

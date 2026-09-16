@@ -60,6 +60,20 @@ export const PERMISSIONS: Permission[] = [
     group: "Writing",
     note: "Attach an instruction to a site, which every run for that site then follows.",
   },
+  /*
+   * Its own permission rather than part of Runs, and left out of the default
+   * set below. A page type is a new set of instructions the engine has not
+   * been run with before, and whoever may define one decides what gets
+   * written and published under it — somebody trusted with the Runs page has
+   * not necessarily been trusted with that.
+   */
+  {
+    id: "custom",
+    label: "Custom page types",
+    group: "Writing",
+    weighty: true,
+    note: "Create page types and run the engine with them. Every run costs money at the model.",
+  },
   {
     id: "websites",
     label: "AI Websites",

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { currentUser } from "./actor";
 import { N8nConfigError } from "./n8n";
 import { EngineConfigError, RunNotFoundError } from "./engine";
+import { PERMISSIONS } from "./permissionlist";
+import { may } from "./permissions";
 
 export async function requireSession(): Promise<NextResponse | null> {
   const session = await auth();
@@ -9,6 +12,30 @@ export async function requireSession(): Promise<NextResponse | null> {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
   return null;
+}
+
+/**
+ * A session, and the permission this route belongs to.
+ *
+ * Most routes stop at requireSession, because most permissions are only
+ * enforced by which pages the menu offers. A route that spends money on
+ * instructions nobody has run before cannot rely on that: the address works
+ * whether or not the link is shown, so it checks for itself.
+ *
+ * The refusal names the permission in the words the Accounts page uses, so
+ * whoever reads it knows what to ask for.
+ */
+export async function requirePermission(permission: string): Promise<NextResponse | null> {
+  const denied = await requireSession();
+  if (denied) return denied;
+
+  if (await may(await currentUser(), permission)) return null;
+
+  const label = PERMISSIONS.find((one) => one.id === permission)?.label ?? permission;
+  return NextResponse.json(
+    { error: `You are not allowed to use ${label}. Ask an admin to grant it.` },
+    { status: 403 }
+  );
 }
 
 /** Turns a thrown error into a response the UI can actually act on. */

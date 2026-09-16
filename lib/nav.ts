@@ -20,4 +20,5 @@ export type Section =
   | "accounts"
   | "keys"
   | "design"
-  | "prompts";
+  | "prompts"
+  | "custom";

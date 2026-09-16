@@ -412,7 +412,12 @@ export default function RunProgress({
       {execution.status === "success" ? (
         <div className="alert alert-ok" style={{ marginTop: 16 }}>
           <strong>Finished.</strong>{" "}
-          {execution.runMode === "outreach"
+          {/* A custom run may have rewritten a page, added one or only drafted
+              a page type, and which of the three is in its steps rather than
+              its mode. So it points there instead of guessing. */}
+          {execution.runMode === "custom"
+            ? "Done. Check the steps for what was written and where it was published."
+            : execution.runMode === "outreach"
             ? "Every publisher has their own article, in its own document, and the email offering it."
             : execution.runMode === "prospects"
             ? "The prospects sheet has been updated with the current figures."

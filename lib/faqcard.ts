@@ -101,9 +101,22 @@ export const FAQ_HEADING =
  *
  * INNER stops at any <details, so only the innermost of nested dropdowns is a
  * question; an outer one is left as it was, around the cards.
+ *
+ * A card is the cb-faq div, or the engine's own earlier card: a plain div
+ * whose style carries the card's border colour, #8080803d, written before the
+ * class existed. Treating that one as a card replaces it rather than drawing a
+ * second box inside it.
  */
 const WS = "[ \\t\\n\\r\\f\\v]";
-const CARD_OPEN_SRC = `<div\\b[^>]*\\bclass=["'](?:[^"']*\\s)?cb-faq(?:\\s[^"']*)?["'][^>]*>`;
+const CARD_OPEN_SRC =
+  `<div\\b[^>]*\\b(?:class=["'](?:[^"']*\\s)?cb-faq(?:\\s[^"']*)?["']|style=["'][^"']*#8080803d)[^>]*>`;
+
+/**
+ * Classes WordPress itself puts on a Details block, and the engine's earlier
+ * FAQ markup carried. A dropdown wearing only these is not somebody else's
+ * widget.
+ */
+const OWN_CLASS = /^(?:wp-block-details|has-[a-z0-9-]*(?:color|background)|is-layout-[a-z0-9-]+|wp-block-details-is-layout-[a-z0-9-]+|wp-container-[a-z0-9-]+)$/i;
 const INNER_SRC = `(?:(?!<details\\b|<\\/details>)[\\s\\S])*`;
 const TRAIL_SRC = `(?:(?!<\\/?div\\b|<\\/?details\\b)[\\s\\S])*?`;
 const UNIT = new RegExp(
@@ -183,7 +196,7 @@ function rebuild(
     const cls = (/\bclass=["']([^"']*)["']/i.exec(attrs) ?? [])[1] ?? "";
     const foreign =
       /(?:^|\s)id\s*=/i.test(bareAttrs) ||
-      cls.split(/\s+/).filter(Boolean).some((c) => c !== "wp-block-details" && !/faq/i.test(c));
+      cls.split(/\s+/).filter(Boolean).some((c) => !OWN_CLASS.test(c) && !/faq/i.test(c));
     if (foreign || !(headed || inFaq)) return null;
   }
 
