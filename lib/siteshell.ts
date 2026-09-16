@@ -19,9 +19,12 @@
  * Every colour, the typeface and the width come from the site's own settings.
  * What is fixed is the arrangement and the restraint.
  *
- * No imports on purpose: this runs in the browser to draw a preview and on the
- * server to write files, and anything from node here would rule out the first.
+ * No node imports on purpose: this runs in the browser to draw a preview and on
+ * the server to write files, and anything from node here would rule out the
+ * first. The one import, the FAQ card, is plain string work and runs in both.
  */
+
+import { styleFaq } from "./faqcard";
 
 export interface ShellPage {
   slug: string;
@@ -1981,7 +1984,7 @@ ${design?.css ? `<style>${design.css}</style>` : ""}
 ${header}
   <main class="wrap is-page">
     <h1 data-title>${escapeText(page.title)}</h1>
-    ${options.editing ? inertScripts(page.bodyHtml) : page.bodyHtml}
+    ${options.editing ? inertScripts(styleFaq(page.bodyHtml).html) : styleFaq(page.bodyHtml).html}
   </main>
 ${footer}
 ${options.editing ? `<script>${EDIT_SCRIPT}</script>` : options.interactive ? `<script>${NAV_SCRIPT}</script>` : ""}

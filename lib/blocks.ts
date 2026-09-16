@@ -18,31 +18,31 @@
  * block full of filler reads as broken and a block full of plausible copy reads
  * as a draft, and the second is the one people edit rather than delete.
  *
- * No imports: this is read in the browser to draw the picker and the markup
- * goes into a page that is rendered on both sides.
+ * Nothing from node: this is read in the browser to draw the picker and the
+ * markup goes into a page that is rendered on both sides. The FAQ card's values
+ * come from ./faqcard, which is plain string work.
  */
+
+import {
+  FAQ_ANSWER_CSS,
+  FAQ_CARD_OPEN,
+  FAQ_DETAILS_CSS,
+  FAQ_QUESTION_CSS,
+  FAQ_SUMMARY_CSS,
+} from "./faqcard";
 
 /*
  * The one exception to "no block carries a style of its own": the FAQ.
  *
  * Every page this system writes -- on a WordPress site, an Elementor one or a
  * site built here -- shows its questions as the same card, with the styles
- * written on each element so no theme can take them away. These are the
- * engine's own values (SEO-Automation-Backend src/steps/faqcard.ts, which the
- * WordPress plugin also copies); change them there and here together. They are
- * translucent, so they sit on a light site and a dark one alike.
+ * written on each element so no theme can take them away. The values are the
+ * shared ones in ./faqcard, which is plain string work and safe in the browser.
  */
-const FAQ_BOX_CSS =
-  "border:1px solid #8080803d !important;border-radius:10px !important;" +
-  "background-color:#8080800f !important;padding:16px 20px !important;" +
-  "margin-top:0;margin-bottom: 20px !important";
-const FAQ_SUMMARY_CSS = "cursor:pointer;line-height:45px;font-size:1rem";
-const FAQ_QUESTION_CSS = "margin:0;display:inline;font-size:1.05rem;line-height:1.4";
-const FAQ_ANSWER_CSS = "margin-top:15px !important;margin-bottom:0";
-
 function faqCard(question: string, answer: string): string {
   return (
-    `<div class="cb-faq" style="${FAQ_BOX_CSS}"><details>` +
+    FAQ_CARD_OPEN +
+    `<details style="${FAQ_DETAILS_CSS}">` +
     `<summary style="${FAQ_SUMMARY_CSS}"><h3 style="${FAQ_QUESTION_CSS}">${question}</h3></summary>\n` +
     `<p style="${FAQ_ANSWER_CSS}">${answer}</p>\n` +
     `</details></div>`

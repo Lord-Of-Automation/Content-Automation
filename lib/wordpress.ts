@@ -34,6 +34,7 @@
  */
 
 import { scopeCss } from "./cssscope";
+import { styleFaq } from "./faqcard";
 import {
   contentStyles, renderChrome, type ShellOptions, type ShellSite, type ShellTheme,
 } from "./siteshell";
@@ -521,9 +522,12 @@ export function pageContent(
    * arrive as words, not as words inside a container of ours that their theme
    * will then have opinions about.
    */
+  // Every FAQ question as the styled card, whatever the stored page holds:
+  // this goes through core REST, where the content bridge plugin never sees it.
+  const body = styleFaq(page.bodyHtml).html;
   const inner = sheet.trim()
-    ? `<div class="wrap is-page">\n${weighPageStyles(page.bodyHtml)}\n</div>`
-    : page.bodyHtml;
+    ? `<div class="wrap is-page">\n${weighPageStyles(body)}\n</div>`
+    : body;
 
   const markup = [`<div class="${WRAP_CLASS}">`, chrome.header, inner, chrome.footer, "</div>"]
     .filter(Boolean)
