@@ -27,7 +27,6 @@ import {
   FAQ_ANSWER_CSS,
   FAQ_CARD_OPEN,
   FAQ_DETAILS_CSS,
-  FAQ_QUESTION_CSS,
   FAQ_SUMMARY_CSS,
 } from "./faqcard";
 
@@ -43,7 +42,9 @@ function faqCard(question: string, answer: string): string {
   return (
     FAQ_CARD_OPEN +
     `<details style="${FAQ_DETAILS_CSS}">` +
-    `<summary style="${FAQ_SUMMARY_CSS}"><h3 style="${FAQ_QUESTION_CSS}">${question}</h3></summary>\n` +
+    // The question is the summary's own text: an editor deletes a summary that
+    // holds a heading, and the question with it.
+    `<summary style="${FAQ_SUMMARY_CSS}">${question}</summary>\n` +
     `<p style="${FAQ_ANSWER_CSS}">${answer}</p>\n` +
     `</details></div>`
   );

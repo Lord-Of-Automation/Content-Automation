@@ -44,10 +44,18 @@ export const FAQ_BOX_CSS =
   "margin-top:0 !important;margin-bottom: 20px !important";
 export const FAQ_DETAILS_CSS =
   "margin:0 !important;padding:0 !important;border:0 !important;background:none !important";
+/*
+ * The question is the summary's own text, styled on the summary.
+ *
+ * It used to be an <h3> inside the <summary>. WordPress's editor (TinyMCE, in
+ * the classic editor, the Classic block's "Edit contents" and Elementor's text
+ * widget) allows only inline content in a summary, so saving a page from the
+ * editor deleted the <summary> and left the <h3> as a line inside the
+ * dropdown: the browser then labelled every question "Details" and hid the
+ * question inside it.
+ */
 export const FAQ_SUMMARY_CSS =
-  "cursor:pointer !important;line-height:45px !important;font-size:1rem !important";
-export const FAQ_QUESTION_CSS =
-  "margin:0 !important;display:inline !important;font-size:1.05rem !important;line-height:1.4 !important";
+  "cursor:pointer !important;line-height:45px !important;font-size:1.05rem !important;font-weight:600 !important";
 export const FAQ_ANSWER_CSS = "margin-top:15px !important;margin-bottom:0 !important";
 export const FAQ_LIST_CSS = "margin:12px 0 0 !important;padding-left:20px !important";
 
@@ -60,8 +68,7 @@ function card(question: string, answer: string, open = false): string {
   return (
     FAQ_CARD_OPEN +
     "<details" + (open ? " open" : "") + ' style="' + FAQ_DETAILS_CSS + '">' +
-    '<summary style="' + FAQ_SUMMARY_CSS + '">' +
-    '<h3 style="' + FAQ_QUESTION_CSS + '">' + question + "</h3></summary>\n" +
+    '<summary style="' + FAQ_SUMMARY_CSS + '">' + question + "</summary>\n" +
     answer +
     "\n</details></div>"
   );
@@ -152,8 +159,24 @@ function rebuild(
   if (/game-demo-toggle/i.test(attrs)) return null;
   if (!carded && /<iframe\b/i.test(inner)) return null;
 
+  // The question: the summary, or -- on a page the WordPress editor has
+  // already saved -- the heading it left behind as the dropdown's first child
+  // when it deleted the summary around it.
+  let questionHtml: string;
+  let rest: string;
+  let headed: boolean;
   const summary = /<summary\b[^>]*>([\s\S]*?)<\/summary>/i.exec(inner);
-  if (!summary) return null;
+  if (summary) {
+    questionHtml = summary[1]!;
+    rest = inner.slice(summary.index + summary[0].length);
+    headed = /<h[2-4]\b/i.test(questionHtml);
+  } else {
+    const orphan = new RegExp(`^${WS}*<(h[2-4])\\b[^>]*>([\\s\\S]*?)<\\/\\1>`, "i").exec(inner);
+    if (!orphan || !(carded || inFaq)) return null;
+    questionHtml = orphan[2]!;
+    rest = inner.slice(orphan[0].length);
+    headed = true;
+  }
 
   if (!carded) {
     const bareAttrs = attrs.replace(/"[^"]*"|'[^']*'/g, '""');
@@ -161,12 +184,11 @@ function rebuild(
     const foreign =
       /(?:^|\s)id\s*=/i.test(bareAttrs) ||
       cls.split(/\s+/).filter(Boolean).some((c) => c !== "wp-block-details" && !/faq/i.test(c));
-    const headed = /<h[2-4]\b/i.test(summary[1]!);
     if (foreign || !(headed || inFaq)) return null;
   }
 
   const question = trimAscii(
-    summary[1]!
+    questionHtml
       .replace(BLOCK_COMMENT, "")
       .replace(/<\/?(?:h[1-6]|p|div|span)\b[^>]*>/gi, "")
       .replace(new RegExp(`${WS}+`, "g"), " "),
@@ -176,7 +198,7 @@ function rebuild(
   const open = /(?:^|\s)open(?:[\s=]|$)/i.test(attrs.replace(/"[^"]*"|'[^']*'/g, '""'));
 
   const answer = trimAscii(
-    (inner.slice(summary.index + summary[0].length) + (trimAscii(trail) ? "\n" + trimAscii(trail) : ""))
+    (rest + (trimAscii(trail) ? "\n" + trimAscii(trail) : ""))
       .replace(BLOCK_COMMENT, "")
       .replace(/<p\b[^>]*>/gi, '<p style="' + FAQ_ANSWER_CSS + '">')
       .replace(/<(ul|ol)\b[^>]*>/gi, '<$1 style="' + FAQ_LIST_CSS + '">')
