@@ -10064,6 +10064,107 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
   margin-top: 14px;
 }
 
+/* The examples to start from: one button, and a short menu under it. Drawn
+   like the profile menu, with a note under each name like the nav menu's, so
+   a choice between two is obvious before either is opened. */
+.pt-examples {
+  position: relative;
+  display: inline-flex;
+}
+
+.pt-examples-caret {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  transition: transform 120ms ease;
+}
+
+.pt-examples > .is-on .pt-examples-caret {
+  transform: rotate(180deg);
+}
+
+.pt-examples-panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  width: 272px;
+  /* Never wider than the screen it opens on, gutters kept. */
+  max-width: calc(100vw - 32px);
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 11px;
+  box-shadow: var(--shadow);
+  /* The empty list centres its text, and a menu reads down its left edge. */
+  text-align: left;
+  animation: pt-examples-in 120ms ease-out;
+}
+
+/* Which edge it lines up with. The component picks, and moves it to the side
+   that fits when the preferred one would run off the screen. Centred with
+   `translate` rather than `transform`, which the opening animation uses. */
+.pt-examples-panel.is-end {
+  right: 0;
+}
+
+.pt-examples-panel.is-start {
+  left: 0;
+}
+
+.pt-examples-panel.is-center {
+  left: 50%;
+  translate: -50% 0;
+}
+
+@keyframes pt-examples-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pt-examples-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  text-align: left;
+  /* Two lines of its own, where a button would otherwise keep one. */
+  white-space: normal;
+  cursor: pointer;
+  transition: background-color var(--quick, 120ms) var(--ease, ease);
+}
+
+.pt-examples-item:hover,
+.pt-examples-item:focus-visible {
+  background: var(--accent-soft);
+}
+
+.pt-examples-label {
+  font-size: 13.5px;
+  font-weight: 560;
+  color: var(--ink);
+}
+
+.pt-examples-note {
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--ink-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pt-examples-panel {
+    animation: none;
+  }
+}
+
 /* The one action above a run's progress, when the run left something to open. */
 .pt-run-tools {
   display: flex;
@@ -10076,6 +10177,19 @@ main > .grid > *:nth-child(n + 4) { animation-delay: 125ms; }
 
 .pt-sheet .notice {
   margin: 12px 20px 0;
+}
+
+/* A row of two fields keeps the space a field keeps under it. The second
+   field is the row's last child and loses that space, so when it is the
+   taller of the two (the address of a new page, with its sentence under it)
+   whatever follows the row sat flush against it. The last row in a section
+   still ends flush. */
+.pt-sheet .row-2 > .field:last-child {
+  margin-bottom: 15px;
+}
+
+.pt-sheet .row-2:last-child > .field:last-child {
+  margin-bottom: 0;
 }
 
 .pt-warn {

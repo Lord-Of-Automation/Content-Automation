@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { useAsk } from "@/components/Ask";
 import PageTypeEditor, { type EditorOrigin } from "@/components/PageTypeEditor";
@@ -12,7 +12,8 @@ import { formatWhen } from "@/lib/format";
 import { LANGUAGES, MARKETS, MARKET_DEFAULT_LANGUAGE } from "@/lib/markets";
 import {
   BLOCK_LABELS,
-  POKER_EXAMPLE,
+  EXAMPLES,
+  SLUG_TOKEN,
   ownerOf,
   typeKeyOf,
   typeKeyParts,
@@ -27,10 +28,10 @@ import type { ExecutionDetail, N8nStatus } from "@/lib/n8n";
  * Pages of a kind the engine was never written for.
  *
  * The engine knows four kinds of page by name, and each has its own research,
- * prompt and sections built into it. Anything else — a poker player, a
- * software provider, a tournament — meant changing the engine. A page type
- * says the same things as data, so a new kind of page is a form filled in here
- * rather than a deploy.
+ * prompt and sections built into it. Anything else — a crypto casino reviewed
+ * in its own way, a poker player, a software provider, a tournament — meant
+ * changing the engine. A page type says the same things as data, so a new
+ * kind of page is a form filled in here rather than a deploy.
  *
  * Three tabs, for the three things somebody comes here to do: keep the types,
  * have the engine draft one from pages that already look right, and run one.
@@ -95,6 +96,7 @@ const BLANK_TYPE: PageType = {
   name: "",
   description: "",
   subject: "",
+  officialSite: false,
   recognise: { urlPatterns: [], bodyClasses: [], examples: [] },
   facts: [{ key: "", label: "", hint: "", verify: true, schemaProperty: "" }],
   trustedSources: [],
@@ -103,7 +105,7 @@ const BLANK_TYPE: PageType = {
   avoid: [],
   blocks: [],
   schemaType: "",
-  wordpress: { postType: "", styleFrom: "" },
+  wordpress: { postType: "", styleFrom: "", slugPattern: SLUG_TOKEN },
   words: 0,
   createdAt: "",
   updatedAt: "",
@@ -295,6 +297,169 @@ function useRunDetail(id: string | null, onGone: (id: string, message: string) =
   return { detail: current, loading: loading || waiting, error, reload: load };
 }
 
+/**
+ * The examples to start a type from, behind one button.
+ *
+ * There used to be one example and a button that opened it. There are two
+ * now, as unlike each other as types get, and a button for each would crowd a
+ * heading that has no room for them. So one button opens a short menu, built
+ * the way the profile and nav menus are: it opens on a click, Enter, Space or
+ * an arrow key, the arrows and Home and End move through it, and Escape, Tab
+ * or a click anywhere else closes it.
+ *
+ * It opens under its button, lined up with the button's right edge in the
+ * heading and centred in the empty list. On a narrow screen either can run off
+ * the side, so it is measured as it opens and moved to the side that fits
+ * before it is painted.
+ */
+function ExamplePicker({
+  label,
+  className,
+  align,
+  onPick,
+}: {
+  label: string;
+  /** The button's classes, which differ between the heading and the empty list. */
+  className: string;
+  align: "end" | "center";
+  onPick: (type: PageType) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [side, setSide] = useState<"start" | "center" | "end">(align);
+  const wrap = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  /** Which entry takes the focus once the menu is there. */
+  const landOn = useRef<"first" | "last">("first");
+  const menuId = useId();
+
+  const entries = () =>
+    Array.from(panel.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
+
+  function show(at: "first" | "last") {
+    landOn.current = at;
+    setSide(align);
+    setOpen(true);
+  }
+
+  /** Closed, with the focus back on the button when it was inside the menu. */
+  function hide(refocus: boolean) {
+    setOpen(false);
+    if (refocus) trigger.current?.focus();
+  }
+
+  // Measured once per opening, before the browser paints it, so a menu that
+  // would run off the screen is never seen doing so. Then the focus goes in.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const box = panel.current?.getBoundingClientRect();
+    const room = document.documentElement.clientWidth;
+    if (box && box.left < 8) setSide("start");
+    else if (box && box.right > room - 8) setSide("end");
+    const list = entries();
+    (landOn.current === "last" ? list[list.length - 1] : list[0])?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const inside = wrap.current?.contains(document.activeElement) ?? false;
+      setOpen(false);
+      if (inside) trigger.current?.focus();
+    };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", key);
+    };
+  }, [open]);
+
+  function onMenuKey(e: React.KeyboardEvent<HTMLDivElement>) {
+    const list = entries();
+    const at = list.indexOf(document.activeElement as HTMLButtonElement);
+    const go = (to: number) => {
+      e.preventDefault();
+      list[(to + list.length) % list.length]?.focus();
+    };
+    switch (e.key) {
+      case "ArrowDown":
+        return go(at + 1);
+      case "ArrowUp":
+        return go(at < 0 ? list.length - 1 : at - 1);
+      case "Home":
+        return go(0);
+      case "End":
+        return go(list.length - 1);
+      case "Tab":
+        // Out of the menu, the way the focus would have gone from the button:
+        // back onto it for Shift+Tab, past it for Tab.
+        if (e.shiftKey) e.preventDefault();
+        hide(true);
+        return;
+    }
+  }
+
+  return (
+    <div className="pt-examples" ref={wrap}>
+      <button
+        ref={trigger}
+        type="button"
+        className={open ? `${className} is-on` : className}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        onClick={() => (open ? hide(false) : show("first"))}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            show(e.key === "ArrowUp" ? "last" : "first");
+          }
+        }}
+      >
+        {label}
+        <svg className="pt-examples-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+
+      {open ? (
+        <div
+          ref={panel}
+          id={menuId}
+          role="menu"
+          aria-label="Examples"
+          className={`pt-examples-panel is-${side}`}
+          onKeyDown={onMenuKey}
+        >
+          {EXAMPLES.map((one) => (
+            <button
+              key={one.id}
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className="pt-examples-item"
+              onClick={() => {
+                // The button has the focus before the editor opens, and the
+                // page hands it back there when the editor closes.
+                hide(true);
+                onPick(one.type);
+              }}
+            >
+              <span className="pt-examples-label">{one.label}</span>
+              <span className="pt-examples-note">{one.note}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function CustomView({ viewer }: { viewer: Viewer }) {
   const ask = useAsk();
   const me = viewer.name.trim().toLowerCase();
@@ -470,9 +635,21 @@ export default function CustomView({ viewer }: { viewer: Viewer }) {
 
   // ------------------------------------------------------------ editor
 
+  // Whatever had the focus when the editor opened — the button that opened it
+  // — has it back once the editor is gone. The sheet is unmounted rather than
+  // closed, so the browser does not do this by itself.
+  const returnFocus = useRef<HTMLElement | null>(null);
   const openEditor = useCallback((type: PageType, origin: EditorOrigin) => {
+    returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setEditor({ type, origin, key: Date.now() });
   }, []);
+  useEffect(() => {
+    if (editor || !returnFocus.current) return;
+    const back = returnFocus.current;
+    returnFocus.current = null;
+    // Gone when saving a draft moved the page to another tab.
+    if (back.isConnected) back.focus();
+  }, [editor]);
 
   // A draft is always new, and always the viewer's. Whatever id or owner the
   // engine gave it, saving it must not land on top of a type that shares them.
@@ -997,13 +1174,12 @@ export default function CustomView({ viewer }: { viewer: Viewer }) {
 
           {tab === "types" ? (
             <div className="app-head-actions">
-              <button
-                type="button"
+              <ExamplePicker
+                label="Start from an example"
                 className="btn btn-ghost head-do"
-                onClick={() => openEditor(POKER_EXAMPLE, "example")}
-              >
-                Start from the poker player example
-              </button>
+                align="end"
+                onPick={(type) => openEditor(type, "example")}
+              />
               <button
                 type="button"
                 className="btn btn-primary head-do is-new"
@@ -1022,17 +1198,17 @@ export default function CustomView({ viewer }: { viewer: Viewer }) {
                 <p className="provider-hint history-empty">Reading the page types…</p>
               ) : !pageTypes.length ? (
                 <div className="empty">
-                  No page types yet. The poker player example is a complete one
-                  to read and adapt; or describe your own from scratch, or let
-                  the engine draft one from pages that already look right.
+                  No page types yet. Each example is a complete one to read and
+                  adapt, a crypto casino review or a poker player biography; or
+                  describe your own from scratch, or let the engine draft one
+                  from pages that already look right.
                   <div className="pt-empty-actions">
-                    <button
-                      type="button"
+                    <ExamplePicker
+                      label="Start from an example"
                       className="btn btn-ghost btn-sm"
-                      onClick={() => openEditor(POKER_EXAMPLE, "example")}
-                    >
-                      Start from the example
-                    </button>
+                      align="center"
+                      onPick={(type) => openEditor(type, "example")}
+                    />
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
@@ -1128,7 +1304,7 @@ export default function CustomView({ viewer }: { viewer: Viewer }) {
                     className="mono"
                     spellCheck={false}
                     value={examples}
-                    placeholder={"https://example.com/players/one-player/\nhttps://another.com/pros/another-player/"}
+                    placeholder={"https://example.com/crypto-casinos/one-casino/\nhttps://another.com/casino-reviews/another-casino/"}
                     aria-invalid={Boolean(exampleProblem)}
                     onChange={(e) => setExamples(e.target.value)}
                   />
@@ -1149,7 +1325,7 @@ export default function CustomView({ viewer }: { viewer: Viewer }) {
                     rows={3}
                     maxLength={1000}
                     value={designNote}
-                    placeholder="Biographies of professional poker players, for fans who want the facts in one place."
+                    placeholder="Independent reviews of crypto casinos, for players choosing where to play with crypto."
                     onChange={(e) => setDesignNote(e.target.value)}
                   />
                   <div className="note">
@@ -1308,7 +1484,7 @@ export default function CustomView({ viewer }: { viewer: Viewer }) {
                     type="url"
                     inputMode="url"
                     spellCheck={false}
-                    placeholder="https://yoursite.com/players/some-player/"
+                    placeholder="https://yoursite.com/crypto-casinos/some-casino/"
                     value={inputs.pageUrl}
                     aria-invalid={Boolean(pageProblem)}
                     onChange={(e) => setInput("pageUrl", e.target.value)}
@@ -1353,7 +1529,7 @@ export default function CustomView({ viewer }: { viewer: Viewer }) {
                         type="url"
                         inputMode="url"
                         spellCheck={false}
-                        placeholder="https://elsewhere.com/players/some-player/"
+                        placeholder="https://elsewhere.com/casino-reviews/some-casino/"
                         value={inputs.sourceUrl}
                         aria-invalid={Boolean(sourceProblem)}
                         onChange={(e) => setInput("sourceUrl", e.target.value)}

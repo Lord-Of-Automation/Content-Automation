@@ -65,11 +65,22 @@ Both live under the SEO menu in the header.
 than the kinds built into it (game review, casino review, promo codes, blog). A
 page type is a record kept on the engine: how to recognise such a page (address
 patterns, body classes), the facts it needs and which of them must be verified,
-the sites trusted for those facts, the outline, the writing rules and what never
-to do, which shared blocks it uses (facts table, pros and cons, FAQ, table of
-contents), its schema.org type, its WordPress post type and a page to copy the
-layout from. The page has three tabs. Page types lists, creates and edits them,
-with a poker player biography as a ready-made example. Create from examples
+the sites trusted for those facts, whether the research also reads the
+subject's own website, the outline, the writing rules and what never to do,
+which shared blocks it uses (facts table, pros and cons, FAQ, table of
+contents), its schema.org type, its WordPress post type, the address a new page
+is given and a page to copy the layout from. Reading the subject's own website
+is for brands, casinos, products and companies, whose own site states things
+like accepted payments, limits and terms: the engine finds it among the search
+results, trusts what it says above other sites, and skips it when it cannot be
+told apart from sites reviewing it. The address of a new page is a pattern with
+{slug} where the subject's name goes, so {slug}-review puts a casino called
+Stake at /stake-review/; it applies only to pages a run adds, and an add is
+stopped before any paid work when the site already has a page at either the
+plain name or the patterned one. The page has three tabs. Page types lists,
+creates and edits them, with two ready-made examples to start from, a crypto
+casino review and a poker player biography, which show how differently two
+types can be set up. Create from examples
 takes one to three example pages and has the engine draft a type, which opens in
 the editor to be reviewed and saved; nothing is published. Run either optimises
 one existing page or adds a new page to your site from a page elsewhere about

@@ -19,19 +19,25 @@
  */
 
 import { signedAs } from "./actor";
+import { SLUG_TOKEN } from "./pagetypeshape";
 import type { CustomRun, DesignDraft, PageType } from "./pagetypeshape";
 
 export {
   BLOCKS,
   BLOCK_LABELS,
+  CRYPTO_CASINO_EXAMPLE,
+  EXAMPLES,
   PAGE_TYPE_LIMITS,
   POKER_EXAMPLE,
   SCHEMA_TYPES,
+  SLUG_PATTERN_REFUSED,
+  SLUG_TOKEN,
   factKeys,
   fnv1a,
   idOf,
   keyOf,
   ownerOf,
+  slugPatternOf,
   typeKeyOf,
   urlPatternOf,
 } from "./pagetypeshape";
@@ -132,13 +138,29 @@ export function isEngineOutdated(error: unknown): boolean {
 }
 
 /**
- * A type with its owner always spelled out.
+ * A type with every field the page reads spelled out.
  *
- * The engine sends one on every type; an engine from before owners left it off
- * an unowned one. Empty either way, so the page has one thing to compare.
+ * The engine sends an owner on every type; an engine from before owners left
+ * it off an unowned one. Empty either way, so the page has one thing to
+ * compare.
+ *
+ * The same goes for the two fields added after that. An engine from before
+ * them sends neither, and does what their defaults say: it does not read the
+ * subject's own site, and it names a new page for the subject alone. So that
+ * is what the editor is given to show, rather than an unticked box and an
+ * empty address that only look the same.
  */
-function owned(type: PageType): PageType {
-  return { ...type, owner: String(type.owner ?? "").trim().toLowerCase() };
+function complete(type: PageType): PageType {
+  return {
+    ...type,
+    owner: String(type.owner ?? "").trim().toLowerCase(),
+    officialSite: type.officialSite === true,
+    wordpress: {
+      postType: type.wordpress?.postType ?? "",
+      styleFrom: type.wordpress?.styleFrom ?? "",
+      slugPattern: String(type.wordpress?.slugPattern ?? "").trim() || SLUG_TOKEN,
+    },
+  };
 }
 
 /**
@@ -156,7 +178,7 @@ export async function listPageTypes(): Promise<{
   try {
     const { pageTypes, problem } = await call<{ pageTypes: PageType[]; problem?: string }>("/page-types");
     return {
-      pageTypes: (pageTypes ?? []).map(owned),
+      pageTypes: (pageTypes ?? []).map(complete),
       engineReady: true,
       ...(typeof problem === "string" && problem ? { problem } : {}),
     };
@@ -186,6 +208,8 @@ function fieldsOf(type: Partial<PageType>): Record<string, unknown> {
     name: type.name,
     description: type.description,
     subject: type.subject,
+    // Only a real true turns it on, as on the engine.
+    officialSite: type.officialSite === true,
     recognise: type.recognise,
     facts: type.facts,
     trustedSources: type.trustedSources,
@@ -194,7 +218,14 @@ function fieldsOf(type: Partial<PageType>): Record<string, unknown> {
     avoid: type.avoid,
     blocks: type.blocks,
     schemaType: type.schemaType,
-    wordpress: type.wordpress,
+    // Picked too, field by field, for the same reason as the whole.
+    wordpress: type.wordpress
+      ? {
+          postType: type.wordpress.postType,
+          styleFrom: type.wordpress.styleFrom,
+          slugPattern: type.wordpress.slugPattern,
+        }
+      : type.wordpress,
     words: type.words,
   };
 }
@@ -209,8 +240,8 @@ export async function savePageType(
     body: JSON.stringify({ ...fieldsOf(type), actor }),
   });
   return {
-    pageType: saved.pageType ? owned(saved.pageType) : saved.pageType,
-    pageTypes: (saved.pageTypes ?? []).map(owned),
+    pageType: saved.pageType ? complete(saved.pageType) : saved.pageType,
+    pageTypes: (saved.pageTypes ?? []).map(complete),
   };
 }
 
@@ -227,7 +258,7 @@ export async function deletePageType(id: string, owner?: string | null): Promise
     `/page-types/${encodeURIComponent(id)}${query}`,
     { method: "DELETE" },
   );
-  return (pageTypes ?? []).map(owned);
+  return (pageTypes ?? []).map(complete);
 }
 
 /**
@@ -255,5 +286,8 @@ export async function listCustomRuns(limit = 30): Promise<CustomRun[]> {
 
 /** Where a design run is, and the type it drafted once it has finished. */
 export async function getDesignDraft(id: string): Promise<DesignDraft> {
-  return call<DesignDraft>(`/custom/drafts/${encodeURIComponent(id)}`);
+  const state = await call<DesignDraft>(`/custom/drafts/${encodeURIComponent(id)}`);
+  // A draft from an engine that predates the newer fields is filled in the
+  // same way as a saved type.
+  return state?.draft ? { ...state, draft: complete(state.draft) } : state;
 }

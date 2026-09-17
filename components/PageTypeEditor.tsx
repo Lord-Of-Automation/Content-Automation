@@ -9,10 +9,13 @@ import {
   BLOCK_LABELS,
   PAGE_TYPE_LIMITS as LIMITS,
   SCHEMA_TYPES,
+  SLUG_PATTERN_REFUSED,
+  SLUG_TOKEN,
   domainOf,
   factKeys,
   keyOf,
   ownerOf,
+  slugPatternOf,
   urlPatternOf,
   type Block,
   type PageType,
@@ -69,6 +72,7 @@ interface Form {
   name: string;
   description: string;
   subject: string;
+  officialSite: boolean;
   urlPatterns: string;
   bodyClasses: string;
   examples: string;
@@ -81,6 +85,8 @@ interface Form {
   schemaType: SchemaType;
   postType: string;
   styleFrom: string;
+  /** As typed. Tidied into the shape the engine keeps only on the way out. */
+  slugPattern: string;
   /** Text, so the box can be emptied while a new number is typed. */
   words: string;
 }
@@ -108,6 +114,7 @@ function formOf(type: PageType): Form {
     name: type.name ?? "",
     description: type.description ?? "",
     subject: type.subject ?? "",
+    officialSite: type.officialSite === true,
     urlPatterns: (type.recognise?.urlPatterns ?? []).join("\n"),
     bodyClasses: (type.recognise?.bodyClasses ?? []).join("\n"),
     examples: (type.recognise?.examples ?? []).join("\n"),
@@ -134,6 +141,7 @@ function formOf(type: PageType): Form {
       : "",
     postType: type.wordpress?.postType ?? "",
     styleFrom: type.wordpress?.styleFrom ?? "",
+    slugPattern: type.wordpress?.slugPattern || SLUG_TOKEN,
     words: type.words ? String(type.words) : "",
   };
 }
@@ -206,6 +214,47 @@ function listProblem(
   return null;
 }
 
+/*
+ * A name to show the address of a new page with.
+ *
+ * The sentence under the field says where a page would go, and it reads best
+ * with a name that fits the subject. A handful of common subjects have one;
+ * anything else gets a name that is plainly a stand-in.
+ */
+const SAMPLE_NAMES: Record<string, string> = {
+  casino: "Stake",
+  "crypto casino": "Stake",
+  sportsbook: "Stake",
+  bookmaker: "Stake",
+  player: "Phil Ivey",
+  provider: "Pragmatic Play",
+  "game provider": "Pragmatic Play",
+  slot: "Gates of Olympus",
+  game: "Gates of Olympus",
+  tournament: "Main Event",
+};
+
+function sampleName(subject: string): string {
+  const said = subject.toLowerCase();
+  if (!said) return "Stake";
+  // Own keys only: "constructor" is a subject somebody may well have, and a
+  // plain lookup would find the object's own machinery under that name.
+  return Object.prototype.hasOwnProperty.call(SAMPLE_NAMES, said) ? SAMPLE_NAMES[said]! : "Example Name";
+}
+
+/**
+ * A sample name as it appears in an address.
+ *
+ * Only ever given one of the Latin names above, so the engine's longer rule
+ * for other scripts is not needed here.
+ */
+function sampleSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function typeOf(form: Form, owner: string | undefined): Partial<PageType> {
   const facts = savedFacts(form.facts);
   return {
@@ -216,6 +265,7 @@ function typeOf(form: Form, owner: string | undefined): Partial<PageType> {
     name: form.name.trim(),
     description: form.description.trim(),
     subject: form.subject.trim(),
+    officialSite: form.officialSite,
     recognise: {
       urlPatterns: lines(form.urlPatterns),
       // A leading dot is what copying a selector out of devtools gives you.
@@ -237,7 +287,13 @@ function typeOf(form: Form, owner: string | undefined): Partial<PageType> {
     avoid: lines(form.avoid),
     blocks: BLOCKS.filter((one) => form.blocks.includes(one)),
     schemaType: form.schemaType,
-    wordpress: { postType: form.postType.trim(), styleFrom: form.styleFrom.trim() },
+    wordpress: {
+      postType: form.postType.trim(),
+      styleFrom: form.styleFrom.trim(),
+      // What the engine would keep. A pattern it would refuse never gets this
+      // far: the save is held back until it is fixed.
+      slugPattern: slugPatternOf(form.slugPattern) ?? form.slugPattern.trim(),
+    },
     words: Math.max(0, Math.round(Number(form.words) || 0)),
   };
 }
@@ -245,7 +301,7 @@ function typeOf(form: Form, owner: string | undefined): Partial<PageType> {
 const HEADINGS: Record<EditorOrigin, string> = {
   saved: "Edit page type",
   new: "New page type",
-  example: "New page type, from the example",
+  example: "New page type, from an example",
   draft: "Drafted from your examples",
 };
 
@@ -470,6 +526,9 @@ export default function PageTypeEditor({
   const ruleLines = lines(form.rules);
   const avoidLines = lines(form.avoid);
   const words = Number(form.words) || 0;
+  const slugPattern = slugPatternOf(form.slugPattern);
+  const subjectWord = form.subject.replace(/\s+/g, " ").trim();
+  const sample = sampleName(subjectWord);
 
   const problems = {
     name:
@@ -495,7 +554,7 @@ export default function PageTypeEditor({
     sources:
       (() => {
         const wrong = sourceList.find((one) => !domainOf(one).includes("."));
-        return wrong ? `${clip(wrong)} is not a domain. Write it like thehendonmob.com.` : null;
+        return wrong ? `${clip(wrong)} is not a domain. Write it like casino.guru.` : null;
       })() ?? listProblem(domains, LIMITS.sources, LIMITS.source, "trusted sources"),
     outline:
       form.outline.filter((one) => one.heading.trim()).length > LIMITS.outline
@@ -507,12 +566,17 @@ export default function PageTypeEditor({
       form.styleFrom.trim() && !/^https?:\/\//i.test(form.styleFrom.trim())
         ? "Give the whole address, starting with https://"
         : null,
+    slugPattern: slugPattern === null ? SLUG_PATTERN_REFUSED : null,
     words: words > LIMITS.words ? `At most ${LIMITS.words} words.` : null,
   };
   const blocked = Object.values(problems).some(Boolean);
   // What the patterns are kept as, when that is not what was typed.
   const patternsRewritten =
     !problems.patterns && patterns.some((one, at) => one !== patternLines[at]);
+  // The same for the address of a new page: only worth saying when something
+  // was typed and it is not already in the shape it is kept in.
+  const slugRewritten =
+    slugPattern !== null && Boolean(form.slugPattern.trim()) && slugPattern !== form.slugPattern;
 
   const title = origin === "saved" && initial.name ? `Edit ${initial.name}` : HEADINGS[origin];
   const theirs = origin === "saved" && form.id && ownerOf(initial) !== me;
@@ -565,7 +629,7 @@ export default function PageTypeEditor({
                   type="text"
                   value={form.name}
                   maxLength={LIMITS.name}
-                  placeholder="Poker player biography"
+                  placeholder="Crypto casino review"
                   aria-invalid={Boolean(problems.name)}
                   onChange={(e) => set("name", e.target.value)}
                 />
@@ -585,10 +649,10 @@ export default function PageTypeEditor({
                   type="text"
                   value={form.subject}
                   maxLength={LIMITS.subject}
-                  placeholder="player"
+                  placeholder="casino"
                   onChange={(e) => set("subject", e.target.value)}
                 />
-                <div className="note">One or two words: player, provider, tournament.</div>
+                <div className="note">One or two words: casino, player, provider, tournament.</div>
               </div>
             </div>
 
@@ -599,7 +663,7 @@ export default function PageTypeEditor({
                 rows={4}
                 value={form.description}
                 maxLength={LIMITS.description}
-                placeholder="A biography of a professional poker player: who they are, their biggest results… Written for poker fans who want the facts in one place."
+                placeholder="An independent review of one crypto casino: who runs it, the coins it takes, how fast it pays out, its bonus terms… Written for players choosing where to play with crypto."
                 onChange={(e) => set("description", e.target.value)}
               />
               <div className="note">
@@ -626,7 +690,7 @@ export default function PageTypeEditor({
                   className="mono"
                   spellCheck={false}
                   value={form.urlPatterns}
-                  placeholder={"/players/\n/poker-players/"}
+                  placeholder={"/crypto-casinos/\n/players/"}
                   aria-invalid={Boolean(problems.patterns)}
                   onChange={(e) => set("urlPatterns", e.target.value)}
                 />
@@ -649,7 +713,7 @@ export default function PageTypeEditor({
                   className="mono"
                   spellCheck={false}
                   value={form.bodyClasses}
-                  placeholder={"single-player"}
+                  placeholder={"single-casino"}
                   aria-invalid={Boolean(problems.bodyClasses)}
                   onChange={(e) => set("bodyClasses", e.target.value)}
                 />
@@ -670,7 +734,7 @@ export default function PageTypeEditor({
                 className="mono"
                 spellCheck={false}
                 value={form.examples}
-                placeholder="https://example.com/players/some-player/"
+                placeholder="https://example.com/crypto-casinos/some-casino/"
                 aria-invalid={Boolean(problems.examples)}
                 onChange={(e) => set("examples", e.target.value)}
               />
@@ -704,7 +768,7 @@ export default function PageTypeEditor({
                           type="text"
                           value={fact.label}
                           maxLength={LIMITS.factLabel}
-                          placeholder="Date of birth"
+                          placeholder="Year launched"
                           onChange={(e) => setFact(fact.uid, { label: e.target.value })}
                         />
                       </label>
@@ -746,7 +810,7 @@ export default function PageTypeEditor({
                           spellCheck={false}
                           value={fact.schemaProperty}
                           maxLength={LIMITS.schemaProperty}
-                          placeholder="birthDate"
+                          placeholder="foundingDate"
                           onChange={(e) => setFact(fact.uid, { schemaProperty: e.target.value })}
                         />
                       </label>
@@ -756,7 +820,7 @@ export default function PageTypeEditor({
                           type="text"
                           value={fact.hint}
                           maxLength={LIMITS.factHint}
-                          placeholder="day, month and year"
+                          placeholder="four-digit year"
                           onChange={(e) => setFact(fact.uid, { hint: e.target.value })}
                         />
                       </label>
@@ -816,7 +880,7 @@ export default function PageTypeEditor({
                 className="mono"
                 spellCheck={false}
                 value={form.trustedSources}
-                placeholder={"thehendonmob.com\nwsop.com"}
+                placeholder={"casino.guru\nthehendonmob.com"}
                 aria-invalid={Boolean(problems.sources)}
                 onChange={(e) => set("trustedSources", e.target.value)}
               />
@@ -824,6 +888,25 @@ export default function PageTypeEditor({
               <div className="note">
                 One domain per line, most trusted first. The research reads
                 these before anything else. {domains.length} of {LIMITS.sources}.
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="check" htmlFor="pt-official-site">
+                <input
+                  id="pt-official-site"
+                  type="checkbox"
+                  checked={form.officialSite}
+                  aria-describedby="pt-official-site-note"
+                  onChange={(e) => set("officialSite", e.target.checked)}
+                />
+                Also read the subject&rsquo;s own website
+              </label>
+              <div className="note" id="pt-official-site-note">
+                For brands, casinos, products and companies: their own site
+                states things like accepted payments, limits and terms. Found
+                among the search results; skipped when it cannot be told apart
+                from sites reviewing it.
               </div>
             </div>
           </section>
@@ -850,7 +933,7 @@ export default function PageTypeEditor({
                         type="text"
                         value={section.heading}
                         maxLength={LIMITS.heading}
-                        placeholder="Career highlights"
+                        placeholder="Welcome bonus and wagering"
                         onChange={(e) => setSection(section.uid, { heading: e.target.value })}
                       />
                     </label>
@@ -860,7 +943,7 @@ export default function PageTypeEditor({
                         rows={2}
                         value={section.guidance}
                         maxLength={LIMITS.guidance}
-                        placeholder="the results and moments that define the career, in order"
+                        placeholder="the offer as stated, the wagering requirement and time limit, in plain numbers"
                         onChange={(e) => setSection(section.uid, { guidance: e.target.value })}
                       />
                     </label>
@@ -939,7 +1022,7 @@ export default function PageTypeEditor({
                   id="pt-rules"
                   rows={5}
                   value={form.rules}
-                  placeholder={"Write in the third person.\nGive every figure with its year."}
+                  placeholder={"Write as an independent reviewer.\nGive every figure with its unit, currency or year."}
                   aria-invalid={Boolean(problems.rules)}
                   onChange={(e) => set("rules", e.target.value)}
                 />
@@ -954,7 +1037,7 @@ export default function PageTypeEditor({
                   id="pt-avoid"
                   rows={5}
                   value={form.avoid}
-                  placeholder={"Invent quotes or anecdotes.\nGive gambling advice."}
+                  placeholder={"Invent a figure, a quote or an anecdote.\nPromise winnings or give gambling advice."}
                   aria-invalid={Boolean(problems.avoid)}
                   onChange={(e) => set("avoid", e.target.value)}
                 />
@@ -1041,26 +1124,65 @@ export default function PageTypeEditor({
                 <div className="note">Empty lets the site decide.</div>
               </div>
               <div className="field">
-                <label htmlFor="pt-style-from">Copy layout from page</label>
+                <label htmlFor="pt-slug-pattern">Address of a new page</label>
                 <input
-                  id="pt-style-from"
-                  type="url"
-                  inputMode="url"
-                  value={form.styleFrom}
-                  maxLength={LIMITS.styleFrom}
-                  placeholder="https://yoursite.com/players/an-existing-player/"
-                  aria-invalid={Boolean(problems.styleFrom)}
-                  onChange={(e) => set("styleFrom", e.target.value)}
+                  id="pt-slug-pattern"
+                  type="text"
+                  className="mono"
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  value={form.slugPattern}
+                  maxLength={LIMITS.slugPattern}
+                  placeholder="{slug}-review"
+                  aria-invalid={Boolean(problems.slugPattern)}
+                  aria-describedby="pt-slug-pattern-note"
+                  onChange={(e) => set("slugPattern", e.target.value)}
                 />
-                {problems.styleFrom ? (
-                  <div className="err">{problems.styleFrom}</div>
+                {problems.slugPattern ? (
+                  <div className="err" id="pt-slug-pattern-note">
+                    {problems.slugPattern}
+                  </div>
                 ) : (
-                  <div className="note">
-                    The whole address of an existing page whose template and
-                    layout new pages take.
+                  // Where one page would go, worked out as the engine works
+                  // it out, so the pattern is checked by reading an address
+                  // rather than the rule.
+                  <div className="note" id="pt-slug-pattern-note">
+                    {subjectWord
+                      ? `${/^[aeiou]/i.test(subjectWord) ? "An" : "A"} ${subjectWord} called ${sample}`
+                      : `A page about ${sample}`}{" "}
+                    would go to{" "}
+                    <span className="mono">
+                      /{(slugPattern ?? SLUG_TOKEN).replace(SLUG_TOKEN, sampleSlug(sample))}/
+                    </span>
+                    . {SLUG_TOKEN} stands for the name. Only pages a run adds
+                    are given this; a page being optimised keeps its address.
+                    {slugRewritten ? ` Saved as ${slugPattern}.` : ""}
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="field">
+              <label htmlFor="pt-style-from">Copy layout from page</label>
+              <input
+                id="pt-style-from"
+                type="url"
+                inputMode="url"
+                value={form.styleFrom}
+                maxLength={LIMITS.styleFrom}
+                placeholder="https://yoursite.com/crypto-casinos/an-existing-casino/"
+                aria-invalid={Boolean(problems.styleFrom)}
+                onChange={(e) => set("styleFrom", e.target.value)}
+              />
+              {problems.styleFrom ? (
+                <div className="err">{problems.styleFrom}</div>
+              ) : (
+                <div className="note">
+                  The whole address of an existing page whose template and
+                  layout new pages take.
+                </div>
+              )}
             </div>
           </section>
         </div>

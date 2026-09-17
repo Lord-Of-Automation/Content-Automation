@@ -77,10 +77,19 @@ export interface PageType {
   name: string;
   /** What such a page is and who it is for. The classifier and the writer both read it. */
   description: string;
-  /** What the page is about, in one or two words: "player", "provider". */
+  /** What the page is about, in one or two words: "casino", "player". */
   subject: string;
+  /**
+   * Whether the research also reads the subject's own website.
+   *
+   * For a casino, a brand or a product, its own site is where the accepted
+   * payments, the limits and the terms are stated. The engine finds it among
+   * the search results and skips it when it cannot be told apart from the
+   * sites reviewing it. Off for a type whose subject has no site of its own.
+   */
+  officialSite: boolean;
   recognise: {
-    /** Parts of an address that mark this kind of page: "/players/". */
+    /** Parts of an address that mark this kind of page: "/crypto-casinos/". */
     urlPatterns: string[];
     /** Body classes the site's theme puts on such pages. */
     bodyClasses: string[];
@@ -102,6 +111,13 @@ export interface PageType {
     postType: string;
     /** An existing page whose layout and template new pages copy. */
     styleFrom: string;
+    /**
+     * The address given to a page a run adds, with {slug} where the subject's
+     * name goes: "{slug}-review" puts Stake at /stake-review/. "{slug}" alone
+     * is the name and nothing else. A page being optimised keeps the address
+     * it has. See slugPatternOf below.
+     */
+    slugPattern: string;
   };
   /** How long a page of this kind usually is. Zero lets the competitors decide. */
   words: number;
@@ -288,8 +304,45 @@ export const PAGE_TYPE_LIMITS = {
   rule: 400,
   postType: 40,
   styleFrom: 500,
+  slugPattern: 60,
   words: 6000,
 } as const;
+
+/** Where the subject's own slug goes in the address of a new page. */
+export const SLUG_TOKEN = "{slug}";
+
+/** What the engine says to an address pattern it will not keep, word for word. */
+export const SLUG_PATTERN_REFUSED =
+  "The address of a new page must contain {slug} once, and otherwise only " +
+  "letters, digits and hyphens, e.g. {slug}-review.";
+
+/**
+ * The address pattern for a new page the way the engine keeps it, or null
+ * when the engine would not keep it.
+ *
+ * Trimmed and lower case, with spaces and underscores made hyphens, repeated
+ * hyphens made one, and hyphens and slashes cut from both ends, so
+ * " /{slug}_Review/ " is kept as "{slug}-review". Empty is "{slug}", the
+ * subject's name alone.
+ *
+ * Null when what is left does not hold {slug} exactly once, holds anything
+ * beside it other than a-z, 0-9 and hyphens, or is longer than the limit. A
+ * person's save of that is refused with SLUG_PATTERN_REFUSED; the designer's
+ * draft is given "{slug}" instead. The same rule as the engine's, so the
+ * editor says so before the save rather than after.
+ */
+export function slugPatternOf(raw: unknown): string | null {
+  const pattern = String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^[-/]+|[-/]+$/g, "");
+  if (!pattern) return SLUG_TOKEN;
+  if (pattern.length > PAGE_TYPE_LIMITS.slugPattern) return null;
+  if (pattern.split(SLUG_TOKEN).length !== 2) return null;
+  return /^[a-z0-9-]*$/.test(pattern.replace(SLUG_TOKEN, "")) ? pattern : null;
+}
 
 /** Whose a type is, the way the engine compares owners: trimmed, lower case. */
 export function ownerOf(type: { owner?: string | null } | null | undefined): string {
@@ -314,13 +367,201 @@ export function typeKeyParts(key: string): { owner: string; id: string } | null 
   return { owner: key.slice(0, at), id: key.slice(at + 1) };
 }
 
-/**
- * A type written out in full, to start from.
+/*
+ * Types written out in full, to start from.
  *
  * A blank form with twenty fields is a hard place to begin, and most of what a
- * good type says is only obvious once you have seen one. This is a real one,
- * complete enough to run as it is. Its id is empty, so saving it makes a new
- * type rather than overwriting anybody's.
+ * good type says is only obvious once you have seen one. These are real ones,
+ * complete enough to run as they are, and as unlike each other as two types
+ * get: a business with a website of its own, reviewed, and a person, written
+ * up. Between them they show that a type is not about any one kind of page.
+ * Their ids are empty, so saving one makes a new type rather than overwriting
+ * anybody's.
+ */
+
+/**
+ * An independent review of one crypto casino.
+ *
+ * The subject has a site of its own, and that site is where the coins, the
+ * limits and the bonus terms are stated, so this one reads it. New pages go to
+ * /<name>-review/, which is how review sites tend to name them.
+ */
+export const CRYPTO_CASINO_EXAMPLE: PageType = {
+  id: "",
+  name: "Crypto casino review",
+  description:
+    "An independent review of one crypto casino: who runs it and under which licence, which " +
+    "coins it takes and how fast it pays out, the welcome bonus and its wagering, the games " +
+    "and providers, and what to watch out for. Written for players choosing where to play " +
+    "with crypto.",
+  subject: "casino",
+  officialSite: true,
+  recognise: {
+    urlPatterns: ["/crypto-casinos/", "/casino-reviews/"],
+    bodyClasses: [],
+    examples: [],
+  },
+  facts: [
+    {
+      key: "licence",
+      label: "Licence",
+      hint: "licensing authority and licence number",
+      verify: true,
+      schemaProperty: "",
+    },
+    {
+      key: "year_launched",
+      label: "Year launched",
+      hint: "four-digit year",
+      verify: true,
+      schemaProperty: "foundingDate",
+    },
+    {
+      key: "operator",
+      label: "Operator",
+      hint: "the company that runs the casino",
+      verify: true,
+      schemaProperty: "",
+    },
+    {
+      key: "accepted_cryptocurrencies",
+      label: "Accepted cryptocurrencies",
+      hint: "coins accepted for deposits and withdrawals, e.g. BTC, ETH, USDT",
+      verify: true,
+      schemaProperty: "",
+    },
+    {
+      key: "minimum_deposit",
+      label: "Minimum deposit",
+      hint: "the smallest deposit, with its currency",
+      verify: true,
+      schemaProperty: "",
+    },
+    {
+      key: "withdrawal_time",
+      label: "Withdrawal time",
+      hint: "typical time for a crypto withdrawal",
+      verify: false,
+      schemaProperty: "",
+    },
+    {
+      key: "welcome_bonus",
+      label: "Welcome bonus",
+      hint: "the offer as the casino states it",
+      verify: true,
+      schemaProperty: "",
+    },
+    {
+      key: "wagering_requirement",
+      label: "Wagering requirement",
+      hint: "e.g. 40x the bonus",
+      verify: true,
+      schemaProperty: "",
+    },
+    {
+      key: "kyc",
+      label: "Identity checks (KYC)",
+      hint: "whether and when ID is asked for",
+      verify: true,
+      schemaProperty: "",
+    },
+    {
+      key: "restricted_countries",
+      label: "Restricted countries",
+      hint: "countries the casino does not accept",
+      verify: true,
+      schemaProperty: "",
+    },
+    {
+      key: "number_of_games",
+      label: "Number of games",
+      hint: "approximate count",
+      verify: false,
+      schemaProperty: "",
+    },
+    {
+      key: "game_providers",
+      label: "Game providers",
+      hint: "the main studios",
+      verify: false,
+      schemaProperty: "",
+    },
+    {
+      key: "provably_fair",
+      label: "Provably fair games",
+      hint: "yes or no, and which games",
+      verify: false,
+      schemaProperty: "",
+    },
+    {
+      key: "customer_support",
+      label: "Customer support",
+      hint: "channels and hours",
+      verify: false,
+      schemaProperty: "",
+    },
+  ],
+  trustedSources: ["casino.guru", "askgamblers.com"],
+  outline: [
+    {
+      heading: "{name} review: the verdict",
+      guidance: "Who it suits and the two or three things that decide it. A summary, not a sales pitch.",
+    },
+    {
+      heading: "Licence and who runs {name}",
+      guidance:
+        "The licensing authority and number, the operator and the year it launched. Say plainly " +
+        "what could not be confirmed.",
+    },
+    {
+      heading: "Crypto deposits and withdrawals",
+      guidance:
+        "Accepted coins, minimum deposit, withdrawal times and limits, fees, and when identity " +
+        "checks are asked for.",
+    },
+    {
+      heading: "Welcome bonus and wagering",
+      guidance:
+        "The offer as stated, the wagering requirement, time limit and maximum bet, in plain numbers.",
+    },
+    {
+      heading: "Games and providers",
+      guidance: "Slots, live casino, originals and provably fair games, and the main providers.",
+    },
+    {
+      heading: "Is {name} safe?",
+      guidance:
+        "Licence, security, responsible gambling tools, restricted countries, and complaints if " +
+        "sources report them.",
+    },
+    { heading: "FAQ", guidance: "Questions players search about this casino." },
+  ],
+  rules: [
+    "Write as an independent reviewer.",
+    "Give every figure with its unit or currency.",
+    "Say where terms vary by country or change often, and tell readers to check the casino's current terms.",
+    "Say once, plainly, that gambling is for adults (18+) and can be addictive.",
+  ],
+  avoid: [
+    "Promise winnings or call any game a sure thing.",
+    "Invent a licence number, a bonus figure or a payout time.",
+    "Encourage play from restricted countries or the use of a VPN.",
+  ],
+  blocks: ["facts_table", "pros_cons", "faq", "contents"],
+  schemaType: "Organization",
+  wordpress: { postType: "", styleFrom: "", slugPattern: "{slug}-review" },
+  words: 1800,
+  createdAt: "",
+  updatedAt: "",
+  updatedBy: "",
+};
+
+/**
+ * A biography of a professional poker player.
+ *
+ * A person has no site of their own worth reading for facts, so this one
+ * leaves it off and trusts the results databases instead. New pages are named
+ * for the player and nothing else.
  */
 export const POKER_EXAMPLE: PageType = {
   id: "",
@@ -330,6 +571,7 @@ export const POKER_EXAMPLE: PageType = {
     "their biggest results and records, how they play, and their life away from the table. " +
     "Written for poker fans who want the facts in one place.",
   subject: "player",
+  officialSite: false,
   recognise: {
     urlPatterns: ["/players/", "/poker-players/", "/pros/"],
     bodyClasses: [],
@@ -442,9 +684,35 @@ export const POKER_EXAMPLE: PageType = {
   ],
   blocks: ["facts_table", "faq", "contents"],
   schemaType: "Person",
-  wordpress: { postType: "", styleFrom: "" },
+  wordpress: { postType: "", styleFrom: "", slugPattern: SLUG_TOKEN },
   words: 1200,
   createdAt: "",
   updatedAt: "",
   updatedBy: "",
 };
+
+/**
+ * The examples the Custom page offers, in the order it offers them.
+ *
+ * The id is only for telling the entries apart on the page; it is never saved.
+ * The note is the one line under the name that says what makes it different.
+ */
+export const EXAMPLES: ReadonlyArray<{
+  id: string;
+  label: string;
+  note: string;
+  type: PageType;
+}> = [
+  {
+    id: "crypto-casino",
+    label: CRYPTO_CASINO_EXAMPLE.name,
+    note: "A business with its own site, reviewed: licence, coins, bonus terms.",
+    type: CRYPTO_CASINO_EXAMPLE,
+  },
+  {
+    id: "poker-player",
+    label: POKER_EXAMPLE.name,
+    note: "A person, written up: career, results and records.",
+    type: POKER_EXAMPLE,
+  },
+];
