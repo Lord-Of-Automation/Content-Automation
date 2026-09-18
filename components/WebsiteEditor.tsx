@@ -419,6 +419,8 @@ export default function WebsiteEditor({ id }: { id: string }) {
     );
   }
 
+  const sidebarName = page?.title || site.name;
+
   return (
     /*
      * The editor is read before it can be drawn, so for a moment this page is
@@ -429,7 +431,7 @@ export default function WebsiteEditor({ id }: { id: string }) {
       {assist ? (
         <SiteAssistant
           id={id}
-          siteName={site.name}
+          siteName={sidebarName}
           dirty={dirty}
           /*
            * What is being pointed at, so it can be asked about.
